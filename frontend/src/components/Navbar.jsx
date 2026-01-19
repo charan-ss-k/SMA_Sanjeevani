@@ -33,8 +33,13 @@ const Navbar = () => {
               </Link>
             </li>
             <li>
+              <Link to="/medicine-recommendation" className={getLinkClass('/medicine-recommendation')}>
+                💊 Medicine
+              </Link>
+            </li>
+            <li>
               <Link to="/dashboard" className={getLinkClass('/dashboard')}>
-                Dashboard
+                📊 Dashboard
               </Link>
             </li>
             <li>

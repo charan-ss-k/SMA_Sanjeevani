@@ -11,13 +11,16 @@ import Contact from './components/Contact.jsx';
 import PrescriptionHandling from './components/PrescriptionHandling.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import Tutorial from './components/Tutorial.jsx';
+import MedicineRecommendation from './components/MedicineRecommendation.jsx';
 import ChatWidget from './components/Chatwidget.jsx';
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Router>
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/medicine-recommendation" element={<MedicineRecommendation />} />
         <Route path="/about" element={<About />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/services" element={<Services />} />

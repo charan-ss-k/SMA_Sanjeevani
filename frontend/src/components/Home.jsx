@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const slides = [
   { title: 'Scan your medicine — get instant voice instructions', bg: 'bg-gradient-to-r from-green-100 to-green-50' },
@@ -18,6 +19,7 @@ const Home = () => {
   const carouselRef = useRef(null);
   const [activeSlide, setActiveSlide] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(false);
+  const [testLang, setTestLang] = useState('english');
   const intervalRef = useRef(null);
 
   // Function to update active slide based on scroll position
@@ -99,12 +101,12 @@ const Home = () => {
                   <div className="flex items-center justify-center gap-3">
                     <a href="/tutorial" className="bg-green-800 text-white px-4 py-2 rounded">Try Demo</a>
                     <button onClick={() => speak('Opening health assistant')} className="bg-amber-50 px-4 py-2 rounded">Ask Health Assistant</button>
-                    <select aria-label="Choose language" className="border px-3 py-2 rounded">
-                      <option>English</option>
-                      <option>Hindi</option>
-                      <option>Telugu</option>
-                      <option>Tamil</option>
-                      <option>Bengali</option>
+                    <select aria-label="Choose language" className="border px-3 py-2 rounded" value={testLang} onChange={(e)=>setTestLang(e.target.value)}>
+                      <option value="english">English</option>
+                      <option value="hindi">Hindi</option>
+                      <option value="telugu">Telugu</option>
+                      <option value="tamil">Tamil</option>
+                      <option value="bengali">Bengali</option>
                     </select>
                   </div>
                 </div>
@@ -168,6 +170,27 @@ const Home = () => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Quick test panel for symptoms recommend endpoint */}
+      <div className="container mx-auto px-6 mt-6">
+        <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="font-bold text-3xl mb-2">💊 Check Your Symptoms</h3>
+              <p className="text-lg mb-4">
+                Get instant AI-powered health recommendations based on your symptoms. Our system will suggest safe medicines and home care tips.
+              </p>
+              <Link 
+                to="/medicine-recommendation"
+                className="inline-block bg-amber-400 hover:bg-amber-300 text-green-900 font-bold px-6 py-3 rounded-lg transition"
+              >
+                🏥 Open Medicine Recommendation →
+              </Link>
+            </div>
+            <div className="hidden md:block text-6xl">💊</div>
+          </div>
+        </section>
       </div>
 
       {/* Intro / Hero below carousel */}

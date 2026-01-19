@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+requests
+pydantic
+# Optional translator package - install if you want translation support
+# indic-trans2
