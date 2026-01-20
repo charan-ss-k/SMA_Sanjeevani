@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { playTTS } from '../utils/tts';
+import { LanguageContext } from '../main';
 
 // --- SVG Icons ---
 
@@ -44,20 +46,19 @@ const CloseIcon = () => (
     </svg>
 );
 
-
 // --- Chatbot Window Component ---
-// This is the full component from chatbot.jsx
-// I've renamed it to ChatbotWindow and added positioning classes
 const ChatbotWindow = () => {
+  const { language } = useContext(LanguageContext);
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: 'bot',
-      text: 'Hi there 👋! I am Sanjevani, your AI health assistant. How can I help you today?',
+      text: 'Hi there 👋! I am Sanjeevani, your AI medical assistant powered by advanced medical AI. Ask me any medical questions in any language - about symptoms, diseases, treatments, medicines, health conditions, or any medical concern. I\'m here to help with accurate health information. What can I help you with today?',
     },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Function to scroll to the bottom of the chat
@@ -71,7 +72,7 @@ const ChatbotWindow = () => {
   }, [messages, isTyping]);
 
   // Function to handle sending a message
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmedInput = inputValue.trim();
     if (trimmedInput === '') return;
 
@@ -83,57 +84,66 @@ const ChatbotWindow = () => {
     };
     setMessages((prevMessages) => [...prevMessages, newUserMessage]);
     setInputValue('');
+    setError(null);
     setIsTyping(true);
 
-    // Simulate a bot response
-    setTimeout(() => {
-      let botResponseText = '';
-      const lowerCaseInput = trimmedInput.toLowerCase();
+    try {
+      // Call backend API for medical Q&A
+      const apiBase = window.__API_BASE__ || 'http://127.0.0.1:8000';
+      const response = await fetch(`${apiBase}/api/medical-qa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: trimmedInput,
+          language: 'english',
+        }),
+        signal: AbortSignal.timeout(120000), // 2 minute timeout
+      });
 
-      if (
-        lowerCaseInput.includes('hello') ||
-        lowerCaseInput.includes('hi')
-      ) {
-        botResponseText = 'Hello! How can I assist with your medication?';
-      } else if (lowerCaseInput.includes('medicine')) {
-        botResponseText =
-          'I can help with medicine identification, reminders, and knowledge. What do you need?';
-      } else if (lowerCaseInput.includes('reminder')) {
-        botResponseText =
-          'I can set up pill reminders for you. Which medicine and what time?';
-      } else if (
-        lowerCaseInput.includes('bye') ||
-        lowerCaseInput.includes('thanks')
-      ) {
-        botResponseText = 'You\'re welcome! Stay healthy. Goodbye! 👋';
-      } else {
-        botResponseText =
-          "I'm sorry, I'm still learning. Could you please rephrase that? I can help with medicine identification and reminders.";
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
       }
+
+      const data = await response.json();
+      const botResponseText = data.answer || 'Unable to generate a response. Please try again.';
 
       const newBotMessage = {
         id: messages.length + 2,
         sender: 'bot',
         text: botResponseText,
       };
+
       setIsTyping(false);
       setMessages((prevMessages) => [...prevMessages, newBotMessage]);
-    }, 1500); // 1.5 second delay
+      
+      // Speak the response using Coqui TTS
+      playTTS(botResponseText, language);
+    } catch (err) {
+      console.error('[ChatWidget] Error:', err);
+      setIsTyping(false);
+      
+      const errorMessage = {
+        id: messages.length + 2,
+        sender: 'bot',
+        text: '⚠️ I encountered an error while processing your question. Please check if the backend is running and try again.',
+      };
+      setMessages((prevMessages) => [...prevMessages, errorMessage]);
+      setError(err.message);
+    }
   };
 
   // Handle Enter key press
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isTyping) {
       handleSend();
     }
   };
 
   return (
-    // **MODIFIED:** Added fixed positioning classes to place the window
     <div className="fixed bottom-24 right-8 z-50 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200" style={{maxWidth: '400px'}}>
       <div className="flex flex-col h-[70vh] md:h-[600px]">
         {/* Chat Header */}
-        <div className="p-4 bg-green-600 text-white flex items-center space-x-3">
+        <div className="p-4 bg-gradient-to-r from-green-600 to-blue-600 text-white flex items-center space-x-3">
           <div className="relative">
             <img
               className="w-10 h-10 rounded-full"
@@ -143,13 +153,13 @@ const ChatbotWindow = () => {
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-lime-400 border-2 border-green-600 rounded-full"></span>
           </div>
           <div>
-            <h2 className="font-semibold text-lg">Sanjevani AI</h2>
-            <p className="text-sm text-green-100">Active now</p>
+            <h2 className="font-semibold text-lg">Sanjeevani AI</h2>
+            <p className="text-sm text-green-100">🏥 Medical Assistant (24/7)</p>
           </div>
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 p-4 overflow-y-auto bg-green-50/30 space-y-4">
+        <div className="flex-1 p-4 overflow-y-auto bg-gradient-to-b from-green-50 to-blue-50 space-y-4">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -190,7 +200,7 @@ const ChatbotWindow = () => {
         <div className="flex p-3 border-t border-gray-200 bg-white items-center">
           <input
             type="text"
-            placeholder="Type your message..."
+            placeholder="Ask about any medical condition..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -199,7 +209,7 @@ const ChatbotWindow = () => {
           <button
             onClick={handleSend}
             className="bg-green-600 text-white p-3 rounded-lg cursor-pointer ml-2 hover:bg-green-700 transition-colors disabled:bg-gray-400 flex-shrink-0"
-            disabled={inputValue.trim() === ''}
+            disabled={inputValue.trim() === '' || isTyping}
           >
             <SendIcon />
           </button>
@@ -211,8 +221,6 @@ const ChatbotWindow = () => {
 
 
 // --- Main Chat Widget Component ---
-// This is the new "parent" component that manages the state.
-// This is what you will import into your app.
 const ChatWidget = () => {
   // State to manage if the chat window is open or not
   const [isOpen, setIsOpen] = useState(false);
@@ -231,7 +239,7 @@ const ChatWidget = () => {
       <div className="fixed bottom-8 right-8 z-50">
         <button 
           onClick={toggleChat} 
-          className="bg-green-500 hover:bg-green-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg"
+          className="bg-green-500 hover:bg-green-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:shadow-xl transition-all animate-pulse"
         >
           {/* Change the icon based on the 'isOpen' state */}
           {isOpen ? <CloseIcon /> : <ChatIcon />}

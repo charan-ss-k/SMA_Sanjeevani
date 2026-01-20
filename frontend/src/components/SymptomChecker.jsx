@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { playTTS } from '../utils/tts';
+import { LanguageContext } from '../main';
 
 const COMMON_SYMPTOMS = [
   'fever', 'headache', 'body pain', 'cough', 'cold', 'sore throat', 'fatigue',
@@ -19,14 +21,8 @@ const CONDITIONS_LIST = [
   'epilepsy', 'cancer', 'tuberculosis', 'covid-19', 'hiv', 'hepatitis'
 ];
 
-function speak(text) {
-  if (!window.speechSynthesis) return;
-  const ut = new SpeechSynthesisUtterance(text);
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(ut);
-}
-
 const SymptomChecker = ({ onResult }) => {
+  const { language } = useContext(LanguageContext);
   const [age, setAge] = useState(28);
   const [gender, setGender] = useState('male');
   const [symptoms, setSymptoms] = useState(['fever', 'headache']);
@@ -34,7 +30,6 @@ const SymptomChecker = ({ onResult }) => {
   const [allergies, setAllergies] = useState([]);
   const [conditions, setConditions] = useState([]);
   const [pregnant, setPregnant] = useState(false);
-  const [language, setLanguage] = useState('english');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showAllSymptoms, setShowAllSymptoms] = useState(false);
@@ -67,7 +62,7 @@ const SymptomChecker = ({ onResult }) => {
       if (allSymptoms.length === 0) {
         setError('Please select or enter at least one symptom');
         setLoading(false);
-        speak('Please select or enter at least one symptom');
+        playTTS('Please select or enter at least one symptom', language);
         return;
       }
 
@@ -87,7 +82,7 @@ const SymptomChecker = ({ onResult }) => {
       
       console.log('[SymptomChecker] Sending POST to:', url);
       console.log('[SymptomChecker] Payload:', payload);
-      speak('Processing your symptoms. This may take up to 2 minutes. Please wait.');
+      playTTS('Processing your symptoms. This may take up to 2 minutes. Please wait.', language);
 
       // Increase timeout to 5 minutes (300 seconds)
       const controller = new AbortController();
@@ -124,20 +119,20 @@ const SymptomChecker = ({ onResult }) => {
         },
         result: data,
       });
-      speak('Analysis complete. Here are your recommendations.');
+      playTTS('Analysis complete. Here are your recommendations.', language);
 
       // Speak the TTS payload
       if (data.tts_payload) {
-        setTimeout(() => speak(data.tts_payload), 1000);
+        setTimeout(() => playTTS(data.tts_payload, language), 1000);
       }
     } catch (err) {
       console.error('[SymptomChecker] Full error:', err);
       if (err.name === 'AbortError') {
         setError('Request timeout. Please try again or check if backend is running.');
-        speak('Request took too long. Please try again.');
+        playTTS('Request took too long. Please try again.', language);
       } else {
         setError(err.message || 'Network error. Is the backend running on http://127.0.0.1:8000?');
-        speak('There was an error. Please try again.');
+        playTTS('There was an error. Please try again.', language);
       }
     } finally {
       setLoading(false);
@@ -196,7 +191,7 @@ const SymptomChecker = ({ onResult }) => {
           <h3 className="text-2xl font-bold text-green-800">🤒 Symptoms (Select all that apply)</h3>
           <button
             type="button"
-            onClick={() => speak('Select symptoms you are experiencing')}
+            onClick={() => playTTS('Select symptoms you are experiencing', language)}
             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-lg font-semibold"
           >
             🔊 Help
@@ -328,7 +323,7 @@ const SymptomChecker = ({ onResult }) => {
         </button>
         <button
           type="button"
-          onClick={() => speak('Ready to help. Select your symptoms and fill the information, then submit.')}
+          onClick={() => playTTS('Ready to help. Select your symptoms and fill the information, then submit.', language)}
           className="flex-1 bg-amber-500 text-white px-8 py-4 rounded-xl font-bold text-xl hover:bg-amber-600 transition shadow-lg"
         >
           🔊 Read Instructions

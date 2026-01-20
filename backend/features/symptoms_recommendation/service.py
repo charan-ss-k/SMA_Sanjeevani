@@ -212,3 +212,56 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
     )
 
     return resp
+
+
+def answer_medical_question(question: str) -> str:
+    """
+    Answer ANY question using LLM as a medical assistant.
+    The LLM intelligently determines if it's medical and responds appropriately.
+    Works with medical terms from around the world in multiple languages.
+    Acts like ChatGPT for medical knowledge.
+    """
+    logger.info("=" * 70)
+    logger.info("MEDICAL Q&A: %s", question)
+    logger.info("=" * 70)
+
+    # Create a comprehensive prompt for medical Q&A
+    # The LLM itself will determine if the question is medical
+    prompt = f"""You are Sanjeevani, an advanced AI medical assistant trained on global medical knowledge.
+Your role is to:
+1. Answer medical, health, and healthcare-related questions comprehensively
+2. Support multiple languages and medical terminology from around the world
+3. Provide accurate, evidence-based medical information
+4. Always emphasize consulting healthcare professionals for serious concerns
+5. Handle rare diseases, specific conditions, and complex medical scenarios
+6. Explain medical concepts clearly for lay people
+
+IMPORTANT RULES:
+- If the question is about health, medicine, disease, symptoms, treatment, prevention, or healthcare: ANSWER COMPREHENSIVELY
+- If the question is NOT medical: Politely decline and redirect to medical topics
+- Always include safety disclaimers when appropriate
+- Never diagnose definitively - provide information and suggest professional consultation
+- Accept medical terms in any language and from any medical tradition
+- Be thorough but concise (2-5 sentences for simple questions, more for complex ones)
+- Respond ONLY with the answer text, no JSON formatting, no markdown
+
+Question from user: {question}
+
+Response:"""
+
+    try:
+        # Call LLM
+        response = call_llm(prompt)
+        logger.info("Medical QA response: %s", response)
+        
+        # Clean response (remove any trailing markers or extra text)
+        answer = response.strip()
+        
+        # If empty, return a default message
+        if not answer or len(answer) < 10:
+            answer = "I encountered an issue processing that question. Please try rephrasing your medical question."
+        
+        return answer
+    except Exception as e:
+        logger.exception("Error in answer_medical_question: %s", e)
+        return "I encountered an error processing your question. Please try again or consult a healthcare professional."

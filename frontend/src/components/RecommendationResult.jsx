@@ -1,13 +1,9 @@
-import React from 'react';
-
-function speak(text) {
-  if (!window.speechSynthesis) return;
-  const ut = new SpeechSynthesisUtterance(text);
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(ut);
-}
+import React, { useContext } from 'react';
+import { playTTS } from '../utils/tts';
+import { LanguageContext } from '../main';
 
 const RecommendationResult = ({ result, onReset }) => {
+  const { language } = useContext(LanguageContext);
   if (!result) return null;
 
   // Handle both old format (direct result) and new format (with input)
@@ -82,7 +78,7 @@ const RecommendationResult = ({ result, onReset }) => {
         <p className="text-gray-700 mb-3">{disclaimer}</p>
         <div className="flex gap-3">
           <button
-            onClick={() => speak(tts_payload || 'No audio available')}
+            onClick={() => playTTS(tts_payload || 'No audio available', language)}
             className="bg-amber-50 px-4 py-2 rounded hover:bg-amber-100"
           >
             🔊 Read Aloud
@@ -121,7 +117,7 @@ const RecommendationResult = ({ result, onReset }) => {
                   </div>
                 )}
                 <button
-                  onClick={() => speak(`${med.name}. ${med.dosage || ''} ${med.instructions || ''}`)}
+                  onClick={() => playTTS(`${med.name}. ${med.dosage || ''} ${med.instructions || ''}`, language)}
                   className="text-sm text-blue-600 mt-2 hover:underline"
                 >
                   🔊 Read Medicine
@@ -142,7 +138,7 @@ const RecommendationResult = ({ result, onReset }) => {
                 <span className="text-green-600 text-lg">✓</span>
                 <span className="text-gray-700">{advice}</span>
                 <button
-                  onClick={() => speak(advice)}
+                  onClick={() => playTTS(advice, language)}
                   className="ml-2 text-amber-600 text-sm hover:underline"
                 >
                   🔊
@@ -159,7 +155,7 @@ const RecommendationResult = ({ result, onReset }) => {
           <h3 className="text-lg font-semibold text-orange-900 mb-2">When to Consult a Doctor</h3>
           <p className="text-orange-800">{doctor_consultation_advice}</p>
           <button
-            onClick={() => speak(doctor_consultation_advice)}
+            onClick={() => playTTS(doctor_consultation_advice, language)}
             className="text-sm text-orange-600 mt-2 hover:underline"
           >
             🔊 Read Aloud

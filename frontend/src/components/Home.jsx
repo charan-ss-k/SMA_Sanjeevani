@@ -1,5 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
+import { playTTS } from '../utils/tts';
+import { LanguageContext } from '../main';
 
 const slides = [
   { title: 'Scan your medicine — get instant voice instructions', bg: 'bg-gradient-to-r from-green-100 to-green-50' },
@@ -8,18 +10,11 @@ const slides = [
   { title: 'Stay updated with medical news and rural health programs', bg: 'bg-gradient-to-r from-pink-100 to-pink-50' },
 ];
 
-function speak(text) {
-  if (!window.speechSynthesis) return;
-  const ut = new SpeechSynthesisUtterance(text);
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(ut);
-}
-
 const Home = () => {
+  const { language } = useContext(LanguageContext);
   const carouselRef = useRef(null);
   const [activeSlide, setActiveSlide] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(false);
-  const [testLang, setTestLang] = useState('english');
   const intervalRef = useRef(null);
 
   // Function to update active slide based on scroll position
@@ -100,14 +95,7 @@ const Home = () => {
                   <p className="text-gray-700 mb-4">Short supporting line about the benefit of this feature.</p>
                   <div className="flex items-center justify-center gap-3">
                     <a href="/tutorial" className="bg-green-800 text-white px-4 py-2 rounded">Try Demo</a>
-                    <button onClick={() => speak('Opening health assistant')} className="bg-amber-50 px-4 py-2 rounded">Ask Health Assistant</button>
-                    <select aria-label="Choose language" className="border px-3 py-2 rounded" value={testLang} onChange={(e)=>setTestLang(e.target.value)}>
-                      <option value="english">English</option>
-                      <option value="hindi">Hindi</option>
-                      <option value="telugu">Telugu</option>
-                      <option value="tamil">Tamil</option>
-                      <option value="bengali">Bengali</option>
-                    </select>
+                    <button onClick={() => playTTS('Opening health assistant', language)} className="bg-amber-50 px-4 py-2 rounded">Ask Health Assistant</button>
                   </div>
                 </div>
               </div>
@@ -200,14 +188,7 @@ const Home = () => {
           <p className="text-gray-700 mt-3 max-w-3xl mx-auto">Bringing healthcare closer to everyone. Scan, listen, and understand your medicines with ease — anytime, anywhere. Designed for rural and illiterate populations, powered by AI and voice technology.</p>
           <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a href="/tutorial" className="bg-green-800 text-white px-5 py-3 rounded">🔍 Try Demo</a>
-            <button onClick={() => speak('Open health assistant')} className="bg-amber-50 px-5 py-3 rounded">💬 Ask Health Assistant</button>
-            <select aria-label="Choose language" className="border px-3 py-3 rounded">
-              <option>English</option>
-              <option>Hindi</option>
-              <option>Telugu</option>
-              <option>Tamil</option>
-              <option>Bengali</option>
-            </select>
+            <button onClick={() => playTTS('Open health assistant', language)} className="bg-amber-50 px-5 py-3 rounded">💬 Ask Health Assistant</button>
           </div>
         </section>
       </div>
@@ -254,7 +235,7 @@ const Home = () => {
         <section className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-semibold">Stay Aware, Stay Healthy</h2>
-            <button onClick={() => speak('Viewing latest medical news.')} className="px-3 py-1 bg-amber-50 rounded">🔊 Read Aloud</button>
+            <button onClick={() => playTTS('Viewing latest medical news.', language)} className="px-3 py-1 bg-amber-50 rounded">🔊 Read Aloud</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
@@ -267,7 +248,7 @@ const Home = () => {
                 <div className="font-semibold">{n.title}</div>
                 <div className="text-sm text-gray-500 mt-2">From: {n.src}</div>
                 <div className="mt-3 flex items-center justify-between">
-                  <button onClick={() => speak(n.title)} className="px-3 py-1 bg-amber-50 rounded">� Read Aloud</button>
+                  <button onClick={() => playTTS(n.title, language)} className="px-3 py-1 bg-amber-50 rounded">🔊 Read Aloud</button>
                   <button className="text-sm text-green-800">View More</button>
                 </div>
               </div>

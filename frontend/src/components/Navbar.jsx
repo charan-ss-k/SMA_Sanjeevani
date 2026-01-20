@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import logo from '../assets/Sanjeevani Logo.png';
+import LanguageSwitcher from './LanguageSwitcher';
 
-const Navbar = () => {
+const Navbar = ({ language, onLanguageChange }) => {
   const location = useLocation();
 
   const getLinkClass = (path) => {
@@ -64,7 +65,8 @@ const Navbar = () => {
             </li>
           </ul>
 
-          <div className="block">
+          <div className="flex items-center space-x-4">
+            <LanguageSwitcher currentLanguage={language} onLanguageChange={onLanguageChange} />
             <button className="bg-green-700 text-white px-4 py-2 rounded-full">Login</button>
           </div>
         </div>

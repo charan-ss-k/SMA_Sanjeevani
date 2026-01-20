@@ -6,6 +6,7 @@ import json
 
 from .models import SymptomRequest, SymptomResponse
 from . import service
+from .. import tts_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -108,3 +109,60 @@ async def recommend(payload: SymptomRequest):
     except Exception as e:
         logger.exception("Failed to generate recommendation: %s", e)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/api/medical-qa")
+async def medical_qa(data: dict):
+    """Answer medical Q&A using LLM with only text replies"""
+    logger.info("=== ENDPOINT HIT: /api/medical-qa ===")
+    logger.info("Incoming question: %s", data.get("question", ""))
+    
+    question = data.get("question", "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question is required")
+    
+    try:
+        answer = service.answer_medical_question(question)
+        logger.info("Medical QA response: %s", answer)
+        return {"answer": answer}
+    except Exception as e:
+        logger.exception("Failed to answer medical question: %s", e)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/api/tts")
+async def generate_tts(data: dict):
+    """Generate speech audio from text using Coqui TTS"""
+    logger.info("=== ENDPOINT HIT: /api/tts ===")
+    
+    text = data.get("text", "").strip()
+    language = data.get("language", "english").strip()
+    
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    
+    if not tts_service.validate_language(language):
+        raise HTTPException(status_code=400, detail=f"Unsupported language: {language}")
+    
+    try:
+        logger.info(f"Generating speech for language: {language}")
+        audio_base64 = tts_service.generate_speech(text, language)
+        
+        if not audio_base64:
+            raise HTTPException(status_code=500, detail="Failed to generate speech")
+        
+        return {
+            "audio": audio_base64,
+            "language": language,
+            "format": "wav"
+        }
+    except Exception as e:
+        logger.exception(f"Failed to generate TTS: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/api/tts/languages")
+async def get_tts_languages():
+    """Get list of supported TTS languages"""
+    return tts_service.get_supported_languages()
+

@@ -1,15 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import SymptomChecker from './SymptomChecker';
 import RecommendationResult from './RecommendationResult';
-
-function speak(text) {
-  if (!window.speechSynthesis) return;
-  const ut = new SpeechSynthesisUtterance(text);
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(ut);
-}
+import { playTTS } from '../utils/tts';
+import { LanguageContext } from '../main';
 
 const MedicineRecommendation = () => {
+  const { language } = useContext(LanguageContext);
   const [result, setResult] = useState(null);
   const [showForm, setShowForm] = useState(true);
 
@@ -26,13 +22,13 @@ const MedicineRecommendation = () => {
 
     setResult(fullData);
     setShowForm(false);
-    speak('Got your recommendations. Please review them carefully.');
+    playTTS('Got your recommendations. Please review them carefully.', language);
   };
 
   const handleReset = () => {
     setResult(null);
     setShowForm(true);
-    speak('Form cleared. Ready for new input.');
+    playTTS('Form cleared. Ready for new input.', language);
   };
 
   return (
@@ -57,7 +53,7 @@ const MedicineRecommendation = () => {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-3xl font-bold text-green-800">Tell us about yourself</h2>
                   <button
-                    onClick={() => speak('Fill in your symptoms and health information')}
+                    onClick={() => playTTS('Fill in your symptoms and health information', language)}
                     className="bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 flex items-center gap-2 text-lg"
                   >
                     🔊 Read Instructions
@@ -123,7 +119,7 @@ const MedicineRecommendation = () => {
                 If you have chest pain, difficulty breathing, or severe bleeding — call ambulance immediately!
               </p>
               <button
-                onClick={() => speak('Emergency hotline 108')}
+                onClick={() => playTTS('Emergency hotline 108', language)}
                 className="w-full bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold text-lg hover:bg-yellow-700"
               >
                 📞 Ambulance: 108
