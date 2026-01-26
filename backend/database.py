@@ -10,13 +10,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database URL configuration
-# Using SQLite for development (easy, no setup needed)
-# Change to PostgreSQL for production: postgresql://user:password@localhost/sanjeevani
-# Change to MySQL for production: mysql+pymysql://user:password@localhost/sanjeevani
-
+# Using PostgreSQL with sanjeevani_finaldb
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "sqlite:///./sanjeevani.db"  # SQLite database file
+    "postgresql://postgres:siddharth%402004@localhost:5432/sanjeevani_finaldb"
 )
 
 # SQLAlchemy setup
