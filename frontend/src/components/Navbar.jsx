@@ -4,12 +4,14 @@ import logo from '../assets/Sanjeevani Logo.png';
 import LanguageSwitcher from './LanguageSwitcher';
 import { AuthContext } from '../main';
 import AuthModal from './AuthModal';
+import { t } from '../utils/translations';
 
 const Navbar = ({ language, onLanguageChange }) => {
   const location = useLocation();
   const { isAuthenticated, user, logout } = useContext(AuthContext);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const langContext = { language };
 
   const getLinkClass = (path) => {
     return location.pathname === path
@@ -28,44 +30,44 @@ const Navbar = ({ language, onLanguageChange }) => {
           <div className="flex items-center space-x-4">
             <Link to="/" className="flex items-center gap-3">
               <img src={logo} alt="Sanjeevani" className="h-20 w-20 object-contain" />
-              <span className="text-green-800 text-3xl font-bold">Sanjeevani</span>
+              <span className="text-green-800 text-3xl font-bold">{t('sanjeevani', language)}</span>
             </Link>
           </div>
 
           <ul className="flex items-center space-x-6 text-lg">
             <li>
               <Link to="/" className={getLinkClass('/')}>
-                Home
+                {t('home', language)}
               </Link>
             </li>
             <li>
               <Link to="/medicine-recommendation" className={getLinkClass('/medicine-recommendation')}>
-                💊 Medicine
+                💊 {t('medicine', language)}
               </Link>
             </li>
             <li>
               <Link to="/dashboard" className={getLinkClass('/dashboard')}>
-                📊 Dashboard
+                📊 {t('dashboard', language)}
               </Link>
             </li>
             <li>
               <Link to="/prescription" className={getLinkClass('/prescription')}>
-                Prescription
+                {t('prescription', language)}
               </Link>
             </li>
             <li>
               <Link to="/services" className={getLinkClass('/services')}>
-                Services
+                {t('services', language)}
               </Link>
             </li>
             <li>
               <Link to="/about" className={getLinkClass('/about')}>
-                About
+                {t('about', language)}
               </Link>
             </li>
             <li>
               <Link to="/contact" className={getLinkClass('/contact')}>
-                Contact
+                {t('contact', language)}
               </Link>
             </li>
           </ul>
@@ -79,7 +81,7 @@ const Navbar = ({ language, onLanguageChange }) => {
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="bg-green-700 text-white px-4 py-2 rounded-full hover:bg-green-800 transition-colors flex items-center gap-2"
                 >
-                  👤 {user?.username || 'User'}
+                  👤 {user?.username || t('user', language)}
                 </button>
                 
                 {showUserMenu && (
@@ -96,7 +98,7 @@ const Navbar = ({ language, onLanguageChange }) => {
                       }}
                       className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 transition-colors font-medium"
                     >
-                      🚪 Logout
+                      🚪 {t('logout', language)}
                     </button>
                   </div>
                 )}
@@ -106,7 +108,7 @@ const Navbar = ({ language, onLanguageChange }) => {
                 onClick={() => setShowAuthModal(true)}
                 className="bg-green-700 text-white px-4 py-2 rounded-full hover:bg-green-800 transition-colors"
               >
-                Login
+                {t('login', language)}
               </button>
             )}
           </div>

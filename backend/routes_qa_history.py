@@ -69,7 +69,8 @@ async def get_user_qa_history(
     if category:
         query = query.filter(QAHistory.category == category)
     
-    qa_history = query.offset(skip).limit(limit).all()
+    # Order by created_at ascending (oldest first) to maintain conversation order
+    qa_history = query.order_by(QAHistory.created_at.asc()).offset(skip).limit(limit).all()
     
     return [
         {

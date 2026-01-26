@@ -2,16 +2,18 @@ import React, { useRef, useEffect, useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
-
-const slides = [
-  { title: 'Scan your medicine — get instant voice instructions', bg: 'bg-gradient-to-r from-green-100 to-green-50' },
-  { title: 'Set reminders & never miss a dose', bg: 'bg-gradient-to-r from-amber-100 to-amber-50' },
-  { title: 'Upload prescriptions and find nearby doctors', bg: 'bg-gradient-to-r from-indigo-100 to-indigo-50' },
-  { title: 'Stay updated with medical news and rural health programs', bg: 'bg-gradient-to-r from-pink-100 to-pink-50' },
-];
+import { t } from '../utils/translations';
 
 const Home = () => {
   const { language } = useContext(LanguageContext);
+  
+  const slides = [
+    { titleKey: 'scanMedicine', bg: 'bg-gradient-to-r from-green-100 to-green-50' },
+    { titleKey: 'setReminders', bg: 'bg-gradient-to-r from-amber-100 to-amber-50' },
+    { titleKey: 'uploadPrescriptions', bg: 'bg-gradient-to-r from-indigo-100 to-indigo-50' },
+    { titleKey: 'stayUpdated', bg: 'bg-gradient-to-r from-pink-100 to-pink-50' },
+  ];
+
   const carouselRef = useRef(null);
   const [activeSlide, setActiveSlide] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(false);
@@ -91,11 +93,11 @@ const Home = () => {
                 onClick={() => setIsPaused(true)}
               >
                 <div className="max-w-4xl px-6 text-center">
-                  <h2 className="text-2xl md:text-4xl font-extrabold text-green-900 mb-3">{s.title}</h2>
-                  <p className="text-gray-700 mb-4">Short supporting line about the benefit of this feature.</p>
+                  <h2 className="text-2xl md:text-4xl font-extrabold text-green-900 mb-3">{t(s.titleKey, language)}</h2>
+                  <p className="text-gray-700 mb-4">{t('bringingHealthcare', language)}</p>
                   <div className="flex items-center justify-center gap-3">
-                    <a href="/tutorial" className="bg-green-800 text-white px-4 py-2 rounded">Try Demo</a>
-                    <button onClick={() => playTTS('Opening health assistant', language)} className="bg-amber-50 px-4 py-2 rounded">Ask Health Assistant</button>
+                    <a href="/tutorial" className="bg-green-800 text-white px-4 py-2 rounded">{t('tryDemo', language)}</a>
+                    <button onClick={() => playTTS(t('askHealthAssistant', language), language)} className="bg-amber-50 px-4 py-2 rounded">{t('askHealthAssistant', language)}</button>
                   </div>
                 </div>
               </div>
@@ -165,15 +167,15 @@ const Home = () => {
         <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="font-bold text-3xl mb-2">💊 Check Your Symptoms</h3>
+              <h3 className="font-bold text-3xl mb-2">{t('checkSymptoms', language)}</h3>
               <p className="text-lg mb-4">
-                Get instant AI-powered health recommendations based on your symptoms. Our system will suggest safe medicines and home care tips.
+                {t('getInstantRecommendations', language)}
               </p>
               <Link 
                 to="/medicine-recommendation"
                 className="inline-block bg-amber-400 hover:bg-amber-300 text-green-900 font-bold px-6 py-3 rounded-lg transition"
               >
-                🏥 Open Medicine Recommendation →
+                {t('openMedicineRecommendation', language)}
               </Link>
             </div>
             <div className="hidden md:block text-6xl">💊</div>
@@ -184,11 +186,11 @@ const Home = () => {
       {/* Intro / Hero below carousel */}
       <div className="container mx-auto px-6 mt-8">
         <section className="bg-white rounded-lg shadow p-6 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-green-900">Smart Medicine Access — Your Digital Health Companion in Every Language</h1>
-          <p className="text-gray-700 mt-3 max-w-3xl mx-auto">Bringing healthcare closer to everyone. Scan, listen, and understand your medicines with ease — anytime, anywhere. Designed for rural and illiterate populations, powered by AI and voice technology.</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-green-900">{t('smartMedicineAccess', language)}</h1>
+          <p className="text-gray-700 mt-3 max-w-3xl mx-auto">{t('bringingHealthcare', language)}</p>
           <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="/tutorial" className="bg-green-800 text-white px-5 py-3 rounded">🔍 Try Demo</a>
-            <button onClick={() => playTTS('Open health assistant', language)} className="bg-amber-50 px-5 py-3 rounded">💬 Ask Health Assistant</button>
+            <a href="/tutorial" className="bg-green-800 text-white px-5 py-3 rounded">{t('tryDemo', language)}</a>
+            <button onClick={() => playTTS(t('askHealthAssistant', language), language)} className="bg-amber-50 px-5 py-3 rounded">{t('askHealthAssistant', language)}</button>
           </div>
         </section>
       </div>
@@ -197,7 +199,7 @@ const Home = () => {
       <div className="container mx-auto px-6 mt-6">
         {/* Reminders placed below the intro per request */}
         <section className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-semibold mb-3">Reminders & Alerts</h3>
+          <h3 className="font-semibold mb-3">{t('remindersAlerts', language)}</h3>
           <div className="space-y-3">
             <div className="p-3 bg-amber-50 rounded flex items-center justify-between">
               <div>
@@ -213,29 +215,29 @@ const Home = () => {
               </div>
               <div className="text-sm">🔊</div>
             </div>
-            <button className="w-full mt-2 bg-green-800 text-white py-2 rounded">+ New Reminder</button>
+            <button className="w-full mt-2 bg-green-800 text-white py-2 rounded">{t('newReminder', language)}</button>
           </div>
         </section>
 
         {/* Mini Dashboard below reminders */}
         <section className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-semibold mb-3">Your Health, Simplified</h3>
+          <h3 className="font-semibold mb-3">{t('yourHealthSimplified', language)}</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="p-3 bg-green-50 rounded">👤 User<br /><strong>Welcome back</strong></div>
-            <div className="p-3 bg-green-50 rounded">💊 Today<br /><strong>2 meds</strong></div>
-            <div className="p-3 bg-green-50 rounded">⏰ Next reminder<br /><strong>8:00 AM</strong></div>
-            <div className="p-3 bg-green-50 rounded">📈 Adherence<br /><strong>92%</strong></div>
+            <div className="p-3 bg-green-50 rounded">👤 User<br /><strong>{t('welcomeBack', language)}</strong></div>
+            <div className="p-3 bg-green-50 rounded">💊 {t('today', language)}<br /><strong>2 {t('meds', language)}</strong></div>
+            <div className="p-3 bg-green-50 rounded">⏰ {t('nextReminder', language)}<br /><strong>8:00 AM</strong></div>
+            <div className="p-3 bg-green-50 rounded">📈 {t('adherence', language)}<br /><strong>92%</strong></div>
           </div>
           <div className="mt-3">
-            <button className="w-full bg-amber-50 py-2 rounded">Go to My Dashboard</button>
+            <button className="w-full bg-amber-50 py-2 rounded">{t('goToDashboard', language)}</button>
           </div>
         </section>
 
         {/* Latest Medical News & Tips (after reminders & dashboard) */}
         <section className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold">Stay Aware, Stay Healthy</h2>
-            <button onClick={() => playTTS('Viewing latest medical news.', language)} className="px-3 py-1 bg-amber-50 rounded">🔊 Read Aloud</button>
+            <h2 className="text-2xl font-semibold">{t('stayAwareStayHealthy', language)}</h2>
+            <button onClick={() => playTTS(t('stayAwareStayHealthy', language), language)} className="px-3 py-1 bg-amber-50 rounded">{t('readAloud', language)}</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
@@ -248,14 +250,14 @@ const Home = () => {
                 <div className="font-semibold">{n.title}</div>
                 <div className="text-sm text-gray-500 mt-2">From: {n.src}</div>
                 <div className="mt-3 flex items-center justify-between">
-                  <button onClick={() => playTTS(n.title, language)} className="px-3 py-1 bg-amber-50 rounded">🔊 Read Aloud</button>
-                  <button className="text-sm text-green-800">View More</button>
+                  <button onClick={() => playTTS(n.title, language)} className="px-3 py-1 bg-amber-50 rounded">{t('readAloud', language)}</button>
+                  <button className="text-sm text-green-800">{t('viewMore', language)}</button>
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-4 text-center">
-            <button className="px-4 py-2 bg-green-800 text-white rounded">View More News</button>
+            <button className="px-4 py-2 bg-green-800 text-white rounded">{t('viewMoreNews', language)}</button>
           </div>
         </section>
       </div>

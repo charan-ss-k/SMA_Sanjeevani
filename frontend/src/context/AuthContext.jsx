@@ -32,14 +32,36 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('user');
   };
 
+  // Helper to get current token (checks both state and localStorage)
+  const getCurrentToken = () => {
+    return token || localStorage.getItem('token');
+  };
+
+  // Wrapper for setToken that also updates localStorage
+  const setTokenWithStorage = (newToken) => {
+    setToken(newToken);
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+    } else {
+      localStorage.removeItem('token');
+    }
+  };
+
   const value = {
     user,
-    setUser,
-    token,
-    setToken,
+    setUser: (newUser) => {
+      setUser(newUser);
+      if (newUser) {
+        localStorage.setItem('user', JSON.stringify(newUser));
+      } else {
+        localStorage.removeItem('user');
+      }
+    },
+    token: getCurrentToken(), // Always return current token
+    setToken: setTokenWithStorage,
     loading,
     logout,
-    isAuthenticated: !!token
+    isAuthenticated: !!getCurrentToken() // Check both state and localStorage
   };
 
   return (

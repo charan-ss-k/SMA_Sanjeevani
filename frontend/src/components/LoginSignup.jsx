@@ -2,12 +2,15 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Auth.css';
 import { AuthContext } from '../context/AuthContext';
+import { LanguageContext } from '../main';
+import { t } from '../utils/translations';
 
 const API_BASE = window.__API_BASE__ || 'http://127.0.0.1:8000';
 
 export function LoginSignup() {
   const navigate = useNavigate();
   const { setUser, setToken } = useContext(AuthContext);
+  const { language } = useContext(LanguageContext);
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -139,7 +142,7 @@ export function LoginSignup() {
       // Redirect to home
       navigate('/home');
     } catch (err) {
-      setError(err.message || 'Authentication failed. Please try again.');
+      setError(err.message || t('authenticationFailed', language));
       console.error('Auth error:', err);
     } finally {
       setLoading(false);
@@ -154,8 +157,8 @@ export function LoginSignup() {
             <div className="logo-circle">
               <span className="logo-text">🏥</span>
             </div>
-            <h1>Sanjeevani</h1>
-            <p className="tagline">AI Medical Assistant</p>
+            <h1>{t('sanjeevani', language)}</h1>
+            <p className="tagline">{t('yourPersonalHealthAssistant', language)}</p>
           </div>
         </div>
 
@@ -203,11 +206,11 @@ export function LoginSignup() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Username</label>
+              <label>{t('username', language)}</label>
               <input
                 type="text"
                 name="username"
-                placeholder="Enter your username"
+                placeholder={t('enterUsername', language)}
                 value={formData.username}
                 onChange={handleChange}
                 disabled={loading}
@@ -217,11 +220,11 @@ export function LoginSignup() {
             {!isLogin && (
               <>
                 <div className="form-group">
-                  <label>Full Name</label>
+                  <label>{t('fullName', language)}</label>
                   <input
                     type="text"
                     name="fullName"
-                    placeholder="Your full name"
+                    placeholder={t('enterFullName', language)}
                     value={formData.fullName}
                     onChange={handleChange}
                     disabled={loading}
@@ -242,11 +245,11 @@ export function LoginSignup() {
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Age</label>
+                    <label>{t('age', language)}</label>
                     <input
                       type="number"
                       name="age"
-                      placeholder="Age (optional)"
+                      placeholder={t('ageOptional', language)}
                       value={formData.age}
                       onChange={handleChange}
                       disabled={loading}
@@ -273,11 +276,11 @@ export function LoginSignup() {
             )}
 
             <div className="form-group">
-              <label>Password</label>
+              <label>{t('password', language)}</label>
               <input
                 type="password"
                 name="password"
-                placeholder="Enter your password"
+                placeholder={t('enterPassword', language)}
                 value={formData.password}
                 onChange={handleChange}
                 disabled={loading}
@@ -286,11 +289,11 @@ export function LoginSignup() {
 
             {!isLogin && (
               <div className="form-group">
-                <label>Confirm Password</label>
+                <label>{t('confirmPassword', language)}</label>
                 <input
                   type="password"
                   name="confirmPassword"
-                  placeholder="Confirm your password"
+                  placeholder={t('confirmYourPassword', language)}
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   disabled={loading}
@@ -306,22 +309,22 @@ export function LoginSignup() {
               {loading ? (
                 <>
                   <span className="spinner"></span>
-                  {isLogin ? 'Logging in...' : 'Creating account...'}
+                  {isLogin ? t('loggingIn', language) : t('creatingAccount', language)}
                 </>
               ) : (
-                isLogin ? 'Login' : 'Sign Up'
+                isLogin ? t('login', language) : t('signUp', language)
               )}
             </button>
           </form>
 
           <p className="form-footer">
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
+            {isLogin ? `${t('dontHaveAccount', language)} ` : `${t('alreadyHaveAccount', language)} `}
             <button
               className="switch-link"
               onClick={() => setIsLogin(!isLogin)}
               disabled={loading}
             >
-              {isLogin ? 'Sign Up' : 'Login'}
+              {isLogin ? t('signUp', language) : t('login', language)}
             </button>
           </p>
         </div>
@@ -329,15 +332,15 @@ export function LoginSignup() {
         <div className="auth-benefits">
           <div className="benefit">
             <span className="icon">🔒</span>
-            <p><strong>Secure</strong> - Encrypted password, JWT tokens</p>
+            <p><strong>{t('secure', language)}</strong> - {t('secureDesc', language)}</p>
           </div>
           <div className="benefit">
             <span className="icon">📊</span>
-            <p><strong>Track</strong> - All your medical history</p>
+            <p><strong>{t('track', language)}</strong> - {t('trackDesc', language)}</p>
           </div>
           <div className="benefit">
             <span className="icon">🔔</span>
-            <p><strong>Reminders</strong> - Medicine alerts & schedules</p>
+            <p><strong>{t('smartReminders', language)}</strong> - {t('remindersDesc', language)}</p>
           </div>
         </div>
       </div>

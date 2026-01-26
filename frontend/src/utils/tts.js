@@ -12,8 +12,11 @@ export async function playTTS(text, language = 'english') {
   try {
     console.log(`🔊 Generating speech for language: ${language}`);
     
+    // Get API base URL
+    const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+    
     // Call backend TTS API
-    const response = await fetch('http://localhost:8000/api/tts', {
+    const response = await fetch(`${apiBase}/api/tts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -79,7 +82,7 @@ function fallbackToWebSpeech(text, language) {
   try {
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Map language to language codes
+    // Map language to language codes for Web Speech API
     const langMap = {
       english: 'en-US',
       telugu: 'te-IN',
@@ -94,8 +97,8 @@ function fallbackToWebSpeech(text, language) {
     
     utterance.lang = langMap[language] || 'en-US';
     utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.volume = 1;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
     
     window.speechSynthesis.cancel(); // Stop any ongoing speech
     window.speechSynthesis.speak(utterance);
@@ -111,7 +114,8 @@ function fallbackToWebSpeech(text, language) {
  */
 export async function getAvailableLanguages() {
   try {
-    const response = await fetch('http://localhost:8000/api/tts/languages');
+    const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+    const response = await fetch(`${apiBase}/api/tts/languages`);
     if (response.ok) {
       return await response.json();
     }
@@ -126,5 +130,9 @@ export async function getAvailableLanguages() {
     hindi: { name: 'हिन्दी (Hindi)', code: 'hi', flag: '🇮🇳' },
     marathi: { name: 'मराठी (Marathi)', code: 'mr', flag: '🇮🇳' },
     bengali: { name: 'বাংলা (Bengali)', code: 'bn', flag: '🇮🇳' },
+    tamil: { name: 'தமிழ் (Tamil)', code: 'ta', flag: '🇮🇳' },
+    kannada: { name: 'ಕನ್ನಡ (Kannada)', code: 'kn', flag: '🇮🇳' },
+    malayalam: { name: 'മലയാളം (Malayalam)', code: 'ml', flag: '🇮🇳' },
+    gujarati: { name: 'ગુજરાતી (Gujarati)', code: 'gu', flag: '🇮🇳' },
   };
 }

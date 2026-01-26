@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
  * SearchableInput Component
  * Replaces checkbox lists with searchable, filterable input
  * As user types, items starting with that letter are shown as suggestions
+ * Supports translation display via displayMap prop
  */
 const SearchableInput = ({
   items = [],
@@ -11,18 +12,29 @@ const SearchableInput = ({
   onSelectionChange = () => {},
   placeholder = "Search...",
   label = "",
-  maxDisplay = 8
+  maxDisplay = 8,
+  displayMap = null, // Optional: function(item) => translated display text
+  language = 'english', // For translations
+  t = (key) => key // Translation function
 }) => {
   const [searchInput, setSearchInput] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
 
+  // Helper to get display text (translated if displayMap provided, else original)
+  const getDisplayText = (item) => {
+    return displayMap ? displayMap(item) : item;
+  };
+
   // Filter items based on search input (case-insensitive, starts with match)
-  const filteredItems = items.filter(item =>
-    item.toLowerCase().startsWith(searchInput.toLowerCase()) && 
-    !selectedItems.includes(item)
-  );
+  // Search in both English key and translated display text
+  const filteredItems = items.filter(item => {
+    const displayText = getDisplayText(item);
+    const matchesSearch = displayText.toLowerCase().startsWith(searchInput.toLowerCase()) ||
+                          item.toLowerCase().startsWith(searchInput.toLowerCase());
+    return matchesSearch && !selectedItems.includes(item);
+  });
 
   // Handle clicking outside dropdown
   useEffect(() => {
@@ -84,11 +96,11 @@ const SearchableInput = ({
               key={item}
               className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
             >
-              <span>{item}</span>
+              <span>{getDisplayText(item)}</span>
               <button
                 onClick={() => handleRemoveItem(item)}
                 className="text-blue-600 hover:text-blue-800 focus:outline-none"
-                title={`Remove ${item}`}
+                title={`Remove ${getDisplayText(item)}`}
               >
                 ×
               </button>
@@ -119,12 +131,12 @@ const SearchableInput = ({
                   index === 0 ? 'bg-blue-50' : ''
                 }`}
               >
-                <span className="text-gray-800">{item}</span>
+                <span className="text-gray-800">{getDisplayText(item)}</span>
               </button>
             ))}
             {filteredItems.length > maxDisplay && (
               <div className="px-4 py-2 text-sm text-gray-500 text-center border-t">
-                +{filteredItems.length - maxDisplay} more items
+                +{filteredItems.length - maxDisplay} more
               </div>
             )}
           </div>
@@ -133,7 +145,7 @@ const SearchableInput = ({
         {/* No Results Message */}
         {showDropdown && searchInput && filteredItems.length === 0 && selectedItems.length < items.length && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-10 p-3 text-center text-gray-500">
-            No matches found for "{searchInput}"
+            {t('noMatchesFound', language).replace('{search}', searchInput)}
           </div>
         )}
       </div>
@@ -141,7 +153,7 @@ const SearchableInput = ({
       {/* Selected Count */}
       {selectedItems.length > 0 && (
         <p className="mt-2 text-sm text-gray-600">
-          Selected: <span className="font-medium">{selectedItems.length}</span> item(s)
+          {t('selected', language)}: <span className="font-medium">{selectedItems.length}</span> {t('items', language)}
         </p>
       )}
     </div>

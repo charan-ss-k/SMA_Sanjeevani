@@ -9,12 +9,20 @@ from datetime import datetime
 
 from .models import SymptomRequest, SymptomResponse
 from . import service
-from .. import tts_service
 from database import get_db
 from models import MedicineHistory, QAHistory
+from middleware import get_current_user_optional
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Try enhanced TTS first, fallback to original
+try:
+    from .. import tts_service_enhanced as tts_service
+    logger.info("✅ Using Enhanced TTS Service (Bhashini/gTTS/Google)")
+except ImportError:
+    logger.warning("⚠️ Enhanced TTS not available, using original TTS service")
+    from .. import tts_service
 
 
 @router.get("/api/symptoms/status")
@@ -137,20 +145,26 @@ async def recommend(payload: SymptomRequest, db: Session = Depends(get_db), user
 
 
 @router.post("/api/medical-qa")
-async def medical_qa(data: dict, db: Session = Depends(get_db), user_id: Optional[int] = None):
+async def medical_qa(
+    data: dict, 
+    db: Session = Depends(get_db), 
+    user_id: Optional[int] = Depends(get_current_user_optional)
+):
     """Answer medical Q&A using LLM with only text replies"""
     logger.info("=== ENDPOINT HIT: /api/medical-qa ===")
     logger.info("Incoming question: %s", data.get("question", ""))
     
     question = data.get("question", "").strip()
     category = data.get("category", "General").strip()
+    request_language = data.get("language", "english").strip().lower()
     
     if not question:
         logger.error("No question provided")
         raise HTTPException(status_code=400, detail="Question is required")
     
     try:
-        answer = service.answer_medical_question(question)
+        # Answer in the requested language if supported
+        answer = service.answer_medical_question(question, language=request_language)
         logger.info("✅ Medical QA response generated: %d chars", len(answer) if answer else 0)
         
         # Save to database if user_id is provided
@@ -180,7 +194,7 @@ async def medical_qa(data: dict, db: Session = Depends(get_db), user_id: Optiona
 
 @router.post("/api/tts")
 async def generate_tts(data: dict):
-    """Generate speech audio from text using Coqui TTS"""
+    """Generate speech audio from text using Enhanced TTS (Bhashini/gTTS/Google/Coqui)"""
     logger.info("=== ENDPOINT HIT: /api/tts ===")
     
     text = data.get("text", "").strip()

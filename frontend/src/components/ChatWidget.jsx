@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { playTTS } from '../utils/tts';
 import { formatMedicalResponse } from '../utils/formatMedicalResponse';
 import { LanguageContext } from '../main';
+import { AuthContext } from '../context/AuthContext.jsx';
+import { t } from '../utils/translations';
 import './ChatWidget.css';
 
 // --- SVG Icons ---
@@ -74,19 +76,22 @@ const StopIcon = () => (
 // --- Chatbot Window Component ---
 const ChatbotWindow = () => {
   const { language } = useContext(LanguageContext);
+  const { token, isAuthenticated } = useContext(AuthContext);
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: 'bot',
-      text: 'Hi there 👋! I am Sanjeevani, your AI medical assistant powered by advanced medical AI. Ask me any medical questions in any language - about symptoms, diseases, treatments, medicines, health conditions, or any medical concern. I\'m here to help with accurate health information. What can I help you with today?',
+      text: t('chatbotWelcome', language),
     },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const chatWindowRef = useRef(null);
 
   // Function to scroll to the bottom of the chat
   const scrollToBottom = () => {
@@ -97,6 +102,146 @@ const ChatbotWindow = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  // Update welcome message when language changes
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev.length > 0 && prev[0].id === 1 && prev[0].sender === 'bot') {
+        return [
+          {
+            ...prev[0],
+            text: t('chatbotWelcome', language)
+          },
+          ...prev.slice(1)
+        ];
+      }
+      return prev;
+    });
+  }, [language]);
+
+  // Load chat history from database and session storage
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      // Reset history loaded state when component remounts
+      setHistoryLoaded(false);
+      
+      // First, try to load from session storage (for immediate display)
+      const sessionHistory = sessionStorage.getItem('chatHistory');
+      if (sessionHistory) {
+        try {
+          const parsedHistory = JSON.parse(sessionHistory);
+          if (parsedHistory && parsedHistory.length > 0) {
+            console.log('[ChatWidget] Loaded from session storage:', parsedHistory.length, 'items');
+            setMessages([
+              {
+                id: 0,
+                sender: 'bot',
+                text: t('chatbotWelcome', language),
+              },
+              ...parsedHistory
+            ]);
+            setHistoryLoaded(true);
+          }
+        } catch (e) {
+          console.warn('[ChatWidget] Failed to parse session history:', e);
+        }
+      }
+      
+      // Then try to load from database if authenticated
+      // Get token from context or localStorage
+      const authToken = token || localStorage.getItem('token');
+      const isAuth = isAuthenticated || !!authToken;
+      
+      if (!isAuth) {
+        if (!sessionHistory) {
+          // Use default welcome message if no session history
+          setMessages([{
+            id: 0,
+            sender: 'bot',
+            text: t('chatbotWelcome', language),
+          }]);
+        }
+        setHistoryLoaded(true);
+        return;
+      }
+
+      try {
+        const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+        console.log('[ChatWidget] Loading history from database for authenticated user');
+        console.log('[ChatWidget] Token available:', !!authToken);
+        
+        if (!authToken) {
+          console.warn('[ChatWidget] No token available, skipping database load');
+          setHistoryLoaded(true);
+          return;
+        }
+        
+        const response = await fetch(`${apiBase}/api/qa-history/?limit=50`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        if (response.ok) {
+          const history = await response.json();
+          console.log('[ChatWidget] Loaded history from database:', history.length, 'items');
+          
+          if (history && history.length > 0) {
+            // Convert history to message format
+            const historyMessages = history.flatMap((qa) => [
+              {
+                id: `user-${qa.id}`,
+                sender: 'user',
+                text: qa.question,
+                timestamp: qa.created_at
+              },
+              {
+                id: `bot-${qa.id}`,
+                sender: 'bot',
+                text: qa.answer,
+                timestamp: qa.created_at
+              }
+            ]);
+
+            // Update messages with database history
+            setMessages([
+              {
+                id: 0,
+                sender: 'bot',
+                text: t('chatbotWelcome', language),
+              },
+              ...historyMessages
+            ]);
+            
+            // Also save to session storage for quick access
+            sessionStorage.setItem('chatHistory', JSON.stringify(historyMessages));
+          } else {
+            console.log('[ChatWidget] No previous history found in database');
+          }
+        } else if (response.status === 401) {
+          console.warn('[ChatWidget] Authentication failed (401)');
+          // Try to get fresh token
+          const freshToken = localStorage.getItem('token');
+          if (freshToken && freshToken !== authToken) {
+            console.log('[ChatWidget] Retrying with fresh token');
+            // Will retry on next render
+          }
+        } else {
+          console.error('[ChatWidget] Failed to load history:', response.status, response.statusText);
+        }
+        setHistoryLoaded(true);
+      } catch (err) {
+        console.error('[ChatWidget] Error loading history:', err);
+        setHistoryLoaded(true);
+      }
+    };
+
+    // Small delay to ensure auth context is ready
+    const timer = setTimeout(loadChatHistory, 300);
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, token, language]); // Added language to reload when language changes
 
   // Function to handle stopping the current request
   const handleStop = () => {
@@ -126,11 +271,17 @@ const ChatbotWindow = () => {
 
     // Add user message to state
     const newUserMessage = {
-      id: messages.length + 1,
+      id: Date.now(), // Use timestamp for unique ID
       sender: 'user',
       text: trimmedInput,
     };
-    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+    setMessages((prevMessages) => {
+      const updated = [...prevMessages, newUserMessage];
+      // Save to session storage
+      const messagesToSave = updated.filter(m => m.id !== 0);
+      sessionStorage.setItem('chatHistory', JSON.stringify(messagesToSave));
+      return updated;
+    });
     setInputValue('');
     setError(null);
     setIsTyping(true);
@@ -143,12 +294,22 @@ const ChatbotWindow = () => {
       const apiBase = window.__API_BASE__ || 'http://localhost:8000';
       console.log('[ChatWidget] Calling API:', `${apiBase}/api/medical-qa`);
       
+      // Prepare headers with authentication if available
+      const headers = { 'Content-Type': 'application/json' };
+      const authToken = token || localStorage.getItem('token');
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+        console.log('[ChatWidget] Sending request with authentication token');
+      } else {
+        console.log('[ChatWidget] No authentication token, request will be unauthenticated');
+      }
+      
       const response = await fetch(`${apiBase}/api/medical-qa`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({
           question: trimmedInput,
-          language: 'english',
+          language: language,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -163,18 +324,29 @@ const ChatbotWindow = () => {
       const botResponseText = data.answer || 'Unable to generate a response. Please try again.';
 
       const newBotMessage = {
-        id: messages.length + 2,
+        id: Date.now(), // Use timestamp for unique ID
         sender: 'bot',
         text: botResponseText,
       };
 
       setIsTyping(false);
-      setMessages((prevMessages) => [...prevMessages, newBotMessage]);
+      setMessages((prevMessages) => {
+        const updated = [...prevMessages, newBotMessage];
+        // Save to session storage for persistence
+        const messagesToSave = updated.filter(m => m.id !== 0); // Exclude welcome message
+        sessionStorage.setItem('chatHistory', JSON.stringify(messagesToSave));
+        return updated;
+      });
       
-      // Speak the response using Coqui TTS (only if not muted)
+      // Note: Q&A is automatically saved to database by backend if user is authenticated
+      console.log('[ChatWidget] Response received and displayed. Saved to database:', isAuthenticated);
+      
+      // Speak the response using TTS in the selected language (only if not muted)
       if (!isMuted) {
         try {
+          // Use the current language for TTS
           playTTS(botResponseText, language);
+          console.log(`[ChatWidget] Playing TTS in ${language} language`);
         } catch (ttsErr) {
           console.warn('[ChatWidget] TTS error (non-fatal):', ttsErr);
         }
@@ -286,7 +458,7 @@ const ChatbotWindow = () => {
         <div className="flex p-3 border-t border-gray-200 bg-white items-center gap-2">
           <input
             type="text"
-            placeholder="Ask about any medical condition..."
+            placeholder={t('askQuestion', language)}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -297,7 +469,7 @@ const ChatbotWindow = () => {
           {/* Mute Button */}
           <button
             onClick={handleMuteToggle}
-            title={isMuted ? 'Unmute TTS' : 'Mute TTS'}
+            title={isMuted ? t('unmute', language) : t('mute', language)}
             className={`p-3 rounded-lg cursor-pointer transition-colors flex-shrink-0 ${isMuted ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'}`}
           >
             {isMuted ? <MuteIcon /> : <UnmuteIcon />}
@@ -307,7 +479,7 @@ const ChatbotWindow = () => {
           {isTyping ? (
             <button
               onClick={handleStop}
-              title="Stop processing"
+              title={t('stop', language)}
               className="bg-orange-500 text-white p-3 rounded-lg cursor-pointer hover:bg-orange-600 transition-colors flex-shrink-0"
             >
               <StopIcon />
@@ -317,6 +489,7 @@ const ChatbotWindow = () => {
               onClick={handleSend}
               className="bg-green-600 text-white p-3 rounded-lg cursor-pointer hover:bg-green-700 transition-colors disabled:bg-gray-400 flex-shrink-0"
               disabled={inputValue.trim() === ''}
+              title={t('send', language)}
             >
               <SendIcon />
             </button>
@@ -332,16 +505,23 @@ const ChatbotWindow = () => {
 const ChatWidget = () => {
   // State to manage if the chat window is open or not
   const [isOpen, setIsOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Function to toggle the chat window
   const toggleChat = () => {
-    setIsOpen(!isOpen);
+    const newState = !isOpen;
+    setIsOpen(newState);
+    // Force reload of history when opening
+    if (newState) {
+      setReloadKey(prev => prev + 1);
+    }
   };
 
   return (
     <>
       {/* Conditionally render the chat window based on 'isOpen' state */}
-      {isOpen && <ChatbotWindow />}
+      {/* Key prop forces remount when reloadKey changes, which reloads history */}
+      {isOpen && <ChatbotWindow key={reloadKey} />}
 
       {/* The toggle button, using the icon from ChatbotIcon.jsx */}
       <div className="fixed bottom-8 right-8 z-50">

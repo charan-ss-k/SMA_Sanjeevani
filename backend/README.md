@@ -1,225 +1,160 @@
-# SMA Sanjeevani - Symptoms Recommendation Backend
+# Backend - SMA Sanjeevani
 
-AI-powered health assistant providing personalized medicine recommendations for rural healthcare.
+FastAPI backend application for the SMA Sanjeevani medical assistant.
 
-## Features
+## 📁 Directory Structure
 
-- ✅ Symptom-based health condition prediction
-- ✅ Safe, OTC medicine recommendations with dosage
-- ✅ Home care advice
-- ✅ Multi-language support (English, Hindi, Telugu, Tamil, Bengali)
-- ✅ Voice-based output (TTS)
-- ✅ Safety filtering (blocks antibiotics, opioids, steroids)
-- ✅ Pregnancy & allergy awareness
+```
+backend/
+├── features/              # Feature modules
+│   ├── symptoms_recommendation/  # Symptom analysis feature
+│   └── tts_service.py     # Text-to-speech service
+│
+├── scripts/               # Utility scripts
+│   ├── create_database.py # Database creation script
+│   └── sanjeevani_finaldb.sql  # Database schema
+│
+├── tests/                 # Test files
+│   ├── test_api_endpoints.py
+│   ├── test_db_connection.py
+│   └── test_signup.py
+│
+├── config/                # Configuration files
+│   └── .env.example      # Environment variables template
+│
+├── main.py               # Application entry point
+├── models.py             # SQLAlchemy database models
+├── database.py           # Database configuration
+├── security.py           # Authentication & security
+├── middleware.py         # Custom middleware
+├── routes_auth.py       # Authentication routes
+├── routes_dashboard.py  # Dashboard routes
+├── routes_medicine_history.py  # Medicine history routes
+├── routes_prescriptions.py    # Prescription routes
+├── routes_reminders.py        # Reminder routes
+├── routes_qa_history.py       # Q&A history routes
+├── requirements.txt     # Python dependencies
+└── .env                 # Environment variables (not in git)
+```
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Install Dependencies
 
 ```bash
-cd backend
 pip install -r requirements.txt
 ```
 
-### 2. Configure LLM Provider
-
-Copy `.env.example` to `.env`:
+### 2. Configure Environment
 
 ```bash
-cp .env.example .env
+cp config/.env.example .env
+# Edit .env with your Azure PostgreSQL credentials
 ```
 
-**Option A: Use Mock Provider (for testing, no setup required)**
+### 3. Initialize Database
 
 ```bash
-# In .env
-LLM_PROVIDER=mock
+# Option 1: Use the script
+python scripts/create_database.py
+
+# Option 2: Run directly
+python database.py
 ```
 
-Then run:
+### 4. Run the Application
 
 ```bash
-cd ..  # Go to project root
-python -m uvicorn backend.main:app --reload --port 8000
+python main.py
 ```
 
-**Option B: Use Mistral-7B via Ollama (recommended for production)**
+The API will be available at `http://localhost:8000`
 
-First, install and start Ollama:
+## 🔧 Configuration
 
-1. Download Ollama from [ollama.ai](https://ollama.ai)
-2. Start Ollama service:
-   ```bash
-   ollama serve
-   ```
-3. In a new terminal, pull Mistral model:
-   ```bash
-   ollama pull mistral
-   ```
+### Environment Variables
 
-Then update `.env`:
-
-```bash
-LLM_PROVIDER=ollama
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=mistral
-```
-
-Start backend:
-
-```bash
-cd "D:\GitHub 2\SMA_Sanjeevani"
-python -m uvicorn backend.main:app --reload --port 8000
-```
-
-### 3. Test the API
-
-**Health Check:**
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-**Test Symptom Recommendation:**
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/symptoms/recommend \
-  -H "Content-Type: application/json" \
-  -d '{
-    "age": 28,
-    "gender": "male",
-    "symptoms": ["fever", "headache", "body pain"],
-    "allergies": ["penicillin"],
-    "existing_conditions": ["diabetes"],
-    "pregnancy_status": false,
-    "language": "english"
-  }'
-```
-
-## Project Structure
-
-```
-backend/
-├── main.py                          # FastAPI app entry point
-├── requirements.txt                 # Dependencies
-├── .env.example                     # Environment variables template
-└── features/
-    └── symptoms_recommendation/
-        ├── __init__.py
-        ├── models.py               # Pydantic schemas
-        ├── router.py               # FastAPI route
-        ├── service.py              # Business logic
-        ├── prompt_templates.py     # LLM prompt
-        ├── safety_rules.py         # Medicine filtering
-        └── utils.py                # Helpers
-```
-
-## API Endpoint
-
-### POST `/api/symptoms/recommend`
-
-**Request:**
-
-```json
-{
-  "age": 28,
-  "gender": "male",
-  "symptoms": ["fever", "headache", "body pain"],
-  "allergies": ["penicillin"],
-  "existing_conditions": ["diabetes"],
-  "pregnancy_status": false,
-  "language": "english"
-}
-```
-
-**Response:**
-
-```json
-{
-  "predicted_condition": "Viral Fever",
-  "recommended_medicines": [
-    {
-      "name": "Paracetamol 500mg",
-      "dosage": "1 tablet morning and night",
-      "duration": "3 days",
-      "instructions": "Take after food",
-      "warnings": ["Do not exceed 3 tablets/day"]
-    }
-  ],
-  "home_care_advice": [
-    "Drink plenty of fluids",
-    "Take adequate rest"
-  ],
-  "doctor_consultation_advice": "If fever persists for more than 3 days, consult a doctor.",
-  "disclaimer": "This is not a medical diagnosis. Consult a doctor for serious symptoms.",
-  "tts_payload": "Take one Paracetamol tablet in the morning and one at night after food..."
-}
-```
-
-## Configuration
-
-Edit `.env` to customize:
+Create a `.env` file in the backend directory:
 
 ```env
-# LLM Provider: "mock" or "ollama"
-LLM_PROVIDER=mock
+# Database Configuration
+DATABASE_URL=postgresql://username:password@host:port/database?sslmode=require
 
-# Ollama settings
+# JWT Secret Key
+SECRET_KEY=your-super-secret-key-change-in-production
+
+# LLM Provider Configuration
+LLM_PROVIDER=ollama
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=mistral
-
-# LLM parameters (lower temp = more deterministic)
+OLLAMA_MODEL=phi3.5
 LLM_TEMPERATURE=0.3
-LLM_MAX_TOKENS=1024
+LLM_MAX_TOKENS=2048
 ```
 
-## Troubleshooting
+## 📡 API Endpoints
 
-### "Cannot connect to Ollama"
+### Authentication
+- `POST /api/auth/signup` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/me` - Get current user
+- `POST /api/auth/change-password` - Change password
 
-- Make sure Ollama is running: `ollama serve` in a separate terminal
-- Verify model is installed: `ollama list` (should show `mistral`)
-- Check URL in .env matches Ollama's binding
+### Features
+- `POST /symptoms/recommend` - Get medicine recommendations
+- `GET /api/dashboard` - Get dashboard data
+- `POST /api/medicine-history` - Save medicine history
+- `GET /api/prescriptions` - Get prescriptions
+- `POST /api/prescriptions` - Create prescription
+- `GET /api/reminders` - Get reminders
+- `POST /api/reminders` - Create reminder
+- `GET /api/qa-history` - Get Q&A history
+- `POST /api/qa-history` - Save Q&A
 
-### "ModuleNotFoundError: No module named 'features'"
+For complete API documentation, see [docs/api/](../docs/api/)
 
-- Make sure you're running from project root:
-  ```bash
-  cd "D:\GitHub 2\SMA_Sanjeevani"
-  python -m uvicorn backend.main:app --port 8000
-  ```
+## 🗄️ Database
 
-### Mock provider always returns same output
-
-- This is expected for testing. Use Ollama for varied AI-generated responses.
-
-## Safety Features
-
-The system includes:
-
-- ✅ Blocks antibiotics, opioids, benzodiazepines, steroids
-- ✅ Filters medicines conflicting with allergies
-- ✅ Adjusts recommendations for pregnancy
-- ✅ Blocks dosages for children <5 years
-- ✅ Triggers emergency alert for severe symptoms
-- ✅ Always includes medical disclaimer
-
-## Frontend Integration
-
-The frontend calls this API at `http://127.0.0.1:8000/api/symptoms/recommend` and:
-
-- Displays recommendations with medicine details
-- Plays voice synthesis of TTS payload
-- Shows warnings and home care advice
-- Handles multi-language output
-
-Start frontend with:
+The application uses Azure PostgreSQL. The database schema is defined in `models.py` and can be initialized using:
 
 ```bash
-cd frontend
-npm run dev
+python scripts/create_database.py
+python database.py
 ```
 
-## License
+## 🧪 Testing
 
-MIT
+```bash
+# Test database connection
+python tests/test_db_connection.py
+
+# Test API endpoints
+python tests/test_api_endpoints.py
+
+# Test signup
+python tests/test_signup.py
+```
+
+## 📦 Dependencies
+
+Key dependencies:
+- `fastapi` - Web framework
+- `sqlalchemy` - ORM
+- `psycopg2-binary` - PostgreSQL adapter
+- `bcrypt` - Password hashing
+- `python-jose` - JWT tokens
+- `uvicorn` - ASGI server
+
+See `requirements.txt` for complete list.
+
+## 🔐 Security
+
+- Passwords are hashed using bcrypt
+- JWT tokens for authentication
+- SSL required for Azure PostgreSQL connections
+- Input validation using Pydantic models
+
+## 📚 Additional Resources
+
+- [Database Setup Guide](../docs/database/)
+- [API Documentation](../docs/api/)
+- [Architecture Documentation](../docs/architecture/)

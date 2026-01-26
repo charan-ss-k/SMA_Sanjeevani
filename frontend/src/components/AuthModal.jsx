@@ -1,11 +1,14 @@
 import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../main';
+import { LanguageContext } from '../main';
 import './AuthModal.css';
+import { t } from '../utils/translations';
 
 const AuthModal = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const { setUser, setToken } = useContext(AuthContext);
+  const { language } = useContext(LanguageContext);
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -145,7 +148,7 @@ const AuthModal = ({ isOpen, onClose }) => {
       onClose();
       navigate('/dashboard');
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError(t('networkError', language));
     } finally {
       setLoading(false);
     }
@@ -176,25 +179,25 @@ const AuthModal = ({ isOpen, onClose }) => {
           {/* Left Section - Branding */}
           <div className="auth-modal-branding">
             <div className="auth-branding-content">
-              <h1 className="auth-brand-title">Sanjeevani</h1>
-              <p className="auth-brand-subtitle">Your Personal Health Assistant</p>
+              <h1 className="auth-brand-title">{t('sanjeevani', language)}</h1>
+              <p className="auth-brand-subtitle">{t('yourPersonalHealthAssistant', language)}</p>
               
               <div className="auth-features">
                 <div className="auth-feature-item">
                   <span className="auth-feature-icon">🔒</span>
-                  <span className="auth-feature-text">Secure & Private</span>
+                  <span className="auth-feature-text">{t('securePrivate', language)}</span>
                 </div>
                 <div className="auth-feature-item">
                   <span className="auth-feature-icon">💊</span>
-                  <span className="auth-feature-text">Medicine Tracking</span>
+                  <span className="auth-feature-text">{t('medicineTracking', language)}</span>
                 </div>
                 <div className="auth-feature-item">
                   <span className="auth-feature-icon">📊</span>
-                  <span className="auth-feature-text">Health Analytics</span>
+                  <span className="auth-feature-text">{t('healthAnalytics', language)}</span>
                 </div>
                 <div className="auth-feature-item">
                   <span className="auth-feature-icon">🔔</span>
-                  <span className="auth-feature-text">Smart Reminders</span>
+                  <span className="auth-feature-text">{t('smartReminders', language)}</span>
                 </div>
               </div>
             </div>
@@ -207,13 +210,13 @@ const AuthModal = ({ isOpen, onClose }) => {
                 className={`auth-tab ${isLogin ? 'active' : ''}`}
                 onClick={() => setIsLogin(true)}
               >
-                Login
+                {t('login', language)}
               </button>
               <button
                 className={`auth-tab ${!isLogin ? 'active' : ''}`}
                 onClick={() => setIsLogin(false)}
               >
-                Sign Up
+                {t('signUp', language)}
               </button>
             </div>
 
@@ -225,12 +228,12 @@ const AuthModal = ({ isOpen, onClose }) => {
               )}
 
               <div className="auth-form-group">
-                <label htmlFor="username">Username</label>
+                <label htmlFor="username">{t('username', language)}</label>
                 <input
                   type="text"
                   id="username"
                   name="username"
-                  placeholder="Enter your username"
+                  placeholder={t('enterUsername', language)}
                   value={formData.username}
                   onChange={handleInputChange}
                   required
@@ -240,12 +243,12 @@ const AuthModal = ({ isOpen, onClose }) => {
               {!isLogin && (
                 <>
                   <div className="auth-form-group">
-                    <label htmlFor="email">Email</label>
+                    <label htmlFor="email">{t('email', language)}</label>
                     <input
                       type="email"
                       id="email"
                       name="email"
-                      placeholder="Enter your email"
+                      placeholder={t('enterEmail', language)}
                       value={formData.email}
                       onChange={handleInputChange}
                       required
@@ -267,12 +270,12 @@ const AuthModal = ({ isOpen, onClose }) => {
 
                   <div className="auth-form-row">
                     <div className="auth-form-group">
-                      <label htmlFor="age">Age</label>
+                      <label htmlFor="age">{t('age', language)}</label>
                       <input
                         type="number"
                         id="age"
                         name="age"
-                        placeholder="Age"
+                        placeholder={t('ageOptional', language)}
                         min="1"
                         max="150"
                         value={formData.age}
@@ -281,16 +284,16 @@ const AuthModal = ({ isOpen, onClose }) => {
                       />
                     </div>
                     <div className="auth-form-group">
-                      <label htmlFor="gender">Gender</label>
+                      <label htmlFor="gender">{t('gender', language)}</label>
                       <select
                         id="gender"
                         name="gender"
                         value={formData.gender}
                         onChange={handleInputChange}
                       >
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
+                        <option value="Male">{t('male', language)}</option>
+                        <option value="Female">{t('female', language)}</option>
+                        <option value="Other">{t('other', language)}</option>
                       </select>
                     </div>
                   </div>
@@ -298,12 +301,12 @@ const AuthModal = ({ isOpen, onClose }) => {
               )}
 
               <div className="auth-form-group">
-                <label htmlFor="password">Password</label>
+                <label htmlFor="password">{t('password', language)}</label>
                 <input
                   type="password"
                   id="password"
                   name="password"
-                  placeholder="Enter your password"
+                  placeholder={t('enterPassword', language)}
                   value={formData.password}
                   onChange={handleInputChange}
                   required
@@ -333,22 +336,22 @@ const AuthModal = ({ isOpen, onClose }) => {
                 {loading ? (
                   <>
                     <span className="auth-spinner"></span>
-                    {isLogin ? 'Logging in...' : 'Creating account...'}
+                    {isLogin ? t('loggingIn', language) : t('creatingAccount', language)}
                   </>
                 ) : (
-                  isLogin ? 'Login' : 'Create Account'
+                  isLogin ? t('login', language) : t('createAccount', language)
                 )}
               </button>
 
               <div className="auth-toggle-container">
                 <p>
-                  {isLogin ? "Don't have an account?" : 'Already have an account?'}
+                  {isLogin ? t('dontHaveAccount', language) : t('alreadyHaveAccount', language)}
                   <button
                     type="button"
                     onClick={handleToggle}
                     className="auth-toggle-btn"
                   >
-                    {isLogin ? 'Sign Up' : 'Login'}
+                    {isLogin ? t('signUp', language) : t('login', language)}
                   </button>
                 </p>
               </div>

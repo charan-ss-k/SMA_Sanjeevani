@@ -4,6 +4,9 @@ requests
 pydantic
 python-multipart
 coqui-tts
+gtts>=2.5.0
+pydub>=0.25.1
+google-cloud-texttospeech>=2.16.0
 
 # Database & ORM
 sqlalchemy>=2.0

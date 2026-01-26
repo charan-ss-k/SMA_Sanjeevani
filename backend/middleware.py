@@ -1,8 +1,9 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional
 from security import verify_token
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
@@ -27,15 +28,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = None):
+async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """
-    Optional authentication - returns user_id if token present, None otherwise.
+    Optional authentication - returns user_id if token present and valid, None otherwise.
     """
     if not credentials:
         return None
     
     try:
-        user_id = verify_token(credentials.credentials)
+        token = credentials.credentials
+        user_id = verify_token(token)
         return user_id
     except:
         return None
