@@ -24,7 +24,8 @@ class SignupRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, description="Username (3-50 chars)")
     email: str = Field(..., description="Email address")
     password: str = Field(..., min_length=6, description="Password (at least 6 chars)")
-    full_name: str = Field(..., min_length=1, max_length=100, description="Full name")
+    first_name: str = Field(..., min_length=1, max_length=100, description="First name")
+    last_name: str = Field(..., min_length=1, max_length=100, description="Last name")
     age: int = Field(None, ge=0, le=150, description="Age")
     gender: str = Field(None, description="Gender (Male/Female/Other)")
 
@@ -40,7 +41,8 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
-    full_name: str
+    first_name: str
+    last_name: str
     age: int
     gender: str
     is_active: bool
@@ -72,7 +74,8 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     - **username**: Unique username (3-50 characters)
     - **email**: Valid email address
     - **password**: At least 6 characters
-    - **full_name**: User's full name
+    - **first_name**: User's first name
+    - **last_name**: User's last name
     - **age**: Optional age
     - **gender**: Optional gender
     
@@ -95,14 +98,15 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
         )
     
     # Create new user
-    hashed_password = hash_password(request.password)
+    password_hash = hash_password(request.password)
     new_user = User(
         username=request.username,
         email=request.email,
-        full_name=request.full_name,
+        first_name=request.first_name,
+        last_name=request.last_name,
         age=request.age,
         gender=request.gender,
-        hashed_password=hashed_password
+        password_hash=password_hash
     )
     
     db.add(new_user)
@@ -119,7 +123,7 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": UserResponse.from_orm(new_user),
+        "user": UserResponse.model_validate(new_user),
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
     }
 
@@ -146,7 +150,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         )
     
     # Verify password
-    if not verify_password(request.password, user.hashed_password):
+    if not verify_password(request.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
@@ -169,7 +173,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": UserResponse.from_orm(user),
+        "user": UserResponse.model_validate(user),
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
     }
 
@@ -198,7 +202,7 @@ async def get_current_user(
             detail="User not found"
         )
     
-    return UserResponse.from_orm(user)
+    return UserResponse.model_validate(user)
 
 
 @router.post("/change-password")
@@ -234,14 +238,14 @@ async def change_password(
         )
     
     # Verify old password
-    if not verify_password(request.old_password, user.hashed_password):
+    if not verify_password(request.old_password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid current password"
         )
     
     # Update password
-    user.hashed_password = hash_password(request.new_password)
+    user.password_hash = hash_password(request.new_password)
     db.commit()
     
     return {"message": "Password changed successfully"}

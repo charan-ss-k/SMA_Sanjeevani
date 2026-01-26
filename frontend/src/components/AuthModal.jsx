@@ -77,19 +77,40 @@ const AuthModal = ({ isOpen, onClose }) => {
 
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/signup';
-      const payload = isLogin 
-        ? {
-            username: formData.username,
-            password: formData.password
-          }
-        : {
-            username: formData.username,
-            email: formData.email,
-            password: formData.password,
-            full_name: formData.fullName,
-            age: parseInt(formData.age),
-            gender: formData.gender
-          };
+      
+      let payload;
+      if (isLogin) {
+        payload = {
+          username: formData.username,
+          password: formData.password
+        };
+      } else {
+        // Split fullName into first_name and last_name
+        const trimmedName = formData.fullName.trim();
+        const nameParts = trimmedName.split(/\s+/).filter(part => part.length > 0);
+        
+        let first_name, last_name;
+        if (nameParts.length === 0) {
+          first_name = '';
+          last_name = 'User';
+        } else if (nameParts.length === 1) {
+          first_name = nameParts[0];
+          last_name = nameParts[0]; // Use same name for last name if only one word
+        } else {
+          first_name = nameParts[0];
+          last_name = nameParts.slice(1).join(' ');
+        }
+        
+        payload = {
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          first_name: first_name,
+          last_name: last_name,
+          age: parseInt(formData.age) || null,
+          gender: formData.gender || null
+        };
+      }
 
       const response = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
@@ -97,12 +118,13 @@ const AuthModal = ({ isOpen, onClose }) => {
         body: JSON.stringify(payload)
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        setError(data.detail || 'Authentication failed');
+        const errorData = await response.json().catch(() => ({ detail: 'Authentication failed' }));
+        setError(errorData.detail || errorData.message || 'Authentication failed');
         return;
       }
+
+      const data = await response.json();
 
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
