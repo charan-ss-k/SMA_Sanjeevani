@@ -13,9 +13,12 @@ import Dashboard from './components/Dashboard.jsx';
 import Tutorial from './components/Tutorial.jsx';
 import MedicineRecommendation from './components/MedicineRecommendation.jsx';
 import ChatWidget from './components/Chatwidget.jsx';
+import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
+import { ProtectedRoute } from './components/ProtectedRoute.jsx';
 
 // Create Language Context
 export const LanguageContext = createContext('english');
+export { AuthContext };
 
 // Language Provider Wrapper
 function AppWrapper() {
@@ -29,22 +32,24 @@ function AppWrapper() {
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage: handleLanguageChange }}>
-      <Router>
-        <Navbar language={language} onLanguageChange={handleLanguageChange} />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/medicine-recommendation" element={<MedicineRecommendation />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/prescription" element={<PrescriptionHandling />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/tutorial" element={<Tutorial />} />
-        </Routes>
-        <ChatWidget />
-      </Router>
-    </LanguageContext.Provider>
+    <AuthProvider>
+      <LanguageContext.Provider value={{ language, setLanguage: handleLanguageChange }}>
+        <Router>
+          <Navbar language={language} onLanguageChange={handleLanguageChange} />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/medicine-recommendation" element={<ProtectedRoute><MedicineRecommendation /></ProtectedRoute>} />
+            <Route path="/about" element={<About />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/prescription" element={<ProtectedRoute><PrescriptionHandling /></ProtectedRoute>} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/tutorial" element={<Tutorial />} />
+          </Routes>
+          <ChatWidget />
+        </Router>
+      </LanguageContext.Provider>
+    </AuthProvider>
   );
 }
 

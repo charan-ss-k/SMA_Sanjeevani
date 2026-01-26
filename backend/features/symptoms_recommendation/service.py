@@ -41,16 +41,16 @@ def call_llm(prompt: str) -> str:
     
     if provider == "mock":
         logger.warning("!!! WARNING: Using MOCK provider - NOT calling real LLM !!!")
-        logger.warning("To use real Neural-Chat-7B, set LLM_PROVIDER=ollama in .env")
-        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Neural-Chat-7B")
+        logger.warning("To use real Phi-3.5, set LLM_PROVIDER=ollama in .env")
+        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Phi-3.5")
     
     if provider == "ollama":
-        logger.info("*** CALLING NEURAL-CHAT-7B VIA OLLAMA ***")
+        logger.info("*** CALLING PHI-3.5 VIA OLLAMA ***")
         ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-        ollama_model = os.environ.get("OLLAMA_MODEL", "neural-chat").strip()
+        ollama_model = os.environ.get("OLLAMA_MODEL", "phi3.5").strip()
         
         logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s", ollama_model)
+        logger.info("Ollama Model: %s (Phi-3.5 - fastest medical LLM)", ollama_model)
         logger.info("Prompt length: %d characters", len(prompt))
         logger.info("Prompt (first 800 chars):\n%s", prompt[:800])
         
@@ -64,7 +64,7 @@ def call_llm(prompt: str) -> str:
         
         try:
             logger.info("Sending request to Ollama...")
-            logger.info("WARNING: This may take 30-120 seconds for Mistral to respond...")
+            logger.info("WARNING: This may take 2-5 seconds for Phi-3.5 to respond...")
             # Increase timeout to 5 minutes (300 seconds) for slow systems
             resp = requests.post(api_url, json=payload, timeout=300)
             
@@ -81,35 +81,35 @@ def call_llm(prompt: str) -> str:
             resp_json = resp.json()
             llm_output = resp_json.get("response", "")
             
-            logger.info("Neural-Chat response received (%d chars)", len(llm_output))
-            logger.info("Neural-Chat output (first 1500 chars):\n%s", llm_output[:1500])
+            logger.info("Phi-3.5 response received (%d chars)", len(llm_output))
+            logger.info("Phi-3.5 output (first 1500 chars):\n%s", llm_output[:1500])
             
             # Try to extract JSON from the response
             try:
                 parsed = utils.try_parse_json(llm_output)
-                logger.info("✓ SUCCESS: Parsed JSON from Neural-Chat response")
+                logger.info("✓ SUCCESS: Parsed JSON from Phi-3.5 response")
                 logger.info("Predicted condition: '%s'", parsed.get("predicted_condition"))
                 logger.info("Number of medicines: %d", len(parsed.get("recommended_medicines", [])))
                 return json.dumps(parsed)
             except Exception as parse_err:
-                logger.error("✗ FAILED: Cannot parse JSON from Neural-Chat")
+                logger.error("✗ FAILED: Cannot parse JSON from Phi-3.5")
                 logger.error("Parse error: %s", parse_err)
-                logger.error("Full Neural-Chat output:\n%s", llm_output)
-                raise ValueError(f"Neural-Chat did not return valid JSON.\n\nNeural-Chat output:\n{llm_output[:2000]}\n\nError: {parse_err}")
+                logger.error("Full Phi-3.5 output:\n%s", llm_output)
+                raise ValueError(f"Phi-3.5 did not return valid JSON.\n\nPhi-3.5 output:\n{llm_output[:2000]}\n\nError: {parse_err}")
                 
         except requests.exceptions.ConnectionError as ce:
-            logger.error("✗ FATAL: Cannot connect to Ollama")
+            logger.error("✗ FATAL: Cannot connect to Ollama (Phi-3.5)")
             logger.error("Ollama URL: %s", ollama_url)
             logger.error("Error: %s", ce)
             raise Exception(
                 f"Cannot connect to Ollama at {ollama_url}\n\n"
                 f"Solutions:\n"
                 f"1. Make sure Ollama is running: ollama serve\n"
-                f"2. Verify model is installed: ollama list\n"
+                f"2. Verify Phi-3.5 model is installed: ollama list\n"
                 f"3. Check OLLAMA_URL in .env is correct"
             )
         except Exception as e:
-            logger.exception("✗ ERROR calling Ollama/Neural-Chat: %s", e)
+            logger.exception("✗ ERROR calling Ollama/Phi-3.5: %s", e)
             raise
     
     else:
@@ -216,7 +216,7 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
 
 def answer_medical_question(question: str) -> str:
     """
-    Answer ANY question using LLM as a medical assistant.
+    Answer ANY question using Phi-3.5 LLM as a medical assistant.
     The LLM intelligently determines if it's medical and responds appropriately.
     Works with medical terms from around the world in multiple languages.
     Acts like ChatGPT for medical knowledge.
@@ -250,18 +250,62 @@ Question from user: {question}
 Response:"""
 
     try:
-        # Call LLM
-        response = call_llm(prompt)
-        logger.info("Medical QA response: %s", response)
+        logger.info("Calling Phi-3.5 LLM for medical Q&A...")
         
-        # Clean response (remove any trailing markers or extra text)
-        answer = response.strip()
+        # Get LLM config
+        provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
+        ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
+        ollama_model = os.environ.get("OLLAMA_MODEL", "phi3.5").strip()
         
-        # If empty, return a default message
-        if not answer or len(answer) < 10:
-            answer = "I encountered an issue processing that question. Please try rephrasing your medical question."
+        logger.info("LLM Provider: %s", provider)
+        logger.info("Ollama URL: %s", ollama_url)
+        logger.info("Ollama Model: %s (using Phi-3.5 for fast responses)", ollama_model)
+        
+        if provider != "ollama":
+            raise Exception(f"Only Ollama provider is supported. Got: {provider}")
+        
+        # Call Ollama directly without JSON parsing
+        api_url = f"{ollama_url}/api/generate"
+        payload = {
+            "model": ollama_model,
+            "prompt": prompt,
+            "stream": False,
+            "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
+        }
+        
+        logger.info("Sending request to Phi-3.5 via Ollama...")
+        logger.info("Timeout: 300 seconds")
+        
+        resp = requests.post(api_url, json=payload, timeout=300)
+        
+        if resp.status_code != 200:
+            error_msg = resp.text
+            logger.error("Ollama error (status %d): %s", resp.status_code, error_msg)
+            raise Exception(f"Ollama API error: {resp.status_code} - {error_msg}")
+        
+        resp.raise_for_status()
+        
+        # Extract response from Ollama
+        resp_json = resp.json()
+        answer = resp_json.get("response", "").strip()
+        
+        logger.info("✓ Phi-3.5 response received (%d chars)", len(answer))
+        logger.info("Response (first 500 chars): %s", answer[:500])
+        
+        # Validate response
+        if not answer or len(answer) < 5:
+            logger.warning("Response too short or empty, using fallback")
+            answer = "I couldn't generate a proper response. Please try rephrasing your medical question."
         
         return answer
+        
+    except requests.exceptions.ConnectionError as ce:
+        logger.error("Connection error to Ollama: %s", ce)
+        return f"Cannot connect to LLM service at {os.environ.get('OLLAMA_URL', 'http://localhost:11434')}. Please ensure Ollama is running with: ollama serve"
+    except requests.exceptions.Timeout:
+        logger.error("Request timeout to Ollama")
+        return "The LLM service took too long to respond. Please try again."
     except Exception as e:
         logger.exception("Error in answer_medical_question: %s", e)
-        return "I encountered an error processing your question. Please try again or consult a healthcare professional."
+        logger.error("Full error details: %s", str(e))
+        return f"Error processing your question: {str(e)[:100]}. Please try again or consult a healthcare professional."

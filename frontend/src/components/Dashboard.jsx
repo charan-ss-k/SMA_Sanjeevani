@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import { AuthContext } from '../main';
+import FeatureLoginPrompt from './FeatureLoginPrompt';
 
 function speak(text) {
   if (!window.speechSynthesis) return;
@@ -12,6 +14,7 @@ function speak(text) {
 }
 
 const Dashboard = () => {
+  const { isAuthenticated } = useContext(AuthContext);
   const [searchHistory, setSearchHistory] = useState([]);
   const [stats, setStats] = useState({
     totalSearches: 0,
@@ -123,7 +126,9 @@ const Dashboard = () => {
   const colors = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 pt-24 pb-10">
+    <>
+      {!isAuthenticated && <FeatureLoginPrompt featureName="the dashboard" />}
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 pt-24 pb-10">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
@@ -325,7 +330,8 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

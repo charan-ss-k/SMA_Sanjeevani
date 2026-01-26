@@ -22,10 +22,11 @@ export async function playTTS(text, language = 'english') {
         text: text,
         language: language,
       }),
+      timeout: 30000, // 30 second timeout
     });
 
     if (!response.ok) {
-      console.error(`TTS API error: ${response.status}`);
+      console.warn(`⚠️ TTS API error: ${response.status} - falling back to Web Speech`);
       // Fallback to Web Speech API
       fallbackToWebSpeech(text, language);
       return;
@@ -33,27 +34,39 @@ export async function playTTS(text, language = 'english') {
 
     const data = await response.json();
     
+    if (!data.audio) {
+      console.warn('⚠️ No audio data in response - falling back to Web Speech');
+      fallbackToWebSpeech(text, language);
+      return;
+    }
+    
     // Create audio element and play
     const audioData = data.audio;
     const mimeType = 'audio/wav';
-    const binaryString = atob(audioData);
-    const bytes = new Uint8Array(binaryString.length);
     
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    try {
+      const binaryString = atob(audioData);
+      const bytes = new Uint8Array(binaryString.length);
+      
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const blob = new Blob([bytes], { type: mimeType });
+      const audioUrl = URL.createObjectURL(blob);
+      
+      const audio = new Audio(audioUrl);
+      audio.play().catch(err => {
+        console.warn('⚠️ Audio play error:', err);
+        fallbackToWebSpeech(text, language);
+      });
+    } catch (decodeErr) {
+      console.warn('⚠️ Audio decode error:', decodeErr);
+      fallbackToWebSpeech(text, language);
     }
     
-    const blob = new Blob([bytes], { type: mimeType });
-    const audioUrl = URL.createObjectURL(blob);
-    
-    const audio = new Audio(audioUrl);
-    audio.play().catch(err => {
-      console.error('Audio play error:', err);
-      fallbackToWebSpeech(text, language);
-    });
-    
   } catch (error) {
-    console.error('TTS Error:', error);
+    console.warn('⚠️ TTS Error (non-fatal):', error);
     // Fallback to Web Speech API
     fallbackToWebSpeech(text, language);
   }

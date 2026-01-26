@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
+import SearchableInput from './SearchableInput';
 
 const COMMON_SYMPTOMS = [
   'fever', 'headache', 'body pain', 'cough', 'cold', 'sore throat', 'fatigue',
@@ -33,6 +34,8 @@ const SymptomChecker = ({ onResult }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showAllSymptoms, setShowAllSymptoms] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const abortControllerRef = React.useRef(null);
 
   const toggleSymptom = (s) => {
     setSymptoms(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -44,6 +47,25 @@ const SymptomChecker = ({ onResult }) => {
 
   const toggleCondition = (c) => {
     setConditions(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('[SymptomChecker] Request stopped by user');
+    }
+    setLoading(false);
+    window.speechSynthesis.cancel();
+  };
+
+  const handleMuteToggle = () => {
+    setIsMuted(!isMuted);
+    if (!isMuted) {
+      window.speechSynthesis.cancel();
+      console.log('[SymptomChecker] TTS muted');
+    } else {
+      console.log('[SymptomChecker] TTS unmuted');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -84,18 +106,15 @@ const SymptomChecker = ({ onResult }) => {
       console.log('[SymptomChecker] Payload:', payload);
       playTTS('Processing your symptoms. This may take up to 2 minutes. Please wait.', language);
 
-      // Increase timeout to 5 minutes (300 seconds)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000);
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController();
 
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: controller.signal,
+        signal: abortControllerRef.current.signal,
       });
-
-      clearTimeout(timeoutId);
       console.log('[SymptomChecker] Response status:', res.status);
 
       if (!res.ok) {
@@ -121,15 +140,15 @@ const SymptomChecker = ({ onResult }) => {
       });
       playTTS('Analysis complete. Here are your recommendations.', language);
 
-      // Speak the TTS payload
-      if (data.tts_payload) {
+      // Speak the TTS payload (only if not muted)
+      if (data.tts_payload && !isMuted) {
         setTimeout(() => playTTS(data.tts_payload, language), 1000);
       }
     } catch (err) {
       console.error('[SymptomChecker] Full error:', err);
       if (err.name === 'AbortError') {
-        setError('Request timeout. Please try again or check if backend is running.');
-        playTTS('Request took too long. Please try again.', language);
+        setError('Request stopped by user.');
+        playTTS('Request stopped.', language);
       } else {
         setError(err.message || 'Network error. Is the backend running on http://127.0.0.1:8000?');
         playTTS('There was an error. Please try again.', language);
@@ -185,45 +204,27 @@ const SymptomChecker = ({ onResult }) => {
         </div>
       </div>
 
-      {/* Symptoms - Predefined */}
+      {/* Symptoms - Searchable */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-2xl font-bold text-green-800">🤒 Symptoms (Select all that apply)</h3>
+          <h3 className="text-2xl font-bold text-green-800">🤒 Symptoms (Search & Select)</h3>
           <button
             type="button"
-            onClick={() => playTTS('Select symptoms you are experiencing', language)}
+            onClick={() => playTTS('Select symptoms you are experiencing. Type to search for symptoms', language)}
             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-lg font-semibold"
           >
             🔊 Help
           </button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {(showAllSymptoms ? COMMON_SYMPTOMS : COMMON_SYMPTOMS.slice(0, 12)).map((s) => (
-            <label
-              key={s}
-              className="flex items-center p-3 border-2 border-gray-300 rounded-lg cursor-pointer hover:bg-green-100 hover:border-green-500 transition"
-            >
-              <input
-                type="checkbox"
-                checked={symptoms.includes(s)}
-                onChange={() => {
-                  setSymptoms(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-                }}
-                className="w-5 h-5 mr-3 cursor-pointer"
-              />
-              <span className="text-lg capitalize font-medium">{s}</span>
-            </label>
-          ))}
-        </div>
-        {!showAllSymptoms && COMMON_SYMPTOMS.length > 12 && (
-          <button
-            type="button"
-            onClick={() => setShowAllSymptoms(true)}
-            className="mt-4 text-green-600 font-semibold hover:text-green-800 text-lg"
-          >
-            + Show More Symptoms
-          </button>
-        )}
+        <SearchableInput
+          items={COMMON_SYMPTOMS}
+          selectedItems={symptoms}
+          onSelectionChange={setSymptoms}
+          placeholder="Type a symptom (e.g., fever, headache, cough)..."
+          label="Select symptoms"
+          maxDisplay={8}
+        />
+        <p className="text-sm text-gray-600 mt-2">💡 Type the first letter of a symptom to filter the list</p>
       </div>
 
       {/* Custom Symptoms Text Input */}
@@ -239,50 +240,32 @@ const SymptomChecker = ({ onResult }) => {
         <p className="text-sm text-gray-600 mt-2">Tip: Separate multiple symptoms with commas (,)</p>
       </div>
 
-      {/* Allergies */}
+      {/* Allergies - Searchable */}
       <div>
-        <h3 className="text-2xl font-bold text-red-800 mb-4">⚠️ Allergies (if you have any)</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {ALLERGIES_LIST.map((a) => (
-            <label
-              key={a}
-              className="flex items-center p-3 border-2 border-red-200 rounded-lg bg-red-50 cursor-pointer hover:bg-red-100 hover:border-red-500 transition"
-            >
-              <input
-                type="checkbox"
-                checked={allergies.includes(a)}
-                onChange={() => {
-                  setAllergies(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
-                }}
-                className="w-5 h-5 mr-3 cursor-pointer"
-              />
-              <span className="text-lg capitalize font-medium">{a}</span>
-            </label>
-          ))}
-        </div>
+        <h3 className="text-2xl font-bold text-red-800 mb-4">⚠️ Allergies (Search & Select)</h3>
+        <SearchableInput
+          items={ALLERGIES_LIST}
+          selectedItems={allergies}
+          onSelectionChange={setAllergies}
+          placeholder="Search for allergies (e.g., penicillin, peanuts, gluten)..."
+          label="Select allergies if you have any"
+          maxDisplay={8}
+        />
+        <p className="text-sm text-gray-600 mt-2">💡 Type the first letter of an allergy to filter the list</p>
       </div>
 
-      {/* Existing Conditions */}
+      {/* Existing Conditions - Searchable */}
       <div>
-        <h3 className="text-2xl font-bold text-orange-800 mb-4">🏥 Existing Health Conditions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {CONDITIONS_LIST.map((c) => (
-            <label
-              key={c}
-              className="flex items-center p-3 border-2 border-orange-200 rounded-lg bg-orange-50 cursor-pointer hover:bg-orange-100 hover:border-orange-500 transition"
-            >
-              <input
-                type="checkbox"
-                checked={conditions.includes(c)}
-                onChange={() => {
-                  setConditions(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
-                }}
-                className="w-5 h-5 mr-3 cursor-pointer"
-              />
-              <span className="text-lg capitalize font-medium">{c}</span>
-            </label>
-          ))}
-        </div>
+        <h3 className="text-2xl font-bold text-orange-800 mb-4">🏥 Existing Health Conditions (Search & Select)</h3>
+        <SearchableInput
+          items={CONDITIONS_LIST}
+          selectedItems={conditions}
+          onSelectionChange={setConditions}
+          placeholder="Search for health conditions (e.g., diabetes, asthma, heart disease)..."
+          label="Select any existing health conditions"
+          maxDisplay={8}
+        />
+        <p className="text-sm text-gray-600 mt-2">💡 Type the first letter of a condition to filter the list</p>
       </div>
 
       {/* Pregnancy Status */}
@@ -307,26 +290,51 @@ const SymptomChecker = ({ onResult }) => {
 
       {/* Submit Buttons */}
       <div className="flex flex-col md:flex-row gap-4 pt-6 border-t-4 border-green-300">
+        {/* Mute Button */}
         <button
-          type="submit"
-          disabled={loading || symptoms.length === 0 && !customSymptoms.trim()}
-          className="flex-1 bg-gradient-to-r from-green-700 to-green-600 text-white px-8 py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xl hover:from-green-800 hover:to-green-700 transition shadow-lg"
+          type="button"
+          onClick={handleMuteToggle}
+          title={isMuted ? 'Unmute TTS' : 'Mute TTS'}
+          className={`px-6 py-4 rounded-xl font-bold text-lg transition shadow-lg ${
+            isMuted
+              ? 'bg-red-500 text-white hover:bg-red-600'
+              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+          }`}
+        >
+          {isMuted ? '🔇 Unmute' : '🔊 Mute'}
+        </button>
+
+        {/* Submit/Stop Button */}
+        <button
+          type={loading ? 'button' : 'submit'}
+          onClick={loading ? handleStop : undefined}
+          disabled={!loading && (symptoms.length === 0 && !customSymptoms.trim())}
+          className={`flex-1 text-white px-8 py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xl transition shadow-lg ${
+            loading
+              ? 'bg-orange-500 hover:bg-orange-600'
+              : 'bg-gradient-to-r from-green-700 to-green-600 hover:from-green-800 hover:to-green-700'
+          }`}
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">⏳</span>
-              Processing (1-2 min)...
+              <span>⏹️ Stop Processing</span>
             </span>
           ) : (
             '💊 Get Recommendation'
           )}
         </button>
+
+        {/* Instructions Button */}
         <button
           type="button"
-          onClick={() => playTTS('Ready to help. Select your symptoms and fill the information, then submit.', language)}
-          className="flex-1 bg-amber-500 text-white px-8 py-4 rounded-xl font-bold text-xl hover:bg-amber-600 transition shadow-lg"
+          onClick={() => {
+            if (!isMuted) {
+              playTTS('Ready to help. Select your symptoms and fill the information, then submit.', language);
+            }
+          }}
+          className="px-6 py-4 bg-amber-500 text-white rounded-xl font-bold text-lg hover:bg-amber-600 transition shadow-lg"
         >
-          🔊 Read Instructions
+          🔊 Help
         </button>
       </div>
     </form>

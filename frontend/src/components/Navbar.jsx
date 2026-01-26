@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useContext, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import logo from '../assets/Sanjeevani Logo.png';
 import LanguageSwitcher from './LanguageSwitcher';
+import { AuthContext } from '../main';
+import AuthModal from './AuthModal';
 
 const Navbar = ({ language, onLanguageChange }) => {
   const location = useLocation();
+  const { isAuthenticated, user, logout } = useContext(AuthContext);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const getLinkClass = (path) => {
     return location.pathname === path
@@ -67,8 +72,52 @@ const Navbar = ({ language, onLanguageChange }) => {
 
           <div className="flex items-center space-x-4">
             <LanguageSwitcher currentLanguage={language} onLanguageChange={onLanguageChange} />
-            <button className="bg-green-700 text-white px-4 py-2 rounded-full">Login</button>
+            
+            {isAuthenticated ? (
+              <div className="relative">
+                <button 
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="bg-green-700 text-white px-4 py-2 rounded-full hover:bg-green-800 transition-colors flex items-center gap-2"
+                >
+                  👤 {user?.username || 'User'}
+                </button>
+                
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-40">
+                    <div className="p-4 border-b border-gray-200">
+                      <p className="font-semibold text-gray-800">{user?.full_name || user?.username}</p>
+                      <p className="text-sm text-gray-500">{user?.email}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setShowUserMenu(false);
+                        window.location.href = '/';
+                      }}
+                      className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 transition-colors font-medium"
+                    >
+                      🚪 Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button 
+                onClick={() => setShowAuthModal(true)}
+                className="bg-green-700 text-white px-4 py-2 rounded-full hover:bg-green-800 transition-colors"
+              >
+                Login
+              </button>
+            )}
           </div>
+
+          {/* Auth Modal Import */}
+          {showAuthModal && (
+            <AuthModal 
+              isOpen={showAuthModal} 
+              onClose={() => setShowAuthModal(false)} 
+            />
+          )}
         </div>
       </div>
     </nav>

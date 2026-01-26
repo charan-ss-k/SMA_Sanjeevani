@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import logo from '../assets/Sanjeevani Logo.png';
+import { AuthContext } from '../main';
+import FeatureLoginPrompt from './FeatureLoginPrompt';
 
 function speak(text) {
   if (!window.speechSynthesis) return;
@@ -48,6 +50,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak, onSetReminder }) => (
 );
 
 const PrescriptionHandling = () => {
+  const { isAuthenticated } = useContext(AuthContext);
   const [medicines, setMedicines] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
@@ -63,6 +66,7 @@ const PrescriptionHandling = () => {
   const [showForm, setShowForm] = useState(false);
   const [upcomingReminders, setUpcomingReminders] = useState([]);
   const [takenMedicines, setTakenMedicines] = useState([]);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -121,6 +125,16 @@ const PrescriptionHandling = () => {
     return () => clearInterval(interval);
   }, [medicines]);
 
+  const handleMuteToggle = () => {
+    setIsMuted(!isMuted);
+    if (!isMuted) {
+      window.speechSynthesis.cancel();
+      console.log('[PrescriptionHandling] TTS muted');
+    } else {
+      console.log('[PrescriptionHandling] TTS unmuted');
+    }
+  };
+
   const handleAddMedicine = () => {
     if (!formData.name || !formData.dosage || !formData.frequency) {
       alert('Please fill in Name, Dosage, and Frequency');
@@ -153,7 +167,7 @@ const PrescriptionHandling = () => {
       notes: '',
     });
     setShowForm(false);
-    speak(`Medicine ${editingId ? 'updated' : 'added'} successfully`);
+    if (!isMuted) speak(`Medicine ${editingId ? 'updated' : 'added'} successfully`);
   };
 
   const handleEditMedicine = (med) => {
@@ -165,7 +179,7 @@ const PrescriptionHandling = () => {
   const handleDeleteMedicine = (id) => {
     if (confirm('Delete this medicine?')) {
       setMedicines(prev => prev.filter(m => m.id !== id));
-      speak('Medicine deleted');
+      if (!isMuted) speak('Medicine deleted');
     }
   };
 
@@ -176,7 +190,7 @@ const PrescriptionHandling = () => {
         ? { ...m, reminders: [...(m.reminders || []), time].sort() }
         : m
     ));
-    speak(`Reminder set for ${time}`);
+    if (!isMuted) speak(`Reminder set for ${time}`);
   };
 
   const handleRemoveReminder = (medId, time) => {
@@ -193,7 +207,7 @@ const PrescriptionHandling = () => {
       ...med,
       takenAt: now,
     }]);
-    speak(`${med.name} marked as taken`);
+    if (!isMuted) speak(`${med.name} marked as taken`);
     setUpcomingReminders(prev => prev.filter(m => m.id !== med.id));
   };
 
@@ -244,13 +258,28 @@ const PrescriptionHandling = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 pt-24 pb-10">
+    <>
+      {!isAuthenticated && <FeatureLoginPrompt featureName="prescription management" />}
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 pt-24 pb-10">
       <div className="container mx-auto px-4 max-w-7xl">
         
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-5xl font-bold text-green-800 mb-2">💊 Prescription & Medicine Management</h1>
-          <p className="text-xl text-gray-700">Upload, track, and get reminders for your medicines</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-5xl font-bold text-green-800 mb-2">💊 Prescription & Medicine Management</h1>
+            <p className="text-xl text-gray-700">Upload, track, and get reminders for your medicines</p>
+          </div>
+          <button
+            onClick={handleMuteToggle}
+            title={isMuted ? 'Unmute TTS' : 'Mute TTS'}
+            className={`px-6 py-3 rounded-lg font-bold text-lg transition shadow-lg ${
+              isMuted
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+          >
+            {isMuted ? '🔇 Unmute' : '🔊 Mute'}
+          </button>
         </div>
 
         {/* Quick Stats */}
@@ -510,7 +539,8 @@ const PrescriptionHandling = () => {
         </div>
 
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

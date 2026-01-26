@@ -3,9 +3,12 @@ import SymptomChecker from './SymptomChecker';
 import RecommendationResult from './RecommendationResult';
 import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
+import { AuthContext } from '../main';
+import FeatureLoginPrompt from './FeatureLoginPrompt';
 
 const MedicineRecommendation = () => {
   const { language } = useContext(LanguageContext);
+  const { isAuthenticated } = useContext(AuthContext);
   const [result, setResult] = useState(null);
   const [showForm, setShowForm] = useState(true);
 
@@ -32,7 +35,9 @@ const MedicineRecommendation = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-amber-50 pt-24 pb-10">
+    <>
+      {!isAuthenticated && <FeatureLoginPrompt featureName="medicine recommendations" />}
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-amber-50 pt-24 pb-10">
       <div className="container mx-auto px-4 max-w-6xl">
         {/* Header */}
         <div className="mb-8">
@@ -175,7 +180,8 @@ const MedicineRecommendation = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

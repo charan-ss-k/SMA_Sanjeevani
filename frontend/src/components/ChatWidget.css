@@ -1,0 +1,116 @@
+/* Professional Medical Response Formatting */
+
+.medical-response {
+  line-height: 1.6;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.medical-response p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.medical-response ul {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.medical-response li {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.medical-response .font-bold {
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.medical-response .text-green-700 {
+  color: #15803d;
+}
+
+.medical-response .text-blue-700 {
+  color: #1d4ed8;
+}
+
+.medical-response .bg-blue-50 {
+  background-color: #eff6ff;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.medical-response .text-red-600 {
+  color: #dc2626;
+}
+
+.medical-response .font-semibold {
+  font-weight: 600;
+}
+
+.medical-response .bg-yellow-50 {
+  background-color: #fefce8;
+}
+
+.medical-response .border-l-4 {
+  border-left-width: 4px;
+}
+
+.medical-response .border-yellow-400 {
+  border-color: #facc15;
+}
+
+.medical-response .p-4 {
+  padding: 1rem;
+}
+
+.medical-response .rounded {
+  border-radius: 0.375rem;
+}
+
+.medical-response .my-4 {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.medical-response .mt-2 {
+  margin-top: 0.5rem;
+}
+
+.medical-response .text-sm {
+  font-size: 0.875rem;
+}
+
+/* Strong emphasis for medication names and key terms */
+.medical-response strong {
+  font-weight: 700;
+  color: #059669;
+}
+
+/* Improved list styling */
+.medical-response ul.list-disc {
+  list-style-type: disc;
+  list-style-position: inside;
+}
+
+.medical-response ul.list-disc li {
+  margin-left: 0.5rem;
+  padding-left: 0.5rem;
+}
+
+/* Responsive text sizes */
+@media (max-width: 640px) {
+  .medical-response {
+    font-size: 0.9rem;
+  }
+
+  .medical-response ul {
+    padding-left: 1rem;
+  }
+
+  .medical-response .font-bold {
+    font-size: 1rem;
+  }
+}
