@@ -1,160 +1,219 @@
-# Backend - SMA Sanjeevani
+# SMA Sanjeevani Backend
 
-FastAPI backend application for the SMA Sanjeevani medical assistant.
+AI-powered medical assistant backend built with FastAPI and PostgreSQL.
 
-## 📁 Directory Structure
+## 🏗️ Project Structure
 
 ```
 backend/
-├── features/              # Feature modules
-│   ├── symptoms_recommendation/  # Symptom analysis feature
-│   └── tts_service.py     # Text-to-speech service
-│
-├── scripts/               # Utility scripts
-│   ├── create_database.py # Database creation script
-│   └── sanjeevani_finaldb.sql  # Database schema
-│
-├── tests/                 # Test files
+├── app/                          # Main application package
+│   ├── __init__.py
+│   ├── main.py                   # Application entry point
+│   ├── api/                      # API layer
+│   │   ├── __init__.py
+│   │   └── routes/               # API route handlers
+│   │       ├── __init__.py
+│   │       ├── routes_auth.py              # Authentication endpoints
+│   │       ├── routes_dashboard.py         # Dashboard data endpoints
+│   │       ├── routes_medicine_history.py  # Medicine history endpoints
+│   │       ├── routes_prescriptions.py     # Prescription management
+│   │       ├── routes_qa_history.py        # Q&A history endpoints
+│   │       └── routes_reminders.py         # Reminder management
+│   ├── core/                     # Core functionality
+│   │   ├── __init__.py
+│   │   ├── config.py             # Application configuration
+│   │   ├── database.py           # Database connection & session
+│   │   ├── security.py           # Authentication & password hashing
+│   │   └── middleware.py         # Custom middleware (auth, etc.)
+│   ├── models/                   # Database models
+│   │   ├── __init__.py
+│   │   └── models.py             # SQLAlchemy ORM models
+│   └── services/                 # Business logic services
+│       ├── __init__.py
+│       ├── tts_service.py                # Text-to-speech service
+│       ├── tts_service_enhanced.py       # Enhanced TTS with multi-language
+│       └── symptoms_recommendation/      # Symptom analysis service
+│           ├── __init__.py
+│           ├── models.py                 # Pydantic models
+│           ├── router.py                 # API router
+│           ├── service.py                # Business logic
+│           ├── prompt_templates.py       # LLM prompts
+│           ├── safety_rules.py           # Medical safety checks
+│           └── utils.py                  # Utility functions
+├── tests/                        # Test suite
 │   ├── test_api_endpoints.py
 │   ├── test_db_connection.py
+│   ├── test_ollama.py
 │   └── test_signup.py
-│
-├── config/                # Configuration files
-│   └── .env.example      # Environment variables template
-│
-├── main.py               # Application entry point
-├── models.py             # SQLAlchemy database models
-├── database.py           # Database configuration
-├── security.py           # Authentication & security
-├── middleware.py         # Custom middleware
-├── routes_auth.py       # Authentication routes
-├── routes_dashboard.py  # Dashboard routes
-├── routes_medicine_history.py  # Medicine history routes
-├── routes_prescriptions.py    # Prescription routes
-├── routes_reminders.py        # Reminder routes
-├── routes_qa_history.py       # Q&A history routes
-├── requirements.txt     # Python dependencies
-└── .env                 # Environment variables (not in git)
+├── scripts/                      # Utility scripts
+│   ├── check_schema.py           # Verify database schema
+│   ├── create_database.py        # Initialize database
+│   ├── debug_mistral.py          # Debug LLM integration
+│   ├── setup_postgres.ps1        # PostgreSQL setup script
+│   └── sanjeevani_finaldb.sql    # Database schema
+├── docs/                         # Documentation
+│   ├── API_DOCUMENTATION.md
+│   ├── DATABASE_SETUP.md
+│   ├── POSTGRESQL_SETUP_GUIDE.md
+│   ├── SETUP_OLLAMA.md
+│   └── TTS_SETUP.md
+├── .env                          # Environment variables (git-ignored)
+├── .env.example                  # Environment template
+├── requirements.txt              # Python dependencies
+└── README.md                     # This file
 ```
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
-### 1. Install Dependencies
+### Prerequisites
+
+- Python 3.9+
+- PostgreSQL 14+ (Azure PostgreSQL Flexible Server recommended)
+- Ollama (for local LLM) or Mistral API access
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   cd backend
+   ```
+
+2. **Create virtual environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+5. **Initialize database**
+   ```bash
+   python scripts/create_database.py
+   ```
+
+6. **Run the application**
+   ```bash
+   # Development mode (with auto-reload)
+   python -m app.main
+   
+   # Production mode
+   uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```
+
+## 📚 API Documentation
+
+Once running, access the interactive API documentation at:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+## 🧪 Running Tests
 
 ```bash
-pip install -r requirements.txt
+# Run all tests
+pytest tests/
+
+# Run specific test file
+pytest tests/test_api_endpoints.py
+
+# Run with coverage
+pytest --cov=app tests/
 ```
 
-### 2. Configure Environment
+## 🗃️ Database
 
-```bash
-cp config/.env.example .env
-# Edit .env with your Azure PostgreSQL credentials
-```
+The application uses PostgreSQL with SQLAlchemy ORM. See [docs/DATABASE_SETUP.md](docs/DATABASE_SETUP.md) for details.
 
-### 3. Initialize Database
+### Models
+- **User**: User accounts and authentication
+- **Prescription**: Medicine prescriptions
+- **Reminder**: Medicine reminders
+- **MedicineHistory**: Symptom-medicine history
+- **QAHistory**: Q&A conversation history
+- **DashboardData**: User dashboard analytics
 
-```bash
-# Option 1: Use the script
-python scripts/create_database.py
+## 🔐 Authentication
 
-# Option 2: Run directly
-python database.py
-```
+JWT-based authentication with Bearer tokens. Token expiry: 30 minutes.
 
-### 4. Run the Application
+**Protected endpoints**: All `/api/*` routes except `/api/auth/login` and `/api/auth/signup`
 
-```bash
-python main.py
-```
+## 🏥 Features
 
-The API will be available at `http://localhost:8000`
+### 1. Symptom Analysis (`/api/symptoms/recommend`)
+- AI-powered symptom analysis
+- Medicine recommendations
+- Safety checks and disclaimers
+- Multi-language support
 
-## 🔧 Configuration
+### 2. Prescription Management
+- Create, read, update, delete prescriptions
+- Track medicine intake
+- Reminder management
+
+### 3. Dashboard Analytics
+- Health metrics tracking
+- Medication adherence stats
+- Recent consultations
+
+### 4. Text-to-Speech
+- Multi-language TTS support
+- Bhashini API integration
+- Google TTS fallback
+
+## 🛠️ Development
+
+### Code Structure
+
+- **Routes** (`app/api/routes/`): Handle HTTP requests/responses
+- **Services** (`app/services/`): Business logic and external integrations
+- **Models** (`app/models/`): Database schema definitions
+- **Core** (`app/core/`): Cross-cutting concerns (auth, config, db)
+
+### Adding New Features
+
+1. Create route in `app/api/routes/`
+2. Add business logic in `app/services/`
+3. Define models in `app/models/` (if needed)
+4. Register router in `app/main.py`
+5. Add tests in `tests/`
 
 ### Environment Variables
 
-Create a `.env` file in the backend directory:
+See `.env.example` for all configuration options:
+- `DATABASE_URL`: PostgreSQL connection string
+- `SECRET_KEY`: JWT secret key
+- `OLLAMA_BASE_URL`: Ollama server URL
+- `LLM_MODEL`: LLM model name
 
-```env
-# Database Configuration
-DATABASE_URL=postgresql://username:password@host:port/database?sslmode=require
+## 📖 Documentation
 
-# JWT Secret Key
-SECRET_KEY=your-super-secret-key-change-in-production
+- [API Documentation](docs/API_DOCUMENTATION.md)
+- [Database Setup](docs/DATABASE_SETUP.md)
+- [PostgreSQL Guide](docs/POSTGRESQL_SETUP_GUIDE.md)
+- [Ollama Setup](docs/SETUP_OLLAMA.md)
+- [TTS Setup](docs/TTS_SETUP.md)
 
-# LLM Provider Configuration
-LLM_PROVIDER=ollama
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=phi3.5
-LLM_TEMPERATURE=0.3
-LLM_MAX_TOKENS=2048
-```
+## 🤝 Contributing
 
-## 📡 API Endpoints
+1. Follow the existing code structure
+2. Write tests for new features
+3. Update documentation
+4. Use type hints
+5. Follow PEP 8 style guide
 
-### Authentication
-- `POST /api/auth/signup` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user
-- `POST /api/auth/change-password` - Change password
+## 📝 License
 
-### Features
-- `POST /symptoms/recommend` - Get medicine recommendations
-- `GET /api/dashboard` - Get dashboard data
-- `POST /api/medicine-history` - Save medicine history
-- `GET /api/prescriptions` - Get prescriptions
-- `POST /api/prescriptions` - Create prescription
-- `GET /api/reminders` - Get reminders
-- `POST /api/reminders` - Create reminder
-- `GET /api/qa-history` - Get Q&A history
-- `POST /api/qa-history` - Save Q&A
+[Add your license here]
 
-For complete API documentation, see [docs/api/](../docs/api/)
+## 🆘 Support
 
-## 🗄️ Database
-
-The application uses Azure PostgreSQL. The database schema is defined in `models.py` and can be initialized using:
-
-```bash
-python scripts/create_database.py
-python database.py
-```
-
-## 🧪 Testing
-
-```bash
-# Test database connection
-python tests/test_db_connection.py
-
-# Test API endpoints
-python tests/test_api_endpoints.py
-
-# Test signup
-python tests/test_signup.py
-```
-
-## 📦 Dependencies
-
-Key dependencies:
-- `fastapi` - Web framework
-- `sqlalchemy` - ORM
-- `psycopg2-binary` - PostgreSQL adapter
-- `bcrypt` - Password hashing
-- `python-jose` - JWT tokens
-- `uvicorn` - ASGI server
-
-See `requirements.txt` for complete list.
-
-## 🔐 Security
-
-- Passwords are hashed using bcrypt
-- JWT tokens for authentication
-- SSL required for Azure PostgreSQL connections
-- Input validation using Pydantic models
-
-## 📚 Additional Resources
-
-- [Database Setup Guide](../docs/database/)
-- [API Documentation](../docs/api/)
-- [Architecture Documentation](../docs/architecture/)
+For issues and questions, see the documentation in the `docs/` directory.

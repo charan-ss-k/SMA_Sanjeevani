@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 requests
 pydantic
+pydantic-settings>=2.0.0  # For settings management
 python-multipart
 coqui-tts
 gtts>=2.5.0
