@@ -10,10 +10,11 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     Dependency to extract and verify JWT token from Authorization header.
     Returns user_id if token is valid.
     Makes authentication optional for now to prevent 500 errors.
+    For anonymous users, returns user_id = 0.
     """
-    # If no credentials provided, allow access (optional auth)
+    # If no credentials provided, allow access with anonymous user (user_id = 0)
     if credentials is None:
-        return "anonymous"
+        return 0
     
     token = credentials.credentials
     
@@ -21,11 +22,11 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         user_id = verify_token(token)
         return user_id
     except HTTPException as e:
-        # For now, allow access with anonymous user instead of raising error
-        return "anonymous"
+        # For now, allow access with anonymous user (user_id = 0) instead of raising error
+        return 0
     except Exception:
-        # For now, allow access with anonymous user instead of raising error
-        return "anonymous"
+        # For now, allow access with anonymous user (user_id = 0) instead of raising error
+        return 0
 
 async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """

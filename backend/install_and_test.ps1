@@ -198,10 +198,10 @@ print(f'LLM Provider: {llm_provider}')
 print(f'Ollama URL: {ollama_url}')
 print(f'Ollama Model: {ollama_model}')
 print('')
-print('ℹ️  To enable Meditron-7B, set in .env:')
+print('ℹ️  To enable Phi-4, set in .env:')
 print('  LLM_PROVIDER=ollama')
 print('  OLLAMA_URL=http://localhost:11434')
-print('  OLLAMA_MODEL=meditron')
+print('  OLLAMA_MODEL=phi4')
 "@
 Write-Host ""
 
@@ -220,7 +220,7 @@ Write-Host "Testing:" -ForegroundColor Cyan
 Write-Host "  System will be available at: http://localhost:5000" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Features Implemented:" -ForegroundColor Cyan
-Write-Host "  ✅ Meditron-7B thinking independently (RAG + enhanced prompt)" -ForegroundColor Green
+Write-Host "  ✅ Phi-4 medical intelligence (RAG + advanced reasoning)" -ForegroundColor Green
 Write-Host "  ✅ Multi-language support (9 Indic languages)" -ForegroundColor Green
 Write-Host "  ✅ 5-step translation pipeline" -ForegroundColor Green
 Write-Host "  ✅ Global medicine knowledge base (100+ medicines)" -ForegroundColor Green

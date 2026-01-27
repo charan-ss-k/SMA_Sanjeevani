@@ -7,7 +7,6 @@ import requests
 
 from . import prompt_templates, safety_rules, utils
 from .models import SymptomRequest, SymptomResponse, MedicineRecommendation
-from .medicine_rag_system import get_rag_context, get_available_medicines
 from .translation_service import (
     translate_symptoms_to_english,
     translate_response_to_language,
@@ -193,14 +192,11 @@ def call_llm(prompt: str) -> str:
         raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Phi-4")
     
     if provider == "ollama":
-        logger.info("*** CALLING PHI-4 VIA OLLAMA ***")
+        logger.info("Calling Phi-4 via Ollama for independent medical reasoning...")
         ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
         ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
         
-        logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s (Phi-4 - Microsoft advanced language model)", ollama_model)
-        logger.info("Prompt length: %d characters", len(prompt))
-        logger.info("Prompt (first 800 chars):\n%s", prompt[:800])
+        logger.info("Model: %s", ollama_model)
         
         api_url = f"{ollama_url}/api/generate"
         payload = {
@@ -208,15 +204,12 @@ def call_llm(prompt: str) -> str:
             "prompt": prompt,
             "stream": False,
             "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
+            "num_predict": 512,  # Limit to 512 tokens for faster generation
         }
         
         try:
-            logger.info("Sending request to Ollama...")
-            logger.info("WARNING: This may take a few seconds for Phi-4 to respond...")
-            # Increase timeout to 10 minutes (600 seconds) for Phi-4 medical inference
+            logger.info("Sending request to Phi-4...")
             resp = requests.post(api_url, json=payload, timeout=600)
-            
-            logger.info("Ollama response status: %d", resp.status_code)
             
             if resp.status_code != 200:
                 error_msg = resp.text
@@ -229,21 +222,17 @@ def call_llm(prompt: str) -> str:
             resp_json = resp.json()
             llm_output = resp_json.get("response", "")
             
-            logger.info("Phi-4 response received (%d chars)", len(llm_output))
-            logger.info("Phi-4 output (first 1500 chars):\n%s", llm_output[:1500])
+            logger.info("✓ Phi-4 response received")
             
             # Try to extract JSON from the response
             try:
                 parsed = utils.try_parse_json(llm_output)
-                logger.info("✓ SUCCESS: Parsed JSON from Phi-4 response")
-                logger.info("Predicted condition: '%s'", parsed.get("predicted_condition"))
-                logger.info("Number of medicines: %d", len(parsed.get("recommended_medicines", [])))
+                logger.info("✓ Successfully parsed Phi-4 response")
                 return json.dumps(parsed)
             except Exception as parse_err:
-                logger.error("✗ FAILED: Cannot parse JSON from Phi-4")
+                logger.error("✗ Failed to parse JSON from Phi-4 response")
                 logger.error("Parse error: %s", parse_err)
-                logger.error("Full Phi-4 output:\n%s", llm_output)
-                raise ValueError(f"Phi-4 did not return valid JSON.\n\nPhi-4 output:\n{llm_output[:2000]}\n\nError: {parse_err}")
+                raise ValueError(f"Phi-4 did not return valid JSON. Error: {parse_err}")
                 
         except requests.exceptions.ConnectionError as ce:
             logger.error("✗ FATAL: Cannot connect to Ollama (Phi-4)")
@@ -343,18 +332,13 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
         body["symptoms"] = english_symptoms
         logger.info(f"Translated symptoms: {english_symptoms}")
     
-    # Step 2: Get RAG context (medicine knowledge base) for LLM
-    rag_context = get_rag_context(body.get("symptoms", []))
-    logger.info("✅ Retrieved RAG context with medicine knowledge base")
+    # Step 2: Build prompt - Phi-4 will think independently
+    prompt = prompt_templates.build_prompt(body, rag_context="")
+    logger.info("Prompt built - Phi-4 will generate recommendations independently")
     
-    # Step 3: Build prompt with RAG context
-    prompt = prompt_templates.build_prompt(body, rag_context=rag_context)
-    logger.info("LLM prompt (first 1000 chars): %s", prompt[:1000])
-    
-    # Step 4: Call LLM - it will think independently using RAG context
+    # Step 3: Call LLM for independent thinking
     try:
         raw = call_llm(prompt)
-        logger.info("LLM raw output (first 500 chars): %s", raw[:500])
         parsed = utils.try_parse_json(raw)
     except Exception as llm_err:
         # Fallback: Generate a symptom-aware response using RAG
@@ -436,7 +420,7 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
 
 def answer_medical_question(question: str, language: str = "english") -> str:
     """
-    Answer ANY question using Meditron-7B LLM as a medical assistant.
+    Answer ANY question using Phi-4 LLM as a medical assistant.
     The LLM intelligently determines if it's medical and responds appropriately.
     Works with medical terms from around the world in multiple languages.
     Acts like ChatGPT for medical knowledge.
@@ -462,7 +446,7 @@ def answer_medical_question(question: str, language: str = "english") -> str:
 
     # Create a comprehensive prompt for medical Q&A
     # The LLM itself will determine if the question is medical
-    # Using Meditron-7B, a specialized medical language model
+    # Using Phi-4 (Microsoft), a powerful general-purpose language model optimized for medical expertise
     prompt = f"""You are Sanjeevani, an advanced AI medical assistant trained on global medical knowledge.
 Your role is to:
 1. Answer medical, health, and healthcare-related questions comprehensively
@@ -504,7 +488,7 @@ Response (in {lang_display}):"""
         
         logger.info("LLM Provider: %s", provider)
         logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s (using Phi-4 for medical expertise)", ollama_model)
+        logger.info("Ollama Model: %s (Phi-4)", ollama_model)
         
         if provider != "ollama":
             raise Exception(f"Only Ollama provider is supported. Got: {provider}")
@@ -518,10 +502,10 @@ Response (in {lang_display}):"""
             "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
         }
         
-        logger.info("Sending request to Meditron-7B via Ollama...")
-        logger.info("Timeout: 600 seconds (10 minutes) for Meditron-7B medical expertise")
+        logger.info("Sending request to Phi-4 via Ollama...")
+        logger.info("Timeout: 60 seconds for Phi-4 medical Q&A response")
         
-        resp = requests.post(api_url, json=payload, timeout=600)
+        resp = requests.post(api_url, json=payload, timeout=60)
         
         if resp.status_code != 200:
             error_msg = resp.text
@@ -534,7 +518,7 @@ Response (in {lang_display}):"""
         resp_json = resp.json()
         answer = resp_json.get("response", "").strip()
         
-        logger.info("✓ Meditron-7B response received (%d chars)", len(answer))
+        logger.info("✓ Phi-4 response received (%d chars)", len(answer))
         logger.info("Response (first 500 chars): %s", answer[:500])
         
         # Validate response

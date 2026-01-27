@@ -52,5 +52,5 @@ langchain>=0.1.0  # Alternative RAG framework components
 pandas>=2.0.0
 nltk>=3.8.1  # Natural language processing
 
-# Ollama Integration (for Meditron LLM)
+# Ollama Integration (for Phi-4 LLM)
 ollama>=0.0.1  # Ollama Python client

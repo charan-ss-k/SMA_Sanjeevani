@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 def try_parse_json(text: str) -> Dict[str, Any]:
     """
     Try to parse JSON from text, handling LLM preambles and system prompts.
-    Meditron and other models sometimes output system text before JSON.
+    Phi-4 and other models sometimes output system text before JSON.
     """
     text = text.strip()
     
