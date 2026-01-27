@@ -1,4 +1,6 @@
-PROMPT_TEMPLATE = """You are Sanjeevani, a rural health assistant. Analyze and respond with JSON only.
+PROMPT_TEMPLATE = """INSTRUCTION: YOU MUST OUTPUT ONLY VALID JSON. NO OTHER TEXT.
+
+You are Sanjeevani, a medical assistant. Analyze symptoms and return ONLY a JSON object with medical recommendations.
 
 Patient: {age} year old {gender}
 Symptoms: {symptoms}
@@ -6,39 +8,33 @@ Allergies: {allergies}
 Conditions: {conditions}
 Pregnant: {pregnant}
 
-LANGUAGE INSTRUCTION (CRITICAL - MUST FOLLOW):
-- The user's preferred language is: {language_display}
-- ALL text in your JSON response MUST be in {language_display} language
-- This includes: predicted_condition, medicine names (if available in {language_display}), dosage instructions, home_care_advice, doctor_consultation_advice, disclaimer, and all warnings
-- If medical terms don't have direct translations, use the {language_display} term followed by English in parentheses
-- RESPOND ENTIRELY IN {language_display.upper()} LANGUAGE - NO EXCEPTIONS
-- This is for rural users who need information in their native language
-- DO NOT use English unless the language is English
-
-MUST FOLLOW:
-- Only OTC medicines (no antibiotics/opioids/steroids)
-- Consider allergies and pregnancy
-- Return ONLY valid JSON, no text before/after
-- All text fields must be in {language_display} language
-
-JSON FORMAT:
+CRITICAL - RESPOND WITH ONLY THIS JSON (no preamble, no explanation):
 {{
-  "predicted_condition": "likely condition in {language_display}",
+  "predicted_condition": "most likely condition",
   "recommended_medicines": [
     {{
-      "name": "medicine with strength in {language_display}",
-      "dosage": "how much per dose in {language_display}",
-      "duration": "how many days in {language_display}",
-      "instructions": "when to take in {language_display}",
-      "warnings": ["warning 1 in {language_display}"]
+      "name": "medicine name with strength",
+      "dosage": "dosage per dose",
+      "duration": "number of days",
+      "instructions": "when/how to take",
+      "warnings": ["warning 1", "warning 2"]
     }}
   ],
-  "home_care_advice": ["advice 1 in {language_display}", "advice 2 in {language_display}"],
-  "doctor_consultation_advice": "when to see doctor in {language_display}",
-  "disclaimer": "Not a professional diagnosis. See a doctor for proper evaluation. (in {language_display})"
+  "home_care_advice": ["advice 1", "advice 2"],
+  "doctor_consultation_advice": "when to see doctor",
+  "disclaimer": "Not a professional diagnosis. See a doctor for proper evaluation."
 }}
 
-IMPORTANT: Generate ALL text content in {language_display} language. Do not use English unless the language is English."""
+LANGUAGE: Respond in {language_display}
+RULES:
+- Only OTC medicines
+- No antibiotics, opioids, or steroids
+- Consider allergies and pregnancy
+- Return ONLY the JSON object, nothing else
+- No markdown, no code blocks, no explanation
+- Start directly with {{ and end with }}
+
+BEGIN JSON OUTPUT (nothing before {{):"""
 
 
 def build_prompt(req: dict) -> str:
@@ -56,6 +52,7 @@ def build_prompt(req: dict) -> str:
     }
     language = req.get("language", "english").lower().strip()
     language_display = lang_names.get(language, "English")
+    language_display_upper = language_display.upper()
 
     return PROMPT_TEMPLATE.format(
         age=req.get("age"),
@@ -65,4 +62,5 @@ def build_prompt(req: dict) -> str:
         conditions=", ".join(req.get("existing_conditions", [])),
         pregnant=str(req.get("pregnancy_status", False)),
         language_display=language_display,
+        language_display_upper=language_display_upper,
     )

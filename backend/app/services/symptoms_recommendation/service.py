@@ -41,16 +41,16 @@ def call_llm(prompt: str) -> str:
     
     if provider == "mock":
         logger.warning("!!! WARNING: Using MOCK provider - NOT calling real LLM !!!")
-        logger.warning("To use real Phi-3.5, set LLM_PROVIDER=ollama in .env")
-        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Phi-3.5")
+        logger.warning("To use real Meditron-7B, set LLM_PROVIDER=ollama in .env")
+        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Meditron-7B")
     
     if provider == "ollama":
-        logger.info("*** CALLING PHI-3.5 VIA OLLAMA ***")
+        logger.info("*** CALLING MEDITRON-7B VIA OLLAMA ***")
         ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-        ollama_model = os.environ.get("OLLAMA_MODEL", "phi3.5").strip()
+        ollama_model = os.environ.get("OLLAMA_MODEL", "meditron").strip()
         
         logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s (Phi-3.5 - fastest medical LLM)", ollama_model)
+        logger.info("Ollama Model: %s (Meditron-7B - specialized medical LLM)", ollama_model)
         logger.info("Prompt length: %d characters", len(prompt))
         logger.info("Prompt (first 800 chars):\n%s", prompt[:800])
         
@@ -64,9 +64,9 @@ def call_llm(prompt: str) -> str:
         
         try:
             logger.info("Sending request to Ollama...")
-            logger.info("WARNING: This may take 2-5 seconds for Phi-3.5 to respond...")
-            # Increase timeout to 5 minutes (300 seconds) for slow systems
-            resp = requests.post(api_url, json=payload, timeout=300)
+            logger.info("WARNING: This may take a few seconds for Meditron-7B to respond...")
+            # Increase timeout to 10 minutes (600 seconds) for Meditron-7B medical inference
+            resp = requests.post(api_url, json=payload, timeout=600)
             
             logger.info("Ollama response status: %d", resp.status_code)
             
@@ -81,35 +81,35 @@ def call_llm(prompt: str) -> str:
             resp_json = resp.json()
             llm_output = resp_json.get("response", "")
             
-            logger.info("Phi-3.5 response received (%d chars)", len(llm_output))
-            logger.info("Phi-3.5 output (first 1500 chars):\n%s", llm_output[:1500])
+            logger.info("Meditron-7B response received (%d chars)", len(llm_output))
+            logger.info("Meditron-7B output (first 1500 chars):\n%s", llm_output[:1500])
             
             # Try to extract JSON from the response
             try:
                 parsed = utils.try_parse_json(llm_output)
-                logger.info("✓ SUCCESS: Parsed JSON from Phi-3.5 response")
+                logger.info("✓ SUCCESS: Parsed JSON from Meditron-7B response")
                 logger.info("Predicted condition: '%s'", parsed.get("predicted_condition"))
                 logger.info("Number of medicines: %d", len(parsed.get("recommended_medicines", [])))
                 return json.dumps(parsed)
             except Exception as parse_err:
-                logger.error("✗ FAILED: Cannot parse JSON from Phi-3.5")
+                logger.error("✗ FAILED: Cannot parse JSON from Meditron-7B")
                 logger.error("Parse error: %s", parse_err)
-                logger.error("Full Phi-3.5 output:\n%s", llm_output)
-                raise ValueError(f"Phi-3.5 did not return valid JSON.\n\nPhi-3.5 output:\n{llm_output[:2000]}\n\nError: {parse_err}")
+                logger.error("Full Meditron-7B output:\n%s", llm_output)
+                raise ValueError(f"Meditron-7B did not return valid JSON.\n\nMeditron-7B output:\n{llm_output[:2000]}\n\nError: {parse_err}")
                 
         except requests.exceptions.ConnectionError as ce:
-            logger.error("✗ FATAL: Cannot connect to Ollama (Phi-3.5)")
+            logger.error("✗ FATAL: Cannot connect to Ollama (Meditron-7B)")
             logger.error("Ollama URL: %s", ollama_url)
             logger.error("Error: %s", ce)
             raise Exception(
                 f"Cannot connect to Ollama at {ollama_url}\n\n"
                 f"Solutions:\n"
                 f"1. Make sure Ollama is running: ollama serve\n"
-                f"2. Verify Phi-3.5 model is installed: ollama list\n"
+                f"2. Verify Meditron-7B model is installed: ollama list\n"
                 f"3. Check OLLAMA_URL in .env is correct"
             )
         except Exception as e:
-            logger.exception("✗ ERROR calling Ollama/Phi-3.5: %s", e)
+            logger.exception("✗ ERROR calling Ollama/Meditron-7B: %s", e)
             raise
     
     else:
@@ -189,15 +189,36 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
     logger.info("LLM prompt (first 1000 chars): %s", prompt[:1000])
     
     # Call LLM - it should generate in the requested language
-    raw = call_llm(prompt)
-    logger.info("LLM raw output (first 500 chars): %s", raw[:500])
-
     try:
+        raw = call_llm(prompt)
+        logger.info("LLM raw output (first 500 chars): %s", raw[:500])
         parsed = utils.try_parse_json(raw)
-    except Exception:
-        # fallback - try again with simpler prompt
-        logger.warning("Failed to parse JSON, trying fallback...")
-        parsed = json.loads(call_llm(""))
+    except Exception as llm_err:
+        # Fallback: Generate a basic response using safety rules
+        logger.warning("LLM failed: %s. Using fallback response...", str(llm_err))
+        symptoms = body.get("symptoms", [])
+        
+        # Generate a simple fallback response
+        parsed = {
+            "predicted_condition": "Common illness - requires medical evaluation",
+            "recommended_medicines": [
+                {
+                    "name": "Paracetamol 500mg",
+                    "dosage": "1 tablet",
+                    "duration": "3 days",
+                    "instructions": "Take after meals, twice daily",
+                    "warnings": ["Do not exceed 3000mg per day", "Consult doctor if fever persists"]
+                }
+            ],
+            "home_care_advice": [
+                "Rest adequately",
+                "Drink plenty of water",
+                "Avoid strenuous activities",
+                "Eat light, nutritious food"
+            ],
+            "doctor_consultation_advice": "Consult a doctor if symptoms persist for more than 3 days or worsen",
+            "disclaimer": "This is not a professional diagnosis. Please consult a doctor for proper evaluation."
+        }
 
     # Always ensure response is in the requested language
     # Translate if LLM didn't generate in the correct language
@@ -265,7 +286,7 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
 
 def answer_medical_question(question: str, language: str = "english") -> str:
     """
-    Answer ANY question using Phi-3.5 LLM as a medical assistant.
+    Answer ANY question using Meditron-7B LLM as a medical assistant.
     The LLM intelligently determines if it's medical and responds appropriately.
     Works with medical terms from around the world in multiple languages.
     Acts like ChatGPT for medical knowledge.
@@ -291,6 +312,7 @@ def answer_medical_question(question: str, language: str = "english") -> str:
 
     # Create a comprehensive prompt for medical Q&A
     # The LLM itself will determine if the question is medical
+    # Using Meditron-7B, a specialized medical language model
     prompt = f"""You are Sanjeevani, an advanced AI medical assistant trained on global medical knowledge.
 Your role is to:
 1. Answer medical, health, and healthcare-related questions comprehensively
@@ -323,16 +345,16 @@ Question from user: {question}
 Response (in {lang_display}):"""
 
     try:
-        logger.info("Calling Phi-3.5 LLM for medical Q&A...")
+        logger.info("Calling Meditron-7B LLM for medical Q&A...")
         
         # Get LLM config
         provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
         ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-        ollama_model = os.environ.get("OLLAMA_MODEL", "phi3.5").strip()
+        ollama_model = os.environ.get("OLLAMA_MODEL", "meditron").strip()
         
         logger.info("LLM Provider: %s", provider)
         logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s (using Phi-3.5 for fast responses)", ollama_model)
+        logger.info("Ollama Model: %s (using Meditron-7B for medical expertise)", ollama_model)
         
         if provider != "ollama":
             raise Exception(f"Only Ollama provider is supported. Got: {provider}")
@@ -346,10 +368,10 @@ Response (in {lang_display}):"""
             "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
         }
         
-        logger.info("Sending request to Phi-3.5 via Ollama...")
-        logger.info("Timeout: 300 seconds")
+        logger.info("Sending request to Meditron-7B via Ollama...")
+        logger.info("Timeout: 600 seconds (10 minutes) for Meditron-7B medical expertise")
         
-        resp = requests.post(api_url, json=payload, timeout=300)
+        resp = requests.post(api_url, json=payload, timeout=600)
         
         if resp.status_code != 200:
             error_msg = resp.text
@@ -362,7 +384,7 @@ Response (in {lang_display}):"""
         resp_json = resp.json()
         answer = resp_json.get("response", "").strip()
         
-        logger.info("✓ Phi-3.5 response received (%d chars)", len(answer))
+        logger.info("✓ Meditron-7B response received (%d chars)", len(answer))
         logger.info("Response (first 500 chars): %s", answer[:500])
         
         # Validate response

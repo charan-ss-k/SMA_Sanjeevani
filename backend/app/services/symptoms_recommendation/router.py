@@ -30,7 +30,7 @@ async def status():
     """Check LLM provider status and configuration"""
     provider = os.environ.get("LLM_PROVIDER", "mock").strip().lower()
     ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-    ollama_model = os.environ.get("OLLAMA_MODEL", "mistral").strip()
+    ollama_model = os.environ.get("OLLAMA_MODEL", "meditron").strip()
     
     return {
         "status": "ok",
@@ -43,11 +43,11 @@ async def status():
 
 @router.get("/api/symptoms/test-ollama")
 async def test_ollama():
-    """Simple test to verify Mistral-7B is working"""
+    """Simple test to verify Meditron-7B is working"""
     logger.info("=== TESTING OLLAMA DIRECTLY ===")
     
     ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-    ollama_model = os.environ.get("OLLAMA_MODEL", "mistral").strip()
+    ollama_model = os.environ.get("OLLAMA_MODEL", "meditron").strip()
     
     # Simple test prompt
     test_prompt = "Respond with only valid JSON. A 28-year-old male has headache. What could be the condition? Return: {\"condition\": \"...\", \"medicine\": \"...\"}"

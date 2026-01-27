@@ -7,17 +7,32 @@ logger = logging.getLogger(__name__)
 
 
 def try_parse_json(text: str) -> Dict[str, Any]:
+    """
+    Try to parse JSON from text, handling LLM preambles and system prompts.
+    Meditron and other models sometimes output system text before JSON.
+    """
+    text = text.strip()
+    
+    # Direct JSON parse attempt first
     try:
         return json.loads(text)
     except Exception:
-        # Try to extract a JSON substring
-        try:
-            start = text.index("{")
-            end = text.rindex("}") + 1
-            return json.loads(text[start:end])
-        except Exception:
-            logger.exception("Failed to parse JSON from LLM output")
-            raise
+        pass
+    
+    # Try to extract a JSON substring (skip preambles like "A chat between...")
+    try:
+        start = text.index("{")
+        end = text.rindex("}") + 1
+        json_str = text[start:end]
+        return json.loads(json_str)
+    except ValueError:
+        # No JSON found at all
+        logger.error("No JSON object found in LLM output")
+        logger.error("LLM output: %s", text[:500])
+        raise ValueError("No JSON found in LLM output. Model may have output system prompt instead of JSON.")
+    except Exception as e:
+        logger.exception("Failed to parse extracted JSON from LLM output: %s", str(e))
+        raise
 
 
 def sanitize_medicine_name(name: str) -> str:

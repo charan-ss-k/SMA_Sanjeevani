@@ -21,7 +21,7 @@ except ImportError:
 # ⚠️ CRITICAL: Make sure this path matches where you installed Tesseract!
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-MODEL_NAME = "mistral"
+MODEL_NAME = "meditron"
 
 def preprocess_image_multiple_methods(image_path):
     """

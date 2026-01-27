@@ -40,10 +40,10 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")  # Alternative naming
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "phi3.5:latest")
-    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "phi3.5")
-    LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.3"))
-    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "2048"))
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "epfl-llm/meditron-7b")
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "meditron")
+    LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.2"))
+    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1024"))
     
     # TTS Configuration
     TTS_MODEL: str = os.getenv("TTS_MODEL", "tts_models/en/ljspeech/tacotron2-DDC")
