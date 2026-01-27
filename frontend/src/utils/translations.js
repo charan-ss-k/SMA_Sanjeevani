@@ -272,9 +272,11 @@ export const translations = {
     markedAsTaken: 'marked as taken',
     prescriptionScannedAdded: 'Prescription scanned and added',
     photoCapturedAdded: 'Photo captured and prescription added',
+    addedToPrescriptions: 'has been added to your prescriptions',
     units: 'units',
     reminders: 'Reminders:',
     noNotes: 'No notes',
+    add: 'Add',
     
     // AuthModal & LoginSignup
     sanjeevani: 'Sanjeevani',
@@ -603,6 +605,7 @@ export const translations = {
     units: 'యూనిట్‌లు',
     reminders: 'రిమైండర్‌లు:',
     noNotes: 'నోట్స్ లేవు',
+    addedToPrescriptions: 'మీ ప్రిస్క్రిప్షన్‌లకు జోడించబడింది',
     
     // AuthModal & LoginSignup
     sanjeevani: 'సంజీవని',
@@ -931,6 +934,7 @@ export const translations = {
     units: 'इकाइयां',
     reminders: 'अनुस्मारक:',
     noNotes: 'कोई नोट्स नहीं',
+    addedToPrescriptions: 'आपकी प्रिस्क्रिप्शन में जोड़ा गया',
     
     // AuthModal & LoginSignup
     sanjeevani: 'संजीवनी',
@@ -1079,6 +1083,8 @@ export const translations = {
     contactUs: 'आमच्याशी संपर्क साधा',
     getInTouch: 'संपर्कात रहा',
     
+    // Medicine Management (Prescriptions)
+    addedToPrescriptions: 'आपल्या प्रिस्क्रिप्शनमध्ये जोडले गेले',
     // About Page
     aboutPage: 'बद्दल पृष्ठ',
     aboutUs: 'आमच्याबद्दल',
@@ -1194,6 +1200,7 @@ export const translations = {
     // Common phrases
     medicine: 'ওষুধ',
     prescription: 'প্রেসক্রিপশন',
+    addedToPrescriptions: 'আপনার প্রেসক্রিপশনে যোগ করা হয়েছে',
     
     // Profile/User
     user: 'ব্যবহারকারী',
@@ -1302,6 +1309,7 @@ export const translations = {
     // Common phrases
     medicine: 'மருந்து',
     prescription: 'மருந்துப்பதிவு',
+    addedToPrescriptions: 'உங்கள் மருந்துப்பதிவுக்கு சேர்க்கப்பட்டுள்ளது',
     
     // Profile/User
     user: 'பயனர்',
@@ -1410,6 +1418,7 @@ export const translations = {
     // Common phrases
     medicine: 'ಮದ್ದು',
     prescription: 'ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್',
+    addedToPrescriptions: 'ನಿಮ್ಮ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್‌ಗೆ ಸೇರಿಸಲಾಗಿದೆ',
     
     // Profile/User
     user: 'ಬಳಕೆದಾರ',
@@ -1518,6 +1527,7 @@ export const translations = {
     // Common phrases
     medicine: 'മരുന്ന്',
     prescription: 'പ്രിസ്ക്രിപ്ഷൻ',
+    addedToPrescriptions: 'നിങ്ങളുടെ പ്രിസ്ക്രിപ്ഷനിലേക്ക് ചേർത്തിരിക്കുന്നു',
     
     // Profile/User
     user: 'ഉപയോക്താവ്',
@@ -1626,6 +1636,7 @@ export const translations = {
     // Common phrases
     medicine: 'દવા',
     prescription: 'પ્રિસ્ક્રિપ્શન',
+    addedToPrescriptions: 'તમારી પ્રિસ્ક્રિપ્શનમાં ઉમેરવામાં આવ્યું',
     
     // Profile/User
     user: 'વપરાશકર્તા',

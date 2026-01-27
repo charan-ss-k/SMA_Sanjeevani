@@ -5,6 +5,7 @@ import { LanguageContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
+import EnhancedMedicineIdentificationModal from './EnhancedMedicineIdentificationModal';
 
 function speak(text, language) {
   if (!window.speechSynthesis) return;
@@ -76,6 +77,8 @@ const PrescriptionHandling = () => {
   const [upcomingReminders, setUpcomingReminders] = useState([]);
   const [takenMedicines, setTakenMedicines] = useState([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [showMedicineIdentification, setShowMedicineIdentification] = useState(false);
+  const { authToken } = useContext(AuthContext);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -220,44 +223,20 @@ const PrescriptionHandling = () => {
     setUpcomingReminders(prev => prev.filter(m => m.id !== med.id));
   };
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setScanning(true);
-      setTimeout(() => {
-        setScanning(false);
-        // Simulate OCR
-        setMedicines(prev => [...prev, {
-          id: Date.now(),
-          name: 'Medicine from Prescription',
-          dosage: '500mg',
-          frequency: 'Twice Daily',
-          duration: '5 days',
-          quantity: 10,
-          reminders: ['09:00', '21:00'],
-          notes: 'Take after food',
-        }]);
-        speak(t('prescriptionScannedAdded', language), language);
-      }, 2000);
+  const handleSaveMedicineFromIdentification = (medicineData) => {
+    setMedicines(prev => [...prev, {
+      id: Date.now(),
+      name: medicineData.medicine_name,
+      dosage: medicineData.dosage,
+      frequency: medicineData.frequency || 'As prescribed',
+      duration: medicineData.duration,
+      quantity: 0,
+      reminders: [],
+      notes: medicineData.notes,
+    }]);
+    if (!isMuted) {
+      speak(`${medicineData.medicine_name} ${t('addedToPrescriptions', language)}`, language);
     }
-  };
-
-  const handleTakePhoto = () => {
-    setScanning(true);
-    setTimeout(() => {
-      setScanning(false);
-      setMedicines(prev => [...prev, {
-        id: Date.now(),
-        name: 'Medicine from Photo',
-        dosage: '250mg',
-        frequency: 'Once Daily',
-        duration: '7 days',
-        quantity: 7,
-        reminders: ['08:00'],
-        notes: 'Take in morning',
-      }]);
-      speak(t('photoCapturedAdded', language), language);
-    }, 2000);
   };
 
   const stats = {
@@ -312,17 +291,11 @@ const PrescriptionHandling = () => {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">{t('uploadPrescription', language)}</h2>
           <div className="flex flex-col sm:flex-row gap-4">
             <button 
-              onClick={handleTakePhoto}
-              className="flex-1 bg-green-700 hover:bg-green-800 text-white py-4 rounded-lg text-lg font-semibold transition"
+              onClick={() => setShowMedicineIdentification(true)}
+              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-4 rounded-lg text-lg font-semibold transition"
             >
-              {t('takePhoto', language)}
+              🔍 AI Medicine Identification
             </button>
-            <label className="flex-1 cursor-pointer">
-              <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-              <div className="border-2 border-dashed border-green-300 py-4 rounded-lg text-lg text-center hover:bg-green-50 transition bg-green-50 font-semibold text-green-900">
-                {t('uploadFile', language)}
-              </div>
-            </label>
           </div>
           {scanning && (
             <div className="mt-4 flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
@@ -549,6 +522,13 @@ const PrescriptionHandling = () => {
 
       </div>
       </div>
+
+      {/* Enhanced Medicine Identification Modal with Comprehensive Information */}
+      <EnhancedMedicineIdentificationModal 
+        open={showMedicineIdentification}
+        onClose={() => setShowMedicineIdentification(false)}
+        onSave={handleSaveMedicineFromIdentification}
+      />
     </>
   );
 };

@@ -89,7 +89,9 @@ const SymptomChecker = ({ onResult }) => {
       
       console.log('[SymptomChecker] Sending POST to:', url);
       console.log('[SymptomChecker] Payload:', payload);
-      playTTS(t('processingSymptoms', language), language);
+      
+      // Play processing message and wait for it to complete
+      await playTTS(t('processingSymptoms', language), language);
 
       // Create abort controller for this request
       abortControllerRef.current = new AbortController();
@@ -123,21 +125,23 @@ const SymptomChecker = ({ onResult }) => {
         },
         result: data,
       });
-      playTTS(t('analysisComplete', language), language);
+      
+      // Play analysis complete and wait for it to finish
+      await playTTS(t('analysisComplete', language), language);
 
-      // Speak the TTS payload (only if not muted)
+      // Speak the TTS payload (only if not muted) - will be queued after analysis complete finishes
       if (data.tts_payload && !isMuted) {
-        setTimeout(() => playTTS(data.tts_payload, language), 1000);
+        await playTTS(data.tts_payload, language);
       }
     } catch (err) {
       console.error('[SymptomChecker] Full error:', err);
       if (err.name === 'AbortError') {
         const errorMsg = t('requestStoppedShort', language);
         setError(errorMsg);
-        playTTS(errorMsg, language);
+        await playTTS(errorMsg, language);
       } else {
         setError(err.message || t('networkError', language));
-        playTTS(t('thereWasError', language), language);
+        await playTTS(t('thereWasError', language), language);
       }
     } finally {
       setLoading(false);

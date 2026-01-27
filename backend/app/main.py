@@ -22,6 +22,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Medicine identification (requires cv2 / opencv-python); optional so server starts without it
+try:
+    from app.api.routes.routes_medicine_identification import router as medicine_identification_router
+    HAVE_MEDICINE_IDENTIFICATION = True
+    logger.info("✅ Medicine identification service loaded successfully")
+except ImportError as e:
+    HAVE_MEDICINE_IDENTIFICATION = False
+    medicine_identification_router = None
+    logger.error(f"❌ Medicine identification disabled: {e}")
+
 # Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
@@ -75,6 +85,10 @@ app.include_router(medicine_history_router, tags=["Medicine History"])
 app.include_router(prescriptions_router, tags=["Prescriptions"])
 app.include_router(qa_history_router, tags=["QA History"])
 app.include_router(reminders_router, tags=["Reminders"])
+if HAVE_MEDICINE_IDENTIFICATION:
+    app.include_router(medicine_identification_router, tags=["Medicine Identification"])
+else:
+    logger.info("ℹ️ Medicine identification feature requires additional dependencies")
 app.include_router(symptoms_router, prefix="", tags=["Symptoms & Recommendations"])
 
 

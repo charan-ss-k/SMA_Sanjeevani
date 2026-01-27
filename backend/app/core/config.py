@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")  # Alternative naming
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "epfl-llm/meditron-7b")
-    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "meditron")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "microsoft/phi-4")
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "phi4")
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.2"))
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1024"))
     

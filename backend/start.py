@@ -6,6 +6,20 @@ Ensures proper environment and starts the application
 import sys
 import os
 from pathlib import Path
+import io
+
+# Fix Unicode output encoding for Windows
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+        print(f"✅ Loaded environment variables from {env_path}")
+except ImportError:
+    print("ℹ️  python-dotenv not installed, skipping .env file (optional)")
 
 # Ensure we're in the backend directory
 backend_dir = Path(__file__).parent

@@ -13,6 +13,17 @@ from app.core.database import get_db
 from app.models.models import MedicineHistory, QAHistory
 from app.core.middleware import get_current_user_optional
 
+# Import TTS services
+try:
+    from .. import parler_tts_service
+    logger_init = logging.getLogger(__name__)
+    logger_init.info("✅ Parler-TTS service available")
+    has_parler_tts = True
+except ImportError as e:
+    logger_init = logging.getLogger(__name__)
+    logger_init.warning(f"⚠️ Parler-TTS not available: {e}")
+    has_parler_tts = False
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -246,4 +257,128 @@ async def generate_tts(data: dict):
 async def get_tts_languages():
     """Get list of supported TTS languages"""
     return tts_service.get_supported_languages()
+
+
+@router.post("/api/tts/parler")
+async def generate_parler_tts(data: dict):
+    """
+    Generate speech audio using Indic Parler-TTS (native language support)
+    Supports: Hindi, Telugu, Tamil, Marathi, Bengali, Kannada, Malayalam, Gujarati, English
+    """
+    logger.info("=== ENDPOINT HIT: /api/tts/parler ===")
+    
+    if not has_parler_tts:
+        logger.warning("⚠️ Parler-TTS not available, falling back to enhanced TTS")
+        # Fallback to regular TTS
+        text = data.get("text", "").strip()
+        language = data.get("language", "english").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required")
+        try:
+            audio_base64 = tts_service.generate_speech(text, language)
+            return {
+                "audio": audio_base64,
+                "language": language,
+                "format": "wav",
+                "method": "enhanced_tts_fallback"
+            }
+        except Exception as e:
+            logger.error(f"Fallback TTS also failed: {e}")
+            return {"audio": None, "language": language, "error": "All TTS services failed"}
+    
+    text = data.get("text", "").strip()
+    language = data.get("language", "english").strip()
+    speaker = data.get("speaker", "neutral").strip()
+    emotion = data.get("emotion", "neutral").strip()
+    
+    if not text:
+        logger.warning("❌ TTS request missing text")
+        raise HTTPException(status_code=400, detail="Text is required")
+    
+    try:
+        logger.info(f"🎤 Generating Parler-TTS audio: {language}, speaker: {speaker}")
+        
+        audio_base64 = parler_tts_service.generate_parler_tts_audio(
+            text,
+            language=language,
+            speaker=speaker,
+            emotion=emotion,
+            output_format="base64"
+        )
+        
+        if not audio_base64:
+            logger.warning("❌ Parler-TTS returned no audio, trying fallback TTS")
+            # Fallback to enhanced TTS
+            try:
+                audio_base64 = tts_service.generate_speech(text, language)
+                if audio_base64:
+                    return {
+                        "audio": audio_base64,
+                        "language": language,
+                        "format": "wav",
+                        "method": "enhanced_tts_fallback",
+                        "note": "Parler-TTS unavailable, using enhanced TTS fallback"
+                    }
+            except Exception as e:
+                logger.error(f"Fallback TTS also failed: {e}")
+            
+            return {
+                "audio": None,
+                "language": language,
+                "error": "TTS service unavailable",
+                "note": "Frontend will fallback to Web Speech API"
+            }
+        
+        logger.info(f"✅ Parler-TTS generated successfully ({len(audio_base64)} bytes)")
+        return {
+            "audio": audio_base64,
+            "language": language,
+            "format": "wav",
+            "method": "parler_tts",
+            "speaker": speaker,
+            "emotion": emotion
+        }
+    except Exception as e:
+        logger.exception(f"❌ Parler-TTS Error: {e}")
+        logger.info("📢 Trying fallback TTS...")
+        
+        try:
+            audio_base64 = tts_service.generate_speech(text, language)
+            return {
+                "audio": audio_base64,
+                "language": language,
+                "format": "wav",
+                "method": "enhanced_tts_fallback",
+                "error_parler": str(e)
+            }
+        except Exception as fallback_err:
+            logger.error(f"Fallback also failed: {fallback_err}")
+            return {
+                "audio": None,
+                "language": language,
+                "error": str(e),
+                "fallback_error": str(fallback_err),
+                "note": "All TTS services failed"
+            }
+
+
+@router.get("/api/tts/parler/languages")
+async def get_parler_languages():
+    """Get list of languages supported by Parler-TTS"""
+    return {
+        "languages": [
+            {"code": "en", "name": "English"},
+            {"code": "hi", "name": "Hindi"},
+            {"code": "te", "name": "Telugu"},
+            {"code": "ta", "name": "Tamil"},
+            {"code": "mr", "name": "Marathi"},
+            {"code": "bn", "name": "Bengali"},
+            {"code": "kn", "name": "Kannada"},
+            {"code": "ml", "name": "Malayalam"},
+            {"code": "gu", "name": "Gujarati"},
+        ],
+        "speaker_options": ["neutral", "goofy", "formal", "casual"],
+        "emotion_options": ["neutral", "happy", "sad", "angry", "calm"],
+        "note": "Not all speaker/emotion combinations may be available in all languages"
+    }
 

@@ -1,14 +1,162 @@
 import os
 import json
 import logging
-from typing import Dict, Callable, Optional
+from typing import Dict, Callable, Optional, List
 
 import requests
 
 from . import prompt_templates, safety_rules, utils
 from .models import SymptomRequest, SymptomResponse, MedicineRecommendation
+from .medicine_rag_system import get_rag_context, get_available_medicines
+from .translation_service import (
+    translate_symptoms_to_english,
+    translate_response_to_language,
+    translate_json_response,
+    translation_service
+)
 
 logger = logging.getLogger(__name__)
+
+
+# Symptom to medicine mapping for intelligent fallback
+SYMPTOM_MEDICINE_MAP = {
+    "fever": {
+        "condition": "Fever",
+        "medicines": [
+            {"name": "Paracetamol 500mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "3 days"},
+            {"name": "Ibuprofen 400mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "3 days"}
+        ]
+    },
+    "cough": {
+        "condition": "Cough",
+        "medicines": [
+            {"name": "Cough Syrup (Dextromethorphan)", "dosage": "10ml", "frequency": "3-4 times daily", "duration": "5 days"},
+            {"name": "Throat Lozenges", "dosage": "1 lozenge", "frequency": "every 2 hours", "duration": "5 days"}
+        ]
+    },
+    "cold": {
+        "condition": "Common Cold",
+        "medicines": [
+            {"name": "Decongestant nasal spray", "dosage": "2 sprays per nostril", "frequency": "3 times daily", "duration": "3-5 days"},
+            {"name": "Vitamin C tablets 500mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "7 days"}
+        ]
+    },
+    "headache": {
+        "condition": "Headache",
+        "medicines": [
+            {"name": "Paracetamol 500mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "3 days"},
+            {"name": "Aspirin 325mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "3 days"}
+        ]
+    },
+    "body pain": {
+        "condition": "Body Pain",
+        "medicines": [
+            {"name": "Ibuprofen 400mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "3 days"},
+            {"name": "Muscle relaxant (Paracetamol + Chlorzoxazone)", "dosage": "1 tablet", "frequency": "twice daily", "duration": "5 days"}
+        ]
+    },
+    "throat pain": {
+        "condition": "Throat Pain/Sore Throat",
+        "medicines": [
+            {"name": "Throat lozenges with benzocaine", "dosage": "1 lozenge", "frequency": "every 2 hours", "duration": "5 days"},
+            {"name": "Antiseptic throat spray", "dosage": "2-3 sprays", "frequency": "4 times daily", "duration": "5 days"}
+        ]
+    },
+    "diarrhea": {
+        "condition": "Diarrhea",
+        "medicines": [
+            {"name": "Oral Rehydration Salts (ORS)", "dosage": "1 sachet", "frequency": "after each loose stool", "duration": "till diarrhea stops"},
+            {"name": "Loperamide 2mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "2 days"}
+        ]
+    },
+    "constipation": {
+        "condition": "Constipation",
+        "medicines": [
+            {"name": "Isabgol (Psyllium husk)", "dosage": "1 teaspoon", "frequency": "once daily at bedtime", "duration": "3-5 days"},
+            {"name": "Liquid paraffin", "dosage": "1-2 tablespoons", "frequency": "once daily", "duration": "3-5 days"}
+        ]
+    },
+    "acidity": {
+        "condition": "Acidity/Heartburn",
+        "medicines": [
+            {"name": "Antacid (Magnesium Hydroxide)", "dosage": "1-2 tablespoons", "frequency": "3 times daily after meals", "duration": "5-7 days"},
+            {"name": "Omeprazole 20mg", "dosage": "1 capsule", "frequency": "once daily", "duration": "7-14 days"}
+        ]
+    },
+    "allergy": {
+        "condition": "Allergy",
+        "medicines": [
+            {"name": "Antihistamine (Cetirizine 10mg)", "dosage": "1 tablet", "frequency": "once daily", "duration": "5-7 days"},
+            {"name": "Antihistamine (Loratadine 10mg)", "dosage": "1 tablet", "frequency": "once daily", "duration": "5-7 days"}
+        ]
+    },
+    "nausea": {
+        "condition": "Nausea/Vomiting",
+        "medicines": [
+            {"name": "Domperidone 10mg", "dosage": "1 tablet", "frequency": "3 times daily before meals", "duration": "3-5 days"},
+            {"name": "Ondansetron 4mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "3 days"}
+        ]
+    }
+}
+
+
+def _generate_symptom_aware_fallback(symptoms: List[str], age: int = 30) -> Dict:
+    """Generate a symptom-appropriate fallback response when LLM fails."""
+    symptoms_str = " ".join(symptoms).lower() if symptoms else ""
+    
+    # Find matching symptoms
+    matched_condition = None
+    matched_medicines = None
+    
+    for symptom_key, medicine_info in SYMPTOM_MEDICINE_MAP.items():
+        if symptom_key in symptoms_str:
+            matched_condition = medicine_info["condition"]
+            matched_medicines = medicine_info["medicines"]
+            break
+    
+    # If no specific match, find closest match
+    if not matched_medicines:
+        for symptom_key, medicine_info in SYMPTOM_MEDICINE_MAP.items():
+            for symptom in symptoms:
+                if symptom_key.split()[0] in symptom.lower():
+                    matched_condition = medicine_info["condition"]
+                    matched_medicines = medicine_info["medicines"]
+                    break
+            if matched_medicines:
+                break
+    
+    # Default if still no match
+    if not matched_medicines:
+        matched_condition = "General Illness"
+        matched_medicines = [
+            {"name": "Paracetamol 500mg", "dosage": "1 tablet", "frequency": "twice daily", "duration": "3 days"}
+        ]
+    
+    # Format medicines with proper structure
+    formatted_medicines = []
+    for med in matched_medicines:
+        formatted_medicines.append({
+            "name": med["name"],
+            "dosage": med["dosage"],
+            "frequency": med["frequency"],
+            "duration": med["duration"],
+            "instructions": f"Take {med['dosage']} {med['frequency']}, {med['duration']}",
+            "warnings": ["Consult doctor if symptoms persist", "Check allergies before use"]
+        })
+    
+    return {
+        "predicted_condition": matched_condition,
+        "symptom_analysis": f"Based on reported symptoms: {', '.join(symptoms)}",
+        "recommended_medicines": formatted_medicines,
+        "home_care_advice": [
+            "Rest adequately",
+            "Drink plenty of water and fluids",
+            "Avoid strenuous activities",
+            "Eat light, nutritious food"
+        ],
+        "doctor_consultation_advice": "Consult a doctor if symptoms persist for more than 3-5 days or worsen",
+        "disclaimer": "This is not a professional diagnosis. Please consult a qualified doctor for proper evaluation."
+    }
 
 
 # Optional translator: try to import IndicTrans2-style package if available
@@ -41,16 +189,16 @@ def call_llm(prompt: str) -> str:
     
     if provider == "mock":
         logger.warning("!!! WARNING: Using MOCK provider - NOT calling real LLM !!!")
-        logger.warning("To use real Meditron-7B, set LLM_PROVIDER=ollama in .env")
-        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Meditron-7B")
+        logger.warning("To use real Phi-4, set LLM_PROVIDER=ollama in .env")
+        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Phi-4")
     
     if provider == "ollama":
-        logger.info("*** CALLING MEDITRON-7B VIA OLLAMA ***")
+        logger.info("*** CALLING PHI-4 VIA OLLAMA ***")
         ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-        ollama_model = os.environ.get("OLLAMA_MODEL", "meditron").strip()
+        ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
         
         logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s (Meditron-7B - specialized medical LLM)", ollama_model)
+        logger.info("Ollama Model: %s (Phi-4 - Microsoft advanced language model)", ollama_model)
         logger.info("Prompt length: %d characters", len(prompt))
         logger.info("Prompt (first 800 chars):\n%s", prompt[:800])
         
@@ -64,8 +212,8 @@ def call_llm(prompt: str) -> str:
         
         try:
             logger.info("Sending request to Ollama...")
-            logger.info("WARNING: This may take a few seconds for Meditron-7B to respond...")
-            # Increase timeout to 10 minutes (600 seconds) for Meditron-7B medical inference
+            logger.info("WARNING: This may take a few seconds for Phi-4 to respond...")
+            # Increase timeout to 10 minutes (600 seconds) for Phi-4 medical inference
             resp = requests.post(api_url, json=payload, timeout=600)
             
             logger.info("Ollama response status: %d", resp.status_code)
@@ -81,35 +229,35 @@ def call_llm(prompt: str) -> str:
             resp_json = resp.json()
             llm_output = resp_json.get("response", "")
             
-            logger.info("Meditron-7B response received (%d chars)", len(llm_output))
-            logger.info("Meditron-7B output (first 1500 chars):\n%s", llm_output[:1500])
+            logger.info("Phi-4 response received (%d chars)", len(llm_output))
+            logger.info("Phi-4 output (first 1500 chars):\n%s", llm_output[:1500])
             
             # Try to extract JSON from the response
             try:
                 parsed = utils.try_parse_json(llm_output)
-                logger.info("✓ SUCCESS: Parsed JSON from Meditron-7B response")
+                logger.info("✓ SUCCESS: Parsed JSON from Phi-4 response")
                 logger.info("Predicted condition: '%s'", parsed.get("predicted_condition"))
                 logger.info("Number of medicines: %d", len(parsed.get("recommended_medicines", [])))
                 return json.dumps(parsed)
             except Exception as parse_err:
-                logger.error("✗ FAILED: Cannot parse JSON from Meditron-7B")
+                logger.error("✗ FAILED: Cannot parse JSON from Phi-4")
                 logger.error("Parse error: %s", parse_err)
-                logger.error("Full Meditron-7B output:\n%s", llm_output)
-                raise ValueError(f"Meditron-7B did not return valid JSON.\n\nMeditron-7B output:\n{llm_output[:2000]}\n\nError: {parse_err}")
+                logger.error("Full Phi-4 output:\n%s", llm_output)
+                raise ValueError(f"Phi-4 did not return valid JSON.\n\nPhi-4 output:\n{llm_output[:2000]}\n\nError: {parse_err}")
                 
         except requests.exceptions.ConnectionError as ce:
-            logger.error("✗ FATAL: Cannot connect to Ollama (Meditron-7B)")
+            logger.error("✗ FATAL: Cannot connect to Ollama (Phi-4)")
             logger.error("Ollama URL: %s", ollama_url)
             logger.error("Error: %s", ce)
             raise Exception(
                 f"Cannot connect to Ollama at {ollama_url}\n\n"
                 f"Solutions:\n"
                 f"1. Make sure Ollama is running: ollama serve\n"
-                f"2. Verify Meditron-7B model is installed: ollama list\n"
+                f"2. Verify Phi-4 model is installed: ollama list\n"
                 f"3. Check OLLAMA_URL in .env is correct"
             )
         except Exception as e:
-            logger.exception("✗ ERROR calling Ollama/Meditron-7B: %s", e)
+            logger.exception("✗ ERROR calling Ollama/Phi-4: %s", e)
             raise
     
     else:
@@ -183,45 +331,47 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
     body = req.dict()
     logger.info("Request body: %s", body)
     logger.info("Language requested: %s", req.language)
-
-    # Build prompt with language instructions
-    prompt = prompt_templates.build_prompt(body)
+    
+    # Get user's language
+    user_language = req.language.lower().strip() if req.language else "english"
+    
+    # Step 1: Translate symptoms to English if needed (for processing)
+    original_symptoms = body.get("symptoms", [])
+    if user_language != "english":
+        logger.info(f"Translating symptoms from {user_language} to English for LLM processing")
+        english_symptoms = translate_symptoms_to_english(original_symptoms, user_language)
+        body["symptoms"] = english_symptoms
+        logger.info(f"Translated symptoms: {english_symptoms}")
+    
+    # Step 2: Get RAG context (medicine knowledge base) for LLM
+    rag_context = get_rag_context(body.get("symptoms", []))
+    logger.info("✅ Retrieved RAG context with medicine knowledge base")
+    
+    # Step 3: Build prompt with RAG context
+    prompt = prompt_templates.build_prompt(body, rag_context=rag_context)
     logger.info("LLM prompt (first 1000 chars): %s", prompt[:1000])
     
-    # Call LLM - it should generate in the requested language
+    # Step 4: Call LLM - it will think independently using RAG context
     try:
         raw = call_llm(prompt)
         logger.info("LLM raw output (first 500 chars): %s", raw[:500])
         parsed = utils.try_parse_json(raw)
     except Exception as llm_err:
-        # Fallback: Generate a basic response using safety rules
-        logger.warning("LLM failed: %s. Using fallback response...", str(llm_err))
+        # Fallback: Generate a symptom-aware response using RAG
+        logger.warning("LLM failed: %s. Using intelligent fallback response...", str(llm_err))
         symptoms = body.get("symptoms", [])
         
-        # Generate a simple fallback response
-        parsed = {
-            "predicted_condition": "Common illness - requires medical evaluation",
-            "recommended_medicines": [
-                {
-                    "name": "Paracetamol 500mg",
-                    "dosage": "1 tablet",
-                    "duration": "3 days",
-                    "instructions": "Take after meals, twice daily",
-                    "warnings": ["Do not exceed 3000mg per day", "Consult doctor if fever persists"]
-                }
-            ],
-            "home_care_advice": [
-                "Rest adequately",
-                "Drink plenty of water",
-                "Avoid strenuous activities",
-                "Eat light, nutritious food"
-            ],
-            "doctor_consultation_advice": "Consult a doctor if symptoms persist for more than 3 days or worsen",
-            "disclaimer": "This is not a professional diagnosis. Please consult a doctor for proper evaluation."
-        }
+        # Generate symptom-appropriate fallback using RAG medicines
+        fallback_response = _generate_symptom_aware_fallback(symptoms, body.get("age", 30))
+        parsed = fallback_response
 
-    # Always ensure response is in the requested language
-    # Translate if LLM didn't generate in the correct language
+    # Step 5: Translate response back to user's language if needed
+    if user_language != "english":
+        logger.info(f"Translating response back to {user_language}")
+        parsed = translate_json_response(parsed, user_language)
+        logger.info(f"✅ Response translated to {user_language}")
+
+    # Language verification and fallback translation if needed
     language = req.language.lower().strip() if req.language else "english"
     if language != "english" and language not in ["en"]:
         # Check if the response seems to be in English (simple heuristic)
@@ -345,16 +495,16 @@ Question from user: {question}
 Response (in {lang_display}):"""
 
     try:
-        logger.info("Calling Meditron-7B LLM for medical Q&A...")
+        logger.info("Calling Phi-4 LLM for medical Q&A...")
         
         # Get LLM config
         provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
         ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-        ollama_model = os.environ.get("OLLAMA_MODEL", "meditron").strip()
+        ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
         
         logger.info("LLM Provider: %s", provider)
         logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s (using Meditron-7B for medical expertise)", ollama_model)
+        logger.info("Ollama Model: %s (using Phi-4 for medical expertise)", ollama_model)
         
         if provider != "ollama":
             raise Exception(f"Only Ollama provider is supported. Got: {provider}")
