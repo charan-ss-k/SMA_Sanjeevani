@@ -4,7 +4,7 @@ requests
 pydantic
 pydantic-settings>=2.0.0  # For settings management
 python-multipart
-
+pandas
 # TTS - Multi-language support with Indic Parler-TTS and fallbacks
 gtts>=2.5.0
 pydub>=0.25.1
