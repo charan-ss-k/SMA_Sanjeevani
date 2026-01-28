@@ -48,6 +48,7 @@ async def create_prescription(
         dosage=prescription.dosage,
         frequency=prescription.frequency,
         duration=prescription.duration,
+        start_date=datetime.utcnow(),
         doctor_name=prescription.doctor_name,
         notes=prescription.notes
     )
@@ -131,6 +132,9 @@ async def update_prescription(
     prescription.doctor_name = prescription_update.doctor_name
     prescription.notes = prescription_update.notes
     prescription.updated_at = datetime.utcnow()
+    # Ensure start_date remains set
+    if not prescription.start_date:
+        prescription.start_date = datetime.utcnow()
     
     db.commit()
     db.refresh(prescription)

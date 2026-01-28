@@ -15,7 +15,7 @@ import numpy as np
 from app.core.database import get_db
 from app.core.middleware import get_current_user, get_current_user_optional
 from app.services.medicine_ocr_service import process_medicine_image
-from app.models.models import Prescription
+from app.models.models import Prescription, MedicineHistory
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ def allowed_file(filename: str) -> bool:
 async def analyze_medicine_image(
     file: UploadFile = File(...),
     user_id: Optional[int] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
 ):
     """
     Analyze medicine image using OCR + Phi-4.
@@ -101,6 +102,27 @@ async def analyze_medicine_image(
         
         # Return properly formatted response
         if result.get('success'):
+            # If user is authenticated, store a brief medicine history entry for analytics
+            try:
+                if user_id:
+                    analysis = result.get('analysis', {}) or {}
+                    mh = MedicineHistory(
+                        user_id=user_id,
+                        symptoms=[],
+                        predicted_condition=analysis.get('medicine_name', 'identified'),
+                        recommended_medicines=[{
+                            'medicine_name': analysis.get('medicine_name'),
+                            'sections': analysis.get('sections')
+                        }],
+                        home_care_advice=None,
+                        dosage_info=analysis.get('dosage') if analysis.get('dosage') else None
+                    )
+                    db.add(mh)
+                    db.commit()
+                    db.refresh(mh)
+            except Exception as e:
+                logger.warning(f"Failed to record medicine history for user {user_id}: {e}")
+
             return JSONResponse(
                 status_code=200,
                 content={

@@ -9,6 +9,9 @@ Generates comprehensive medicine information including:
 """
 
 import logging
+import os
+import time
+import random
 import requests
 from typing import Dict, Any
 from app.services.unified_medicine_database import UnifiedMedicineDatabase
@@ -25,7 +28,10 @@ class EnhancedMedicineLLMGenerator:
     
     OLLAMA_URL = "http://localhost:11434/api/generate"
     MODEL = "phi4"
-    TIMEOUT = 60  # seconds (phi4 may need more time)
+    # Configurable timeouts and retry behavior
+    TIMEOUT_BASE = int(os.getenv('OLLAMA_TIMEOUT_BASE', '60'))  # base read timeout in seconds
+    MAX_RETRIES = int(os.getenv('OLLAMA_MAX_RETRIES', '3'))  # number of retry attempts on timeout/server error
+    NUM_PREDICT = int(os.getenv('OLLAMA_NUM_PREDICT', '2048'))  # maximum tokens to request from model
     
     @staticmethod
     def generate_comprehensive_info(ocr_text: str, medicine_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -60,84 +66,78 @@ class EnhancedMedicineLLMGenerator:
     
     @staticmethod
     def _create_comprehensive_prompt(ocr_text: str, medicine_info: Dict[str, Any]) -> str:
-        """Create comprehensive prompt for LLM"""
+        """Create comprehensive prompt for accurate LLM-generated medicine information"""
         
-        db_context = UnifiedMedicineDatabase.format_for_llm_comprehensive(medicine_info)
+        medicine_name = medicine_info.get('name', 'Unknown Medicine')
         
-        prompt = f"""{db_context}
+        prompt = f"""You are an expert medical information provider. Based on your medical knowledge, provide ACCURATE and COMPLETE information about the following medicine.
 
-PATIENT OBSERVATION FROM IMAGE: {ocr_text}
+MEDICINE IDENTIFIED FROM IMAGE:
+Medicine Name: {medicine_name}
+OCR Text from Image: {ocr_text}
 
-Please provide COMPREHENSIVE medical information in the following format:
+YOUR TASK: Generate ACCURATE medical information about this medicine using your medical knowledge. Do NOT make up information - use only verified medical knowledge.
 
-1. MEDICINE OVERVIEW:
-   - What is it: [Brief description]
-   - Purpose: [Main purpose]
-   - Classification: [Type of medicine]
+Provide the information in EXACTLY this format with all sections filled:
 
-2. WHEN TO USE:
-   - Primary uses: [List conditions]
-   - Symptoms it treats: [Common symptoms]
-   - When not to use: [Contraindications]
+1. MEDICINE NAME:
+Provide the exact generic and brand name of this medicine.
 
-3. DOSAGE INSTRUCTIONS:
-   FOR ADULTS:
-   - Standard dose: [Amount and frequency]
-   - Maximum daily: [Max amount]
-   - Duration: [How long to take]
-   
-   FOR CHILDREN:
-   - Under 5 years: [Dosage if applicable or "Not recommended"]
-   - 5-12 years: [Age-appropriate dose]
-   - 12-18 years: [Teen dosage]
-   
-   FOR PREGNANCY:
-   - Safe during pregnancy: [Yes/No/Consult doctor]
-   - Trimester 1: [Safety info]
-   - Trimester 2: [Safety info]
-   - Trimester 3: [Safety info]
-   
-   FOR BREASTFEEDING:
-   - Safe while breastfeeding: [Yes/No/Consult doctor]
-   - Notes: [Any specific precautions]
+2. TYPE:
+Provide the pharmaceutical form (e.g., Tablet, Capsule, Syrup, Powder, Injection, Cream, etc.)
+Be specific about the formulation.
 
-4. PRECAUTIONS & WARNINGS:
-   - Important warnings: [Critical information]
-   - Before taking: [Check these conditions]
-   - During use: [Things to avoid]
-   - Storage: [How to store]
+3. DOSAGE:
+   For Adults: Provide standard adult dosage including frequency and maximum daily dose
+   For Children: Provide age-specific dosages or indicate if not recommended for children
+   For Pregnancy: Provide safety category (Category A/B/C/D/X) and explain safety in each trimester
+   Include specific measurements and frequency for each group
 
-5. SIDE EFFECTS:
-   - Common side effects: [Usually mild]
-   - Serious side effects: [Seek medical help]
-   - Allergic reactions: [Signs to watch for]
+4. WHO CAN TAKE & AGE RESTRICTIONS:
+   Suitable for: List specific age groups and conditions
+   Avoid for: List specific contraindications and medical conditions where NOT recommended
+   During Pregnancy: Specify pregnancy category and trimester-specific info
+   During Breastfeeding: Specify if safe during breastfeeding and any precautions
 
-6. DRUG INTERACTIONS:
-   - Medicines to avoid: [Which medicines conflict]
-   - Food interactions: [Food effects]
-   - Alcohol: [Safe or not]
+5. INSTRUCTIONS:
+   How to take: Provide detailed step-by-step instructions
+   Best time to take: Specify optimal time (with/without food, morning/evening, etc.)
+   If missed dose: Provide clear instructions
+   Storage: Provide specific storage requirements (temperature, humidity, light, etc.)
+   Special considerations: Any special handling or usage notes
 
-7. INSTRUCTIONS FOR USE:
-   - How to take: [Detailed instructions]
-   - Best time to take: [Morning/Evening/With food]
-   - What to do if missed dose: [Instructions]
-   - What to do if overdose: [Emergency info]
+6. PRECAUTIONS:
+   Important warnings: List critical warnings and cautions
+   Avoid with: List specific medicines, foods, supplements that should NOT be taken together
+   Check before taking: List medical conditions to check with doctor first
+   Lab monitoring: Any tests or monitoring needed during use
+   Contraindications: Absolute reasons NOT to take this medicine
 
-8. ADDITIONAL INFORMATION:
-   - Effectiveness: [When you'll feel better]
-   - Habit forming: [Addiction risk]
-   - Long-term use: [Safety considerations]
-   - Special precautions: [For elderly/weak patients]
+7. SIDE EFFECTS:
+   Common: List frequently occurring side effects that are usually mild
+   Serious: List serious side effects requiring immediate medical attention
+   Allergic reactions: List signs of allergic reactions
+   Rare but serious: List uncommon but dangerous side effects
 
-IMPORTANT: Provide all information in clear, easy-to-understand language. 
-Be precise about safety information. Always recommend consulting a healthcare professional.
-Focus on accuracy and patient safety."""
+CRITICAL INSTRUCTIONS:
+- Use your medical knowledge base, NOT made-up information
+- Include specific dosages with measurements (mg, ml, etc.)
+- Include frequency (times per day, every X hours, etc.)
+- Be precise about age groups (Under 5, 5-12, 12-18, 18-65, Over 65)
+- Include pregnancy categories (FDA categories A/B/C/D/X)
+- List SPECIFIC drug interactions, not generic ones
+- Mention SPECIFIC food interactions
+- Include warnings from medical guidelines
+- Always mention "consult healthcare professional" where applicable
+- If you don't have accurate information about something, say "Specific information not available in medical database"
+
+Generate COMPLETE information for all 7 sections. Do not omit any section."""
         
         return prompt
     
     @staticmethod
     def _parse_comprehensive_output(llm_text: str, medicine_info: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse LLM output into comprehensive structured format"""
+        """Parse LLM output into simplified 7-field format"""
         
         # Extract all sections from LLM text
         sections = EnhancedMedicineLLMGenerator._extract_all_sections(llm_text)
@@ -156,24 +156,24 @@ Focus on accuracy and patient safety."""
             # Full LLM response
             "full_information": llm_text,
             
-            # Parsed sections - structured for frontend tabs
+            # Simplified 7 fields - structured for frontend single-column display
             "sections": {
-                "MEDICINE OVERVIEW": sections.get("MEDICINE OVERVIEW", sections.get("OVERVIEW", "Information not available")),
-                "DOSAGE INSTRUCTIONS": sections.get("DOSAGE INSTRUCTIONS", sections.get("DOSAGE", "Consult doctor for dosage")),
-                "PRECAUTIONS & WARNINGS": sections.get("PRECAUTIONS & WARNINGS", sections.get("PRECAUTIONS", "Consult healthcare professional")),
-                "SIDE EFFECTS": sections.get("SIDE EFFECTS", "Information not available"),
-                "DRUG INTERACTIONS": sections.get("DRUG INTERACTIONS", sections.get("INTERACTIONS", "Consult pharmacist")),
-                "INSTRUCTIONS FOR USE": sections.get("INSTRUCTIONS FOR USE", sections.get("INSTRUCTIONS", "Follow healthcare provider's instructions")),
-                "ADDITIONAL INFORMATION": sections.get("ADDITIONAL INFORMATION", "See full information")
+                "MEDICINE NAME": sections.get("MEDICINE NAME", medicine_info.get('name', 'Unknown')),
+                "TYPE": sections.get("TYPE", "Not specified"),
+                "DOSAGE": sections.get("DOSAGE", "As prescribed"),
+                "WHO CAN TAKE & AGE RESTRICTIONS": sections.get("WHO CAN TAKE & AGE RESTRICTIONS", "Consult doctor"),
+                "INSTRUCTIONS": sections.get("INSTRUCTIONS", "Follow healthcare provider's instructions"),
+                "PRECAUTIONS": sections.get("PRECAUTIONS", "Consult healthcare professional"),
+                "SIDE EFFECTS": sections.get("SIDE EFFECTS", "Information not available")
             },
             
             # Flat fields for compatibility
-            "precautions": sections.get("PRECAUTIONS & WARNINGS", sections.get("PRECAUTIONS", "Consult healthcare professional")),
+            "type": sections.get("TYPE", "Not specified"),
+            "precautions": sections.get("PRECAUTIONS", "Consult healthcare professional"),
             "side_effects": sections.get("SIDE EFFECTS", "Information not available"),
-            "interactions": sections.get("DRUG INTERACTIONS", sections.get("INTERACTIONS", "Consult pharmacist")),
-            "dosage": sections.get("DOSAGE INSTRUCTIONS", sections.get("DOSAGE", "As prescribed")),
-            "when_to_use": sections.get("WHEN TO USE", "As per doctor's recommendation"),
-            "instructions": sections.get("INSTRUCTIONS FOR USE", sections.get("INSTRUCTIONS", "Follow healthcare provider's instructions")),
+            "dosage": sections.get("DOSAGE", "As prescribed"),
+            "who_can_take": sections.get("WHO CAN TAKE & AGE RESTRICTIONS", "Consult doctor"),
+            "instructions": sections.get("INSTRUCTIONS", "Follow healthcare provider's instructions"),
             
             # Warnings
             "warnings": [
@@ -188,26 +188,20 @@ Focus on accuracy and patient safety."""
     @staticmethod
     def _extract_all_sections(text: str) -> Dict[str, str]:
         """
-        Extract all numbered sections from LLM output.
-        Handles both numbered format (1. SECTION:) and unnumbered sections.
+        Extract simplified 7-section format from LLM output.
+        Handles detailed responses with sub-sections and bullet points.
         """
         sections = {}
         
-        # List of section headers to look for
+        # List of section headers to look for (simplified)
         section_headers = [
-            "MEDICINE OVERVIEW",
-            "WHEN TO USE",
-            "DOSAGE INSTRUCTIONS",
+            "MEDICINE NAME",
+            "TYPE",
             "DOSAGE",
-            "PRECAUTIONS & WARNINGS",
-            "PRECAUTIONS",
-            "SIDE EFFECTS",
-            "DRUG INTERACTIONS",
-            "INTERACTIONS",
-            "INSTRUCTIONS FOR USE",
+            "WHO CAN TAKE & AGE RESTRICTIONS",
             "INSTRUCTIONS",
-            "ADDITIONAL INFORMATION",
-            "OVERVIEW"
+            "PRECAUTIONS",
+            "SIDE EFFECTS"
         ]
         
         lines = text.split('\n')
@@ -215,10 +209,15 @@ Focus on accuracy and patient safety."""
         current_content = []
         
         for i, line in enumerate(lines):
-            # Check if this line starts a new section
+            # Check if this line starts a new section (look for section number and header)
             is_new_section = False
             for header in section_headers:
-                if header in line.upper():
+                # Match both "1. MEDICINE NAME:" and just "MEDICINE NAME:"
+                if header in line.upper() and (
+                    line.strip().startswith(header) or 
+                    line.strip().startswith(f"{section_headers.index(header) + 1}.") or
+                    (any(c.isdigit() for c in line[:3]) and header in line.upper())
+                ):
                     # Save previous section
                     if current_section:
                         sections[current_section] = '\n'.join(current_content).strip()
@@ -226,23 +225,61 @@ Focus on accuracy and patient safety."""
                     current_section = header
                     current_content = []
                     is_new_section = True
+                    # Skip the header line itself, get content from next line
                     break
             
             if not is_new_section and current_section:
-                # Add line to current section if not empty or a sub-header
-                if line.strip() and not line.strip().startswith('-'):
+                # Add line to current section
+                if line.strip():
                     current_content.append(line)
-                elif line.strip().startswith('-') or line.strip().startswith('•'):
-                    # Include bullet points
+                elif current_content:  # Keep empty lines if we already have content
                     current_content.append(line)
         
         # Save last section
         if current_section:
             sections[current_section] = '\n'.join(current_content).strip()
         
-        # If no sections found, create from full text
+        # If no sections found, try alternative parsing - split by numbered sections
+        if not sections:
+            sections = EnhancedMedicineLLMGenerator._extract_sections_alternative(text, section_headers)
+        
+        # If still no sections, use full text
         if not sections:
             sections["FULL INFORMATION"] = text
+        
+        return sections
+    
+    @staticmethod
+    def _extract_sections_alternative(text: str, section_headers: list) -> Dict[str, str]:
+        """Alternative extraction method for numbered sections"""
+        sections = {}
+        
+        for idx, header in enumerate(section_headers, 1):
+            # Look for patterns like "1. MEDICINE NAME:" or "1.MEDICINE NAME" or "[MEDICINE NAME]"
+            pattern_variants = [
+                f"{idx}. {header}",
+                f"{idx}. {header.lower()}",
+                f"{idx}.{header}",
+                f"[{header}]",
+                header
+            ]
+            
+            for variant in pattern_variants:
+                if variant.lower() in text.lower():
+                    start_idx = text.lower().find(variant.lower())
+                    # Find next section start
+                    next_idx = len(text)
+                    for next_header in section_headers:
+                        if next_header != header:
+                            for next_variant in [f"{section_headers.index(next_header) + 1}.", f"[{next_header}]", next_header]:
+                                find_pos = text.lower().find(next_variant.lower(), start_idx + len(variant))
+                                if find_pos != -1 and find_pos < next_idx:
+                                    next_idx = find_pos
+                    
+                    content = text[start_idx + len(variant):next_idx].strip()
+                    if content:
+                        sections[header] = content
+                        break
         
         return sections
     
@@ -275,7 +312,7 @@ Focus on accuracy and patient safety."""
         return ' '.join(section_content[:10]) if section_content else 'Information not available'
     
     @staticmethod
-    def _generate_with_fallback(prompt: str, medicine_info: Dict[str, Any], use_llm_even_if_empty: bool = False, retry_count: int = 0, max_retries: int = 2) -> Dict[str, Any]:
+    def _generate_with_fallback(prompt: str, medicine_info: Dict[str, Any], use_llm_even_if_empty: bool = False, retry_count: int = 0, max_retries: int = None) -> Dict[str, Any]:
         """
         Attempt LLM generation with automatic fallback
         
@@ -286,121 +323,98 @@ Focus on accuracy and patient safety."""
             retry_count: Current retry count (internal use)
             max_retries: Maximum number of retries (default: 2)
         """
-        try:
-            logger.info(f"🧠 Attempting LLM generation for: {medicine_info.get('name')} (attempt {retry_count + 1}/{max_retries + 1})")
-            
-            # Try LLM with extended timeout
-            response = requests.post(
-                EnhancedMedicineLLMGenerator.OLLAMA_URL,
-                json={
+        # Determine max retries
+        if max_retries is None:
+            max_retries = EnhancedMedicineLLMGenerator.MAX_RETRIES
+
+        attempt = 0
+        base_read_timeout = EnhancedMedicineLLMGenerator.TIMEOUT_BASE
+
+        while attempt <= max_retries:
+            read_timeout = base_read_timeout * (2 ** attempt)
+            logger.info(f"🧠 Attempting LLM generation for: {medicine_info.get('name')} (attempt {attempt + 1}/{max_retries + 1}) - read_timeout={read_timeout}s")
+
+            try:
+                payload = {
                     "model": EnhancedMedicineLLMGenerator.MODEL,
                     "prompt": prompt,
                     "stream": False,
-                    "temperature": 0.3,
-                    "top_p": 0.9,
+                    "temperature": 0.1,  # low temperature for accuracy
+                    "top_p": 0.95,
                     "top_k": 40,
-                },
-                timeout=EnhancedMedicineLLMGenerator.TIMEOUT
-            )
-            
-            if response.status_code == 200:
-                llm_output = response.json().get('response', '')
-                if llm_output.strip():
-                    logger.info("✅ LLM generated comprehensive medicine information successfully")
-                    # Parse LLM output into structured format
-                    return EnhancedMedicineLLMGenerator._parse_comprehensive_output(
-                        llm_output,
-                        medicine_info
-                    )
+                    "num_predict": EnhancedMedicineLLMGenerator.NUM_PREDICT,
+                }
+
+                # Use a tuple timeout: (connect_timeout, read_timeout)
+                response = requests.post(
+                    EnhancedMedicineLLMGenerator.OLLAMA_URL,
+                    json=payload,
+                    timeout=(10, read_timeout)
+                )
+
+                if response.status_code == 200:
+                    # Some LLM endpoints respond with a 'response' field
+                    data = None
+                    try:
+                        data = response.json()
+                    except Exception:
+                        # fallback to raw text
+                        pass
+
+                    llm_output = ''
+                    if isinstance(data, dict):
+                        llm_output = data.get('response') or data.get('text') or data.get('output') or ''
+                    if not llm_output:
+                        # try raw text
+                        try:
+                            llm_output = response.text or ''
+                        except Exception:
+                            llm_output = ''
+
+                    if llm_output and llm_output.strip():
+                        logger.info("✅ LLM generated comprehensive medicine information successfully")
+                        return EnhancedMedicineLLMGenerator._parse_comprehensive_output(llm_output, medicine_info)
+
+                    logger.warning(f"LLM returned empty response on attempt {attempt + 1}")
+                    # fall through to retry
+
+                elif response.status_code == 404:
+                    logger.warning("⚠️ LLM service returned 404 - model/service unavailable")
+                    break
+                elif response.status_code >= 500:
+                    logger.warning(f"LLM returned server error {response.status_code} on attempt {attempt + 1}")
+                    # retry on server errors
                 else:
-                    logger.warning(f"LLM returned empty response (attempt {retry_count + 1}/{max_retries + 1})")
-                    if retry_count < max_retries:
-                        return EnhancedMedicineLLMGenerator._generate_with_fallback(
-                            prompt, medicine_info, use_llm_even_if_empty, retry_count + 1, max_retries
-                        )
-                    else:
-                        logger.warning("Max retries reached, using fallback response")
-                        if not medicine_info.get('found'):
-                            return EnhancedMedicineLLMGenerator._create_synthetic_response(prompt, medicine_info)
-                        return EnhancedMedicineLLMGenerator._create_database_response(medicine_info)
-            elif response.status_code == 404:
-                # 404 means service not found or model not available - fallback immediately
-                logger.warning(f"⚠️ LLM service returned 404 - Ollama may not be running or model unavailable")
-                if not medicine_info.get('found'):
-                    logger.info("Using synthetic response generation")
-                    return EnhancedMedicineLLMGenerator._create_synthetic_response(prompt, medicine_info)
-                logger.info("Using enhanced database response")
-                return EnhancedMedicineLLMGenerator._create_database_response(medicine_info)
-            elif response.status_code == 500:
-                # 500 means server error - try once more
-                logger.warning(f"LLM returned server error (500) (attempt {retry_count + 1}/{max_retries + 1})")
-                if retry_count < max_retries:
-                    return EnhancedMedicineLLMGenerator._generate_with_fallback(
-                        prompt, medicine_info, use_llm_even_if_empty, retry_count + 1, max_retries
-                    )
-                else:
-                    logger.warning("Max retries reached after server errors, using fallback")
-                    if not medicine_info.get('found'):
-                        return EnhancedMedicineLLMGenerator._create_synthetic_response(prompt, medicine_info)
-                    return EnhancedMedicineLLMGenerator._create_database_response(medicine_info)
-            else:
-                # Other status codes - fallback immediately
-                logger.warning(f"LLM returned status {response.status_code}, using fallback response")
-                if not medicine_info.get('found'):
-                    return EnhancedMedicineLLMGenerator._create_synthetic_response(prompt, medicine_info)
-                return EnhancedMedicineLLMGenerator._create_database_response(medicine_info)
-                
-        except requests.exceptions.ConnectionError:
-            logger.warning("❌ Cannot connect to LLM service - Ollama may not be running")
-            logger.info("Using fallback response generation")
-            if not medicine_info.get('found'):
-                return EnhancedMedicineLLMGenerator._create_synthetic_response(prompt, medicine_info)
-            return EnhancedMedicineLLMGenerator._create_database_response(medicine_info)
-            
-        except requests.exceptions.Timeout:
-            logger.warning(f"⏱️ LLM timeout (attempt {retry_count + 1}/{max_retries + 1})")
-            if retry_count < max_retries:
-                logger.info("Retrying with extended timeout...")
-                try:
-                    response = requests.post(
-                        EnhancedMedicineLLMGenerator.OLLAMA_URL,
-                        json={
-                            "model": EnhancedMedicineLLMGenerator.MODEL,
-                            "prompt": prompt,
-                            "stream": False,
-                            "temperature": 0.3,
-                        },
-                        timeout=60  # Extended timeout
-                    )
-                    if response.status_code == 200:
-                        llm_output = response.json().get('response', '')
-                        if llm_output.strip():
-                            logger.info("✅ LLM succeeded with extended timeout")
-                            return EnhancedMedicineLLMGenerator._parse_comprehensive_output(
-                                llm_output,
-                                medicine_info
-                            )
-                except:
-                    pass
-            
-            logger.warning("Max timeout attempts reached, using fallback response")
-            # If LLM completely fails, generate from prompt anyway
-            if not medicine_info.get('found'):
-                logger.info("Generating synthetic response from prompt template...")
-                return EnhancedMedicineLLMGenerator._create_synthetic_response(prompt, medicine_info)
-            
-            logger.warning("📊 Falling back to database response")
-            return EnhancedMedicineLLMGenerator._create_database_response(medicine_info)
-            
-        except Exception as e:
-            logger.error(f"❌ LLM error: {type(e).__name__}: {e}")
-            logger.info("Using fallback response generation")
-            # Try to create a more comprehensive response even from database
-            if not medicine_info.get('found'):
-                logger.info("Generating response from prompt for unknown medicine...")
-                return EnhancedMedicineLLMGenerator._create_synthetic_response(prompt, medicine_info)
-            
-            return EnhancedMedicineLLMGenerator._create_database_response(medicine_info)
+                    logger.warning(f"LLM returned status {response.status_code}, using fallback response")
+                    break
+
+            except requests.exceptions.ConnectionError:
+                logger.warning("❌ Cannot connect to LLM service - Ollama may not be running")
+                break
+
+            except requests.exceptions.Timeout:
+                logger.warning(f"⏱️ LLM read timeout on attempt {attempt + 1} (read_timeout={read_timeout}s)")
+                # retry with exponential backoff
+
+            except Exception as e:
+                logger.error(f"❌ LLM error on attempt {attempt + 1}: {type(e).__name__}: {e}")
+                # On unexpected exceptions, allow a retry
+
+            # Prepare for next attempt (if any)
+            attempt += 1
+            if attempt <= max_retries:
+                backoff = min(30, (2 ** attempt) + random.uniform(0.5, 1.5))
+                logger.info(f"Waiting {backoff:.1f}s before next LLM attempt...")
+                time.sleep(backoff)
+
+        # If LLM completely fails after retries, fallback
+        logger.warning("LLM generation failed after retries, using fallback response")
+        if not medicine_info.get('found'):
+            logger.info("Generating synthetic response from prompt template...")
+            return EnhancedMedicineLLMGenerator._create_synthetic_response(prompt, medicine_info)
+
+        logger.warning("📊 Falling back to database response")
+        return EnhancedMedicineLLMGenerator._create_database_response(medicine_info)
     
     @staticmethod
     def _create_synthetic_response(prompt: str, medicine_info: Dict[str, Any]) -> Dict[str, Any]:
