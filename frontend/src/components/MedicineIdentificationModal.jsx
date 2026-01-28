@@ -195,7 +195,7 @@ const MedicineIdentificationModal = ({ isOpen, onClose, onSave }) => {
 
       try {
         // Save to backend prescription history
-        const response = await fetch('/api/prescriptions', {
+        const response = await fetch('/api/prescriptions/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -212,7 +212,14 @@ const MedicineIdentificationModal = ({ isOpen, onClose, onSave }) => {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to save prescription');
+          let errorText = '';
+          try {
+            errorText = await response.text();
+          } catch {
+            errorText = 'Unable to parse error response';
+          }
+          console.error('Response status:', response.status, 'Body:', errorText);
+          throw new Error(`Failed to save prescription: ${response.status} ${errorText}`);
         }
 
         console.log('✅ Prescription saved to database');

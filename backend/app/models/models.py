@@ -72,13 +72,13 @@ class Prescription(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    medicine_name = Column(String(200), nullable=False)
-    dosage = Column(String(100), nullable=False)  # e.g., "500mg", "2 tablets"
-    frequency = Column(String(100), nullable=False)  # e.g., "Twice daily"
-    duration = Column(String(100), nullable=False)  # e.g., "7 days", "2 weeks"
+    medicine_name = Column(String(255), nullable=False)
+    dosage = Column(Text, nullable=False)  # Changed from String(100) to Text for longer dosage information
+    frequency = Column(String(255), nullable=False)  # e.g., "Twice daily"
+    duration = Column(String(255), nullable=False)  # e.g., "7 days", "2 weeks"
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=True)
-    doctor_name = Column(String(200), nullable=True)
+    doctor_name = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)

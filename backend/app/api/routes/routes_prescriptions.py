@@ -6,6 +6,9 @@ from app.models.models import Prescription
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/prescriptions", tags=["prescriptions"])
 
@@ -42,25 +45,45 @@ async def create_prescription(
     db: Session = Depends(get_db)
 ):
     """Create a new prescription for authenticated user."""
-    new_prescription = Prescription(
-        user_id=user_id,
-        medicine_name=prescription.medicine_name,
-        dosage=prescription.dosage,
-        frequency=prescription.frequency,
-        duration=prescription.duration,
-        start_date=datetime.utcnow(),
-        doctor_name=prescription.doctor_name,
-        notes=prescription.notes
-    )
-    db.add(new_prescription)
-    db.commit()
-    db.refresh(new_prescription)
-    
-    return {
-        **new_prescription.__dict__,
-        'created_at': new_prescription.created_at.isoformat(),
-        'updated_at': new_prescription.updated_at.isoformat()
-    }
+    try:
+        logger.info(f"Creating prescription for user_id={user_id}: {prescription.medicine_name}")
+        
+        # If user_id is 0 (anonymous), still allow but log it
+        if user_id == 0:
+            logger.warning("Creating prescription for anonymous user (user_id=0)")
+        
+        new_prescription = Prescription(
+            user_id=user_id,
+            medicine_name=prescription.medicine_name,
+            dosage=prescription.dosage,
+            frequency=prescription.frequency,
+            duration=prescription.duration,
+            start_date=datetime.utcnow(),
+            doctor_name=prescription.doctor_name,
+            notes=prescription.notes
+        )
+        
+        db.add(new_prescription)
+        db.commit()
+        db.refresh(new_prescription)
+        
+        logger.info(f"✅ Prescription created successfully: {new_prescription.id}")
+        
+        return {
+            **new_prescription.__dict__,
+            'created_at': new_prescription.created_at.isoformat(),
+            'updated_at': new_prescription.updated_at.isoformat()
+        }
+    except HTTPException as http_err:
+        logger.error(f"HTTP Error: {http_err.detail}")
+        raise
+    except Exception as err:
+        logger.error(f"❌ Error creating prescription: {str(err)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create prescription: {str(err)}"
+        )
 
 @router.get("/", response_model=List[PrescriptionResponse])
 async def get_user_prescriptions(

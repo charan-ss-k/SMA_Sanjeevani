@@ -56,6 +56,34 @@ async def startup_event():
     try:
         init_db()
         logger.info("✅ Database initialized successfully")
+        
+        # Create anonymous user for prescriptions
+        try:
+            from app.core.database import SessionLocal
+            from app.models.models import User
+            
+            db = SessionLocal()
+            anonymous_user = db.query(User).filter(User.id == 0).first()
+            
+            if not anonymous_user:
+                logger.info("🔄 Creating anonymous user for prescriptions...")
+                anonymous_user = User(
+                    id=0,
+                    username="anonymous",
+                    email="anonymous@sanjeevani.local",
+                    password_hash="disabled",
+                    is_active=True
+                )
+                db.add(anonymous_user)
+                db.commit()
+                logger.info("✅ Anonymous user created successfully")
+            else:
+                logger.info("✅ Anonymous user already exists")
+            
+            db.close()
+        except Exception as e:
+            logger.warning(f"⚠️ Could not create anonymous user: {e}")
+            
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
         raise
