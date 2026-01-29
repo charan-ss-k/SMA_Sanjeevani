@@ -53,16 +53,46 @@ const DashboardAppointments = ({ language = 'en' }) => {
     }
   };
 
-  const cancelAppointment = (appointmentId) => {
-    if (window.confirm('Are you sure you want to cancel this appointment?')) {
-      const updated = appointments.filter(apt => apt.doctor_id !== appointmentId);
-      setAppointments(updated);
-      
-      const allAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
-      const filtered = allAppointments.filter(apt => apt.doctor_id !== appointmentId);
-      localStorage.setItem('userAppointments', JSON.stringify(filtered));
-
-      playTTS('Appointment cancelled', language);
+  const cancelAppointment = async (appointment) => {
+    if (window.confirm(`Are you sure you want to cancel the appointment with Dr. ${appointment.doctor_name} on ${new Date(appointment.appointment_date).toLocaleDateString()}?`)) {
+      try {
+        const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+        const token = localStorage.getItem('access_token');
+        
+        console.log('🗑️ Cancelling appointment:', appointment.id);
+        
+        const response = await fetch(`${apiBase}/api/appointments/appointment/${appointment.id}`, {
+          method: 'DELETE',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        console.log('📤 Cancel response:', response.status, data);
+        
+        if (response.ok) {
+          // Remove from state
+          const updated = appointments.filter(apt => apt.id !== appointment.id);
+          setAppointments(updated);
+          
+          // Also remove from localStorage if it exists there
+          const allAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
+          const filtered = allAppointments.filter(apt => apt.id !== appointment.id && apt.doctor_id !== appointment.doctor_id);
+          localStorage.setItem('userAppointments', JSON.stringify(filtered));
+          
+          playTTS(`Appointment with ${appointment.doctor_name} has been cancelled`, language);
+          console.log('✅ Appointment cancelled successfully');
+        } else {
+          const errorMsg = data.detail || 'Failed to cancel appointment';
+          throw new Error(errorMsg);
+        }
+      } catch (error) {
+        console.error('❌ Error cancelling appointment:', error);
+        playTTS(`Error: ${error.message}`, language);
+        alert(`Failed to cancel appointment: ${error.message}`);
+      }
     }
   };
 
@@ -137,7 +167,7 @@ const DashboardAppointments = ({ language = 'en' }) => {
                   </button>
                   <button
                     className="apt-btn cancel"
-                    onClick={() => cancelAppointment(apt.doctor_id)}
+                    onClick={() => cancelAppointment(apt)}
                   >
                     Cancel
                   </button>

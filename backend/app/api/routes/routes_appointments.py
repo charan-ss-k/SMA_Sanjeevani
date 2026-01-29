@@ -499,6 +499,52 @@ async def update_appointment(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/appointment/{appointment_id}")
+async def delete_appointment(
+    appointment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete/cancel an appointment - removes it from the database.
+    """
+    try:
+        print(f"🗑️ [CANCEL] Deleting appointment {appointment_id} for user {current_user.id}")
+        
+        appointment = db.query(Appointment).filter(
+            Appointment.id == appointment_id,
+            Appointment.user_id == current_user.id
+        ).first()
+        
+        if not appointment:
+            print(f"❌ [CANCEL] Appointment {appointment_id} not found for user {current_user.id}")
+            raise HTTPException(status_code=404, detail="Appointment not found")
+        
+        # Store details before deleting
+        apt_details = {
+            "id": appointment.id,
+            "doctor_name": appointment.doctor_name,
+            "appointment_date": appointment.appointment_date.isoformat() if appointment.appointment_date else None
+        }
+        
+        db.delete(appointment)
+        db.commit()
+        
+        print(f"✅ [CANCEL] Appointment {appointment_id} successfully deleted for user {current_user.id}")
+        
+        return {
+            "success": True,
+            "message": f"Appointment with Dr. {apt_details['doctor_name']} on {apt_details['appointment_date']} has been cancelled",
+            "appointment_id": appointment_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ [CANCEL] Error deleting appointment {appointment_id}: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/doctor/{doctor_id}")
 async def get_doctor_details(doctor_id: str):
     """

@@ -108,6 +108,51 @@ const ConsultPage = () => {
       console.error('❌ Error loading appointments:', err);
     }
   };
+
+  const cancelAppointment = async (appointment) => {
+    if (!window.confirm(`Cancel appointment with Dr. ${appointment.doctor_name} on ${new Date(appointment.appointment_date).toLocaleDateString()}?`)) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+      const token = localStorage.getItem('access_token');
+      
+      console.log('🗑️ Cancelling appointment:', appointment.id);
+      
+      const response = await fetch(`${apiBase}/api/appointments/appointment/${appointment.id}`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      console.log('📤 Cancel response:', response.status, data);
+      
+      if (response.ok) {
+        setMessage(`✅ ${data.message}`);
+        if (!isMuted) playTTS(data.message, language);
+        
+        // Reload appointments to refresh the list
+        await loadAppointments();
+        
+        // Clear message after 2 seconds
+        setTimeout(() => setMessage(''), 2000);
+      } else {
+        const errorMsg = data.detail || 'Failed to cancel appointment';
+        throw new Error(errorMsg);
+      }
+    } catch (error) {
+      console.error('❌ Error cancelling appointment:', error);
+      setError(`Failed to cancel: ${error.message}`);
+      if (!isMuted) playTTS(`Error: ${error.message}`, language);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const handleSearchChange = (e) => {
     const { name, value } = e.target;
@@ -777,11 +822,7 @@ const ConsultPage = () => {
                         }}>
                           🔔 Set Reminder
                         </button>
-                        <button className="btn btn-secondary" onClick={() => {
-                          if (window.confirm('Cancel this appointment?')) {
-                            // TODO: Add cancel appointment functionality
-                          }
-                        }}>
+                        <button className="btn btn-secondary" onClick={() => cancelAppointment(apt)}>
                           ❌ Cancel
                         </button>
                       </div>
