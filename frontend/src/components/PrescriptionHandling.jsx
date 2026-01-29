@@ -3,6 +3,7 @@ import logo from '../assets/Sanjeevani Logo.png';
 import { AuthContext } from '../main';
 import { LanguageContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
+import PrescriptionAnalyzer from './PrescriptionAnalyzer';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
 
@@ -61,6 +62,7 @@ const PrescriptionHandling = () => {
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [activeTab, setActiveTab] = useState('manage'); // 'manage' or 'analyze'
   
   // Image analysis state
   const [file, setFile] = useState(null);
@@ -404,6 +406,40 @@ const PrescriptionHandling = () => {
             <p className="text-4xl font-bold mt-2">{stats.totalPrescriptions}</p>
           </div>
         </div>
+
+        {/* Tab Navigation */}
+        <div className="flex gap-4 mb-8 border-b-2 border-gray-200">
+          <button
+            onClick={() => setActiveTab('manage')}
+            className={`px-6 py-4 font-bold transition border-b-4 ${
+              activeTab === 'manage'
+                ? 'border-b-blue-600 text-blue-600'
+                : 'border-b-transparent text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            📋 Manage Prescriptions
+          </button>
+          <button
+            onClick={() => setActiveTab('analyze')}
+            className={`px-6 py-4 font-bold transition border-b-4 ${
+              activeTab === 'analyze'
+                ? 'border-b-purple-600 text-purple-600'
+                : 'border-b-transparent text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            📸 Analyze Handwritten
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'analyze' && (
+          <div className="mb-8">
+            <PrescriptionAnalyzer />
+          </div>
+        )}
+
+        {activeTab === 'manage' && (
+          <>
 
         {/* AI Medicine Identification Section - Inline */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
@@ -810,7 +846,8 @@ const PrescriptionHandling = () => {
           </aside>
 
         </div>
-
+        </>
+        )}
       </div>
       </div>
     </>

@@ -11,18 +11,23 @@ pydub>=0.25.1
 google-cloud-texttospeech>=2.16.0
 # Indic Parler-TTS for native language audio (install via git)
 # pip install git+https://github.com/huggingface/parler-tts.git
-torch>=2.0.0  # Required by Parler-TTS
-transformers>=4.35.0  # Required by Parler-TTS and medical models
+torch>=2.0.0  # Required by Parler-TTS, TrOCR, and deep learning models
+transformers>=4.35.0  # Required by Parler-TTS, TrOCR, and medical models
 
 # Image Processing (for OCR and medicine identification)
 opencv-python>=4.8.0  # CRITICAL: For cv2 module
 pillow>=10.0.0
 numpy>=1.24.0
 scipy>=1.11.0  # For image processing algorithms
+scikit-image>=0.21.0  # For advanced image processing and morphological operations
 
 # OCR (pytesseract = Python bindings; install Tesseract engine from https://github.com/UB-Mannheim/tesseract/wiki)
 pytesseract>=0.3.10
 easyocr>=1.7.0
+
+# Handwritten Text Recognition (HTR) - TrOCR for prescription analysis
+transformers>=4.35.0  # TrOCR model from Hugging Face
+torch>=2.0.0  # PyTorch for TrOCR and deep learning
 
 # Database & ORM
 sqlalchemy>=2.0

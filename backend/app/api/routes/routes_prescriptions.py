@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.middleware import get_current_user
-from app.models.models import Prescription
+from app.core.middleware import get_current_user, get_current_user_optional
+from app.models.models import Prescription, User
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
+import tempfile
+import cv2
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +43,12 @@ class PrescriptionResponse(BaseModel):
 @router.post("/", response_model=PrescriptionResponse)
 async def create_prescription(
     prescription: PrescriptionCreate,
-    user_id: int = Depends(get_current_user),
+    user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new prescription for authenticated user."""
     try:
+        user_id = user.id
         logger.info(f"Creating prescription for user_id={user_id}: {prescription.medicine_name}")
         
         # If user_id is 0 (anonymous), still allow but log it
@@ -87,12 +90,13 @@ async def create_prescription(
 
 @router.get("/", response_model=List[PrescriptionResponse])
 async def get_user_prescriptions(
-    user_id: int = Depends(get_current_user),
+    user = Depends(get_current_user),
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 10
 ):
     """Get all prescriptions for authenticated user."""
+    user_id = user.id
     prescriptions = db.query(Prescription).filter(
         Prescription.user_id == user_id
     ).offset(skip).limit(limit).all()
@@ -108,10 +112,11 @@ async def get_user_prescriptions(
 @router.get("/{prescription_id}", response_model=PrescriptionResponse)
 async def get_prescription(
     prescription_id: int,
-    user_id: int = Depends(get_current_user),
+    user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get specific prescription (user can only access their own)."""
+    user_id = user.id
     prescription = db.query(Prescription).filter(
         Prescription.id == prescription_id,
         Prescription.user_id == user_id
@@ -133,10 +138,11 @@ async def get_prescription(
 async def update_prescription(
     prescription_id: int,
     prescription_update: PrescriptionCreate,
-    user_id: int = Depends(get_current_user),
+    user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update prescription (user can only update their own)."""
+    user_id = user.id
     prescription = db.query(Prescription).filter(
         Prescription.id == prescription_id,
         Prescription.user_id == user_id
@@ -171,10 +177,11 @@ async def update_prescription(
 @router.delete("/{prescription_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_prescription(
     prescription_id: int,
-    user_id: int = Depends(get_current_user),
+    user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete prescription (user can only delete their own)."""
+    user_id = user.id
     prescription = db.query(Prescription).filter(
         Prescription.id == prescription_id,
         Prescription.user_id == user_id
@@ -188,3 +195,120 @@ async def delete_prescription(
     
     db.delete(prescription)
     db.commit()
+
+# AI Medicine Identification Section - Prescription Handwriting Analysis
+
+ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'bmp', 'tiff'}
+MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+def allowed_image_file(filename: str) -> bool:
+    """Check if file has allowed image extension"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
+
+@router.post("/analyze", response_model=Dict[str, Any])
+async def analyze_handwritten_prescription(
+    file: UploadFile = File(...),
+    user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """
+    Analyze handwritten prescription image using AI.
+    
+    Workflow:
+    1. Preprocess image for handwritten text (adaptive thresholding, denoising)
+    2. Recognize text using TrOCR (Microsoft Transformer OCR for handwriting)
+    3. Decipher noisy text using Phi-4 LLM with specialized prompt
+    4. Extract medicine names, dosages, and frequencies
+    
+    Returns: Structured list of medicines with dosages and frequencies
+    """
+    temp_file_path = None
+    
+    logger.info(f"📥 Received prescription analysis request from user: {user.id if user else 'anonymous'}")
+    logger.info(f"📄 File: {file.filename}, Type: {file.content_type}, Size: {file.size}")
+    
+    try:
+        # Validate file
+        if not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No file provided"
+            )
+        
+        if not allowed_image_file(file.filename):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File type not allowed. Allowed: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}"
+            )
+        
+        # Read and validate file size
+        file_content = await file.read()
+        file_size = len(file_content)
+        
+        if file_size > MAX_IMAGE_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File too large. Max: {MAX_IMAGE_FILE_SIZE / 1024 / 1024}MB"
+            )
+        
+        if file_size < 1000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File too small. Please upload a complete prescription image"
+            )
+        
+        # Save temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as tmp:
+            tmp.write(file_content)
+            temp_file_path = tmp.name
+        
+        logger.debug(f"Temporary file saved: {temp_file_path}")
+        
+        # Verify it's a valid image
+        image = cv2.imread(temp_file_path)
+        if image is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid image file. Please upload a valid image"
+            )
+        
+        logger.debug(f"Image validated. Size: {image.shape}")
+        
+        # Run prescription analysis
+        logger.info("🏥 Starting prescription analysis pipeline...")
+        from app.services.prescription_analyzer_service import PrescriptionAnalyzerService
+        
+        result = PrescriptionAnalyzerService.analyze_prescription_image(temp_file_path)
+        
+        # Add user context to result
+        if user and user.id != 0:
+            result['user_id'] = user.id
+            logger.info(f"Analysis result saved for user {user.id}")
+        
+        # Log success
+        medicines_count = len(result.get('medicines', []))
+        logger.info(f"✅ Prescription analysis successful. Found {medicines_count} medicines")
+        
+        return result
+        
+    except HTTPException as http_err:
+        logger.error(f"HTTP Error: {http_err.detail}")
+        raise
+    except Exception as err:
+        logger.error(f"❌ Error analyzing prescription: {str(err)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Prescription analysis failed: {str(err)}"
+        )
+    finally:
+        # Clean up temporary file
+        if temp_file_path:
+            import os
+            try:
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+                    logger.debug(f"Temporary file cleaned up: {temp_file_path}")
+            except Exception as cleanup_err:
+                logger.warning(f"Failed to clean up temporary file: {cleanup_err}")

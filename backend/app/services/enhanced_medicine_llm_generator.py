@@ -662,3 +662,242 @@ For safety, it's recommended to consult with:
                 "Do not take any medicine without proper medical advice"
             ]
         }
+    @staticmethod
+    def decipher_prescription_text(noisy_ocr_text: str) -> Dict[str, Any]:
+        """
+        Decipher handwritten prescription text using specialized LLM prompt.
+        Designed specifically for noisy, messy OCR output from handwritten prescriptions.
+        
+        Args:
+            noisy_ocr_text: Raw OCR text from handwritten prescription (messy, unclear)
+            
+        Returns:
+            Structured JSON with deciphered medicines, dosages, and frequencies
+        """
+        logger.info("🔍 Starting prescription text deciphering...")
+        logger.debug(f"Raw OCR text: {noisy_ocr_text[:200]}...")
+        
+        # Create specialized prompt for deciphering
+        prompt = EnhancedMedicineLLMGenerator._create_prescription_deciphering_prompt(noisy_ocr_text)
+        
+        logger.info("📝 Sending deciphering prompt to LLM...")
+        
+        try:
+            # Call LLM with retry logic
+            response_text = EnhancedMedicineLLMGenerator._call_ollama_with_retry(
+                prompt,
+                max_retries=EnhancedMedicineLLMGenerator.MAX_RETRIES,
+                timeout_base=EnhancedMedicineLLMGenerator.TIMEOUT_BASE
+            )
+            
+            logger.debug(f"LLM Response: {response_text[:500]}...")
+            
+            # Parse the JSON response
+            import json
+            
+            # Try to extract JSON from response
+            json_match = None
+            try:
+                # Look for JSON array in the response
+                start_idx = response_text.find('[')
+                end_idx = response_text.rfind(']') + 1
+                
+                if start_idx != -1 and end_idx > start_idx:
+                    json_str = response_text[start_idx:end_idx]
+                    medicines_list = json.loads(json_str)
+                    logger.info(f"✅ Successfully extracted {len(medicines_list)} medicines from prescription")
+                    return {
+                        "status": "success",
+                        "medicines": medicines_list,
+                        "raw_text": noisy_ocr_text,
+                        "llm_output": response_text,
+                        "generated_at": __import__('datetime').datetime.now().isoformat()
+                    }
+            except json.JSONDecodeError as je:
+                logger.warning(f"JSON parsing failed: {je}. Attempting fallback parsing...")
+            
+            # Fallback: manual parsing if JSON extraction fails
+            medicines_list = EnhancedMedicineLLMGenerator._parse_prescription_fallback(response_text)
+            
+            return {
+                "status": "success" if medicines_list else "partial",
+                "medicines": medicines_list,
+                "raw_text": noisy_ocr_text,
+                "llm_output": response_text,
+                "generated_at": __import__('datetime').datetime.now().isoformat(),
+                "note": "Used fallback parsing - results may be less accurate"
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Prescription deciphering failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "raw_text": noisy_ocr_text,
+                "medicines": [],
+                "generated_at": __import__('datetime').datetime.now().isoformat()
+            }
+    
+    @staticmethod
+    def _create_prescription_deciphering_prompt(noisy_text: str) -> str:
+        """
+        Create a specialized prompt for an expert pharmacist LLM.
+        The LLM must decipher messy, handwritten prescription text.
+        """
+        prompt = f"""You are an expert pharmacist with 30+ years of experience reading handwritten doctor prescriptions.
+
+TASK: Decipher the following NOISY handwritten prescription text and extract structured medicine information.
+
+IMPORTANT NOTES:
+- The input text is from OCR (optical character recognition) of a handwritten prescription
+- It will contain spelling errors, unclear abbreviations, and medical shorthand
+- Your job is to INTERPRET the messy text and identify actual medicine names and instructions
+- You must work with INCOMPLETE and INCORRECT text
+
+NOISY OCR TEXT FROM HANDWRITTEN PRESCRIPTION:
+---
+{noisy_text}
+---
+
+YOUR TASK:
+1. Identify each DISTINCT medicine mentioned
+2. Extract dosage (e.g., "500mg", "1 tablet", "5ml")
+3. Extract frequency (e.g., "BD" = twice daily, "TDS" = thrice daily, "OD" = once daily, "QID" = four times daily)
+4. Extract duration if mentioned (e.g., "7 days", "2 weeks")
+5. Handle common medical abbreviations:
+   - BD = Bis Die (twice daily)
+   - TDS = Ter Die Sumendum (thrice daily)
+   - OD = Omni Die (once daily)
+   - QID = Quater In Die (four times daily)
+   - PC = Post Cibum (after meals)
+   - AC = Ante Cibum (before meals)
+   - HS = Hora Somni (at bedtime)
+   - AM/PM = morning/evening
+   - SOS = as needed
+   - IM = intramuscular, IV = intravenous, PO = oral
+
+RETURN EXACTLY THIS JSON FORMAT (array of medicine objects):
+[
+  {{
+    "medicine_name": "Actual medicine name (best guess if unclear)",
+    "dosage": "Amount and unit (e.g. 500mg, 1 tablet, 10ml)",
+    "frequency": "How many times per day or interval",
+    "duration": "How long to take (days/weeks/months or 'as needed')",
+    "special_instructions": "Any special instructions (with/without food, bedtime, etc.)",
+    "confidence": "high/medium/low (how confident you are about this medicine)",
+    "notes": "Any uncertainty or alternative interpretations"
+  }},
+  ...
+]
+
+RULES FOR DECIPHERING:
+1. Medicine names: Even if misspelled in OCR, identify the likely medicine
+2. For unclear entries, use "confidence": "low" and add notes
+3. If text says "as needed", set frequency to "as needed" and duration to "N/A"
+4. Remove duplicates - don't list the same medicine twice
+5. Only include items that are clearly medicines (ignore general notes)
+6. If cannot determine a field, use empty string ""
+
+EXAMPLE OUTPUT:
+[
+  {{
+    "medicine_name": "Paracetamol",
+    "dosage": "500mg",
+    "frequency": "TDS (thrice daily)",
+    "duration": "5 days",
+    "special_instructions": "After meals",
+    "confidence": "high",
+    "notes": ""
+  }},
+  {{
+    "medicine_name": "Amoxicillin",
+    "dosage": "250mg",
+    "frequency": "BD (twice daily)",
+    "duration": "10 days",
+    "special_instructions": "With milk or water",
+    "confidence": "high",
+    "notes": ""
+  }}
+]
+
+CRITICAL: Return ONLY the JSON array, nothing else. Start with [ and end with ]"""
+        
+        return prompt
+    
+    @staticmethod
+    def _parse_prescription_fallback(llm_output: str) -> list:
+        """
+        Fallback parser if JSON extraction fails.
+        Attempts to extract medicine information from natural language output.
+        """
+        import re
+        import json
+        
+        medicines = []
+        
+        # Try to find any JSON-like structure first
+        json_patterns = [
+            r'\[\s*\{.*?\}\s*\]',  # Array of objects
+            r'\{[^}]*medicine[^}]*\}',  # Object with 'medicine'
+        ]
+        
+        for pattern in json_patterns:
+            matches = re.findall(pattern, llm_output, re.DOTALL)
+            for match in matches:
+                try:
+                    parsed = json.loads(match)
+                    if isinstance(parsed, list):
+                        medicines.extend(parsed)
+                    elif isinstance(parsed, dict):
+                        medicines.append(parsed)
+                except:
+                    continue
+        
+        if medicines:
+            logger.info(f"Fallback parser found {len(medicines)} medicines")
+            return medicines
+        
+        # Last resort: try to extract key phrases
+        logger.warning("Could not parse prescription output - returning empty list")
+        return []
+    
+    @staticmethod
+    def _call_ollama_with_retry(prompt: str, max_retries: int = 3, timeout_base: int = 60) -> str:
+        """
+        Helper method to call Ollama API with retry logic.
+        Reuses existing retry mechanism from the class.
+        """
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                timeout = timeout_base * (2 ** attempt)  # Exponential backoff
+                
+                response = requests.post(
+                    EnhancedMedicineLLMGenerator.OLLAMA_URL,
+                    json={
+                        "model": EnhancedMedicineLLMGenerator.MODEL,
+                        "prompt": prompt,
+                        "stream": False,
+                        "num_predict": EnhancedMedicineLLMGenerator.NUM_PREDICT
+                    },
+                    timeout=timeout
+                )
+                
+                if response.status_code == 200:
+                    return response.json().get('response', '')
+                else:
+                    logger.warning(f"LLM returned status {response.status_code}")
+                    
+            except requests.Timeout:
+                logger.warning(f"Timeout on attempt {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                continue
+            except Exception as e:
+                logger.warning(f"Error on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                continue
+        
+        raise RuntimeError("Failed to get response from LLM after retries")
