@@ -9,9 +9,11 @@ import About from './components/About.jsx';
 import Services from './components/Services.jsx';
 import Contact from './components/Contact.jsx';
 import PrescriptionHandling from './components/PrescriptionHandling.jsx';
+import Reminders from './components/Reminders.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import Tutorial from './components/Tutorial.jsx';
 import MedicineRecommendation from './components/MedicineRecommendation.jsx';
+import ConsultPage from './components/ConsultPage.jsx';
 import ChatWidget from './components/Chatwidget.jsx';
 import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
 import { ProtectedRoute } from './components/ProtectedRoute.jsx';
@@ -43,6 +45,8 @@ function AppWrapper() {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/services" element={<Services />} />
             <Route path="/prescription" element={<ProtectedRoute><PrescriptionHandling /></ProtectedRoute>} />
+            <Route path="/reminders" element={<ProtectedRoute><Reminders /></ProtectedRoute>} />
+            <Route path="/consult" element={<ProtectedRoute><ConsultPage /></ProtectedRoute>} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/tutorial" element={<Tutorial />} />
           </Routes>

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.api.routes.routes_auth import router as auth_router
 from app.api.routes.routes_dashboard import router as dashboard_router
+from app.api.routes.routes_doctors import router as doctors_router
 from app.api.routes.routes_medicine_history import router as medicine_history_router
 from app.api.routes.routes_prescriptions import router as prescriptions_router
 from app.api.routes.routes_qa_history import router as qa_history_router
@@ -109,6 +110,7 @@ async def health_check():
 # Include routers
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(dashboard_router, tags=["Dashboard"])
+app.include_router(doctors_router, tags=["Doctors"])
 app.include_router(medicine_history_router, tags=["Medicine History"])
 app.include_router(prescriptions_router, tags=["Prescriptions"])
 app.include_router(qa_history_router, tags=["QA History"])

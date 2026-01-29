@@ -1,11 +1,14 @@
 import React, { useRef, useEffect, useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { playTTS } from '../utils/tts';
-import { LanguageContext } from '../main';
+import { LanguageContext, AuthContext } from '../main';
 import { t } from '../utils/translations';
+import DashboardAppointments from './DashboardAppointments';
+import DashboardReminders from './DashboardReminders';
 
 const Home = () => {
   const { language } = useContext(LanguageContext);
+  const { isAuthenticated, user } = useContext(AuthContext);
   
   const slides = [
     { titleKey: 'scanMedicine', bg: 'bg-gradient-to-r from-green-100 to-green-50' },
@@ -78,7 +81,8 @@ const Home = () => {
 
   return (
     <div className="pt-16 pb-12 bg-gray-50 min-h-screen"> {/* reduced offset for fixed navbar */}
-      {/* Large Carousel (top) */}
+      {/* Large Carousel (top) - Only show when NOT authenticated */}
+      {!isAuthenticated && (
       <div className="w-full overflow-hidden">
         <div className="relative">
           <div 
@@ -97,7 +101,7 @@ const Home = () => {
                   <p className="text-gray-700 mb-4">{t('bringingHealthcare', language)}</p>
                   <div className="flex items-center justify-center gap-3">
                     <a href="/tutorial" className="bg-green-800 text-white px-4 py-2 rounded">{t('tryDemo', language)}</a>
-                    <button onClick={() => playTTS(t('askHealthAssistant', language), language)} className="bg-amber-50 px-4 py-2 rounded">{t('askHealthAssistant', language)}</button>
+                    <Link to="/chatbot" className="bg-amber-50 px-4 py-2 rounded">{t('askHealthAssistant', language)}</Link>
                   </div>
                 </div>
               </div>
@@ -161,8 +165,10 @@ const Home = () => {
           </div>
         </div>
       </div>
+      )}
 
-      {/* Quick test panel for symptoms recommend endpoint */}
+      {/* Quick test panel for symptoms recommend endpoint - Only show when NOT authenticated */}
+      {!isAuthenticated && (
       <div className="container mx-auto px-6 mt-6">
         <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
           <div className="flex items-center justify-between">
@@ -182,82 +188,159 @@ const Home = () => {
           </div>
         </section>
       </div>
+      )}
 
-      {/* Intro / Hero below carousel */}
+      {/* Intro / Hero below carousel - Only show when NOT authenticated */}
+      {!isAuthenticated && (
       <div className="container mx-auto px-6 mt-8">
         <section className="bg-white rounded-lg shadow p-6 text-center">
           <h1 className="text-3xl md:text-4xl font-bold text-green-900">{t('smartMedicineAccess', language)}</h1>
           <p className="text-gray-700 mt-3 max-w-3xl mx-auto">{t('bringingHealthcare', language)}</p>
           <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a href="/tutorial" className="bg-green-800 text-white px-5 py-3 rounded">{t('tryDemo', language)}</a>
-            <button onClick={() => playTTS(t('askHealthAssistant', language), language)} className="bg-amber-50 px-5 py-3 rounded">{t('askHealthAssistant', language)}</button>
+            <Link to="/chatbot" className="bg-amber-50 px-5 py-3 rounded">{t('askHealthAssistant', language)}</Link>
           </div>
         </section>
       </div>
+      )}
 
-      {/* Main content: Reminders, Mini Dashboard, News, Community */}
+      {/* Main content: Professional Dashboard with Appointments and Reminders */}
       <div className="container mx-auto px-6 mt-6">
-        {/* Reminders placed below the intro per request */}
-        <section className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-semibold mb-3">{t('remindersAlerts', language)}</h3>
-          <div className="space-y-3">
-            <div className="p-3 bg-amber-50 rounded flex items-center justify-between">
-              <div>
-                <div className="font-medium">💊 Paracetamol</div>
-                <div className="text-sm text-gray-600">Take 1 tablet at 8:00 AM (☀️ Morning)</div>
+        {isAuthenticated ? (
+          <>
+            {/* Welcome Section with User Info */}
+            <section className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow p-6 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold text-blue-900 mb-2">
+                    👋 Welcome back, {user?.username || 'User'}!
+                  </h2>
+                  <p className="text-gray-700">Your health companion dashboard is ready</p>
+                </div>
+                <div className="text-6xl hidden md:block">🏥</div>
               </div>
-              <div className="text-sm">🔊</div>
-            </div>
-            <div className="p-3 bg-amber-50 rounded flex items-center justify-between">
-              <div>
-                <div className="font-medium">💊 Vitamin D</div>
-                <div className="text-sm text-gray-600">Take after lunch at 2:00 PM</div>
+            </section>
+
+            {/* Appointments Section */}
+            <section className="bg-white rounded-lg shadow p-6 mb-6">
+              <DashboardAppointments language={language} />
+              <div className="mt-6 text-center">
+                <Link 
+                  to="/consult"
+                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-lg transition"
+                >
+                  📅 Book New Appointment
+                </Link>
               </div>
-              <div className="text-sm">🔊</div>
-            </div>
-            <button className="w-full mt-2 bg-green-800 text-white py-2 rounded">{t('newReminder', language)}</button>
-          </div>
-        </section>
+            </section>
 
-        {/* Mini Dashboard below reminders */}
-        <section className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="font-semibold mb-3">{t('yourHealthSimplified', language)}</h3>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="p-3 bg-green-50 rounded">👤 User<br /><strong>{t('welcomeBack', language)}</strong></div>
-            <div className="p-3 bg-green-50 rounded">💊 {t('today', language)}<br /><strong>2 {t('meds', language)}</strong></div>
-            <div className="p-3 bg-green-50 rounded">⏰ {t('nextReminder', language)}<br /><strong>8:00 AM</strong></div>
-            <div className="p-3 bg-green-50 rounded">📈 {t('adherence', language)}<br /><strong>92%</strong></div>
-          </div>
-          <div className="mt-3">
-            <button className="w-full bg-amber-50 py-2 rounded">{t('goToDashboard', language)}</button>
-          </div>
-        </section>
+            {/* Reminders Section */}
+            <section className="bg-white rounded-lg shadow p-6 mb-6">
+              <DashboardReminders language={language} />
+            </section>
+          </>
+        ) : (
+          <>
+            {/* Not Authenticated - Show Call to Action */}
+            <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h3 className="font-bold text-3xl mb-2">Get Started with Your Health Journey</h3>
+                  <p className="text-lg mb-4">
+{t('getStartedDesc', language)}
+                  </p>
+                  <button onClick={() => window.location.href = '#'} className="inline-block bg-amber-400 hover:bg-amber-300 text-green-900 font-bold px-6 py-3 rounded-lg transition">
+                    🔐 {t('loginToContinue', language)}
+                  </button>
+                </div>
+                <div className="hidden md:block text-6xl">💚</div>
+              </div>
+            </section>
 
-        {/* Latest Medical News & Tips (after reminders & dashboard) */}
-        <section className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold">{t('stayAwareStayHealthy', language)}</h2>
-            <button onClick={() => playTTS(t('stayAwareStayHealthy', language), language)} className="px-3 py-1 bg-amber-50 rounded">{t('readAloud', language)}</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { title: 'New malaria tablet launched — safer for children.', src: 'WHO' },
-              { title: 'COVID booster dose available at government hospitals.', src: 'AIIMS' },
-              { title: '5 Healthy habits to reduce cholesterol naturally.', src: 'Healthline India' },
-            ].map((n, i) => (
-              <div key={n.title} className="bg-white border rounded p-4">
-                <img src={`https://picsum.photos/seed/news${i}/400/240`} alt="news" className="h-28 w-full object-cover rounded mb-3" />
-                <div className="font-semibold">{n.title}</div>
-                <div className="text-sm text-gray-500 mt-2">From: {n.src}</div>
-                <div className="mt-3 flex items-center justify-between">
-                  <button onClick={() => playTTS(n.title, language)} className="px-3 py-1 bg-amber-50 rounded">{t('readAloud', language)}</button>
-                  <button className="text-sm text-green-800">{t('viewMore', language)}</button>
+            {/* Quick Stats */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="bg-blue-50 rounded-lg shadow p-6 text-center hover:shadow-xl transition-shadow">
+                <div className="text-4xl mb-2">👨‍⚕️</div>
+                <h3 className="font-bold text-xl text-blue-900">{t('expertDoctors', language)}</h3>
+                <p className="text-gray-700">{t('expertDoctorsDesc', language)}</p>
+              </div>
+              <div className="bg-green-50 rounded-lg shadow p-6 text-center hover:shadow-xl transition-shadow">
+                <div className="text-4xl mb-2">📅</div>
+                <h3 className="font-bold text-xl text-green-900">{t('easyBooking', language)}</h3>
+                <p className="text-gray-700">{t('easyBookingDesc', language)}</p>
+              </div>
+              <div className="bg-purple-50 rounded-lg shadow p-6 text-center hover:shadow-xl transition-shadow">
+                <div className="text-4xl mb-2">📊</div>
+                <h3 className="font-bold text-xl text-purple-900">{t('analytics', language)}</h3>
+                <p className="text-gray-700">{t('healthTrackDesc', language)}</p>
+              </div>
+            </section>
+
+            {/* About Sanjeevani Section */}
+            <section className="bg-gradient-to-r from-amber-50 to-green-50 rounded-2xl shadow-lg p-8 mb-6">
+              <div className="text-center mb-6">
+                <h2 className="text-3xl font-bold text-green-900 mb-3">
+                  🌟 {t('aboutSanjeevani', language)}
+                </h2>
+                <div className="max-w-3xl mx-auto">
+                  <h3 className="text-xl font-semibold text-green-800 mb-3">{t('whatWeDo', language)}</h3>
+                  <p className="text-gray-700 text-lg leading-relaxed">
+                    {t('whatWeDoDesc', language)}
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="mt-4 text-center">
-            <button className="px-4 py-2 bg-green-800 text-white rounded">{t('viewMoreNews', language)}</button>
+            </section>
+
+            {/* How to Use Section */}
+            <section className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-green-900 mb-2">
+                  🚀 {t('howToUse', language)}
+                </h2>
+                <p className="text-gray-600 text-lg">{t('howToUseSteps', language)}</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 text-center hover:shadow-xl transition-shadow">
+                  <div className="text-5xl mb-3">1️⃣</div>
+                  <h3 className="font-bold text-lg text-green-900 mb-2">{t('step1Title', language)}</h3>
+                  <p className="text-gray-700">{t('step1Desc', language)}</p>
+                </div>
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 text-center hover:shadow-xl transition-shadow">
+                  <div className="text-5xl mb-3">2️⃣</div>
+                  <h3 className="font-bold text-lg text-blue-900 mb-2">{t('step2Title', language)}</h3>
+                  <p className="text-gray-700">{t('step2Desc', language)}</p>
+                </div>
+                <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-6 text-center hover:shadow-xl transition-shadow">
+                  <div className="text-5xl mb-3">3️⃣</div>
+                  <h3 className="font-bold text-lg text-amber-900 mb-2">{t('step3Title', language)}</h3>
+                  <p className="text-gray-700">{t('step3Desc', language)}</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6 text-center hover:shadow-xl transition-shadow">
+                  <div className="text-5xl mb-3">4️⃣</div>
+                  <h3 className="font-bold text-lg text-purple-900 mb-2">{t('step4Title', language)}</h3>
+                  <p className="text-gray-700">{t('step4Desc', language)}</p>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* Features Section - Always Show */}
+        <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="font-bold text-3xl mb-2">{t('checkSymptoms', language)}</h3>
+              <p className="text-lg mb-4">
+                {t('getInstantRecommendations', language)}
+              </p>
+              <Link 
+                to="/medicine-recommendation"
+                className="inline-block bg-amber-400 hover:bg-amber-300 text-green-900 font-bold px-6 py-3 rounded-lg transition"
+              >
+                {t('openMedicineRecommendation', language)}
+              </Link>
+            </div>
+            <div className="hidden md:block text-6xl">💊</div>
           </div>
         </section>
       </div>

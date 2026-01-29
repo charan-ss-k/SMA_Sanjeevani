@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import SymptomChecker from './SymptomChecker';
 import RecommendationResult from './RecommendationResult';
-import { playTTS } from '../utils/tts';
+import { playTTS, stopAllTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
 import { AuthContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
@@ -12,6 +12,17 @@ const MedicineRecommendation = () => {
   const { isAuthenticated } = useContext(AuthContext);
   const [result, setResult] = useState(null);
   const [showForm, setShowForm] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const handleMuteToggle = () => {
+    if (!isMuted) {
+      stopAllTTS();
+    }
+    setIsMuted(!isMuted);
+    if (isMuted) {
+      playTTS(t('voiceUnmuted', language), language);
+    }
+  };
 
   const handleResult = (fullData) => {
     // Save to localStorage for dashboard
@@ -26,13 +37,13 @@ const MedicineRecommendation = () => {
 
     setResult(fullData);
     setShowForm(false);
-    playTTS(t('gotRecommendations', language), language);
+    if (!isMuted) playTTS(t('gotRecommendations', language), language);
   };
 
   const handleReset = () => {
     setResult(null);
     setShowForm(true);
-    playTTS(t('formCleared', language), language);
+    if (!isMuted) playTTS(t('formCleared', language), language);
   };
 
   return (
@@ -41,13 +52,26 @@ const MedicineRecommendation = () => {
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-amber-50 pt-24 pb-10">
       <div className="container mx-auto px-4 max-w-6xl">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-green-800 mb-4">
-            {t('medicineRecommendation', language)}
-          </h1>
-          <p className="text-xl text-gray-700">
-            {t('tellUsAboutSymptoms', language)}
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-bold text-green-800 mb-4">
+              {t('medicineRecommendation', language)}
+            </h1>
+            <p className="text-xl text-gray-700">
+              {t('tellUsAboutSymptoms', language)}
+            </p>
+          </div>
+          <button
+            onClick={handleMuteToggle}
+            title={isMuted ? t('unmute', language) : t('mute', language)}
+            className={`px-6 py-3 rounded-lg font-bold text-lg transition shadow-lg ${
+              isMuted
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+          >
+            {isMuted ? `🔇 ${t('unmute', language)}` : `🔊 ${t('mute', language)}`}
+          </button>
         </div>
 
         {/* Two Column Layout */}
@@ -59,7 +83,7 @@ const MedicineRecommendation = () => {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-3xl font-bold text-green-800">{t('tellUsAboutYourself', language)}</h2>
                   <button
-                    onClick={() => playTTS(t('fillSymptomsInfo', language), language)}
+                    onClick={() => !isMuted && playTTS(t('fillSymptomsInfo', language), language)}
                     className="bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 flex items-center gap-2 text-lg"
                   >
                     {t('readInstructions', language)}
@@ -125,7 +149,7 @@ const MedicineRecommendation = () => {
                 {t('emergencyText', language)}
               </p>
               <button
-                onClick={() => playTTS(t('ambulance', language), language)}
+                onClick={() => !isMuted && playTTS(t('ambulance', language), language)}
                 className="w-full bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold text-lg hover:bg-yellow-700"
               >
                 {t('ambulance', language)}

@@ -1,10 +1,9 @@
 """
 Enhanced TTS Service for Indian Languages
-Supports multiple TTS providers with automatic fallback:
-1. Bhashini TTS (Primary) - Free, government-backed, excellent for Indian languages
-2. Google Cloud TTS (Secondary) - Best quality, requires API key
-3. gTTS (Fallback) - Simple, free, reliable
-4. Coqui TTS (Legacy) - If others fail
+Uses gTTS as primary provider with AI4Bharat IndicTTS as fallback
+- gTTS: Free, reliable, supports all Indian languages (primary)
+- AI4Bharat IndicTTS: High-quality Indian language TTS (fallback)
+- Coqui TTS: Offline support (last resort)
 
 Supports: English, Telugu, Hindi, Marathi, Bengali, Tamil, Kannada, Malayalam, Gujarati
 """
@@ -80,165 +79,173 @@ SUPPORTED_LANGUAGES = {
 }
 
 # Configuration from environment
-GOOGLE_TTS_API_KEY = os.getenv("GOOGLE_TTS_API_KEY", None)
 BHASHINI_API_KEY = os.getenv("BHASHINI_API_KEY", None)  # Optional, can work without
-USE_BHASHINI = os.getenv("USE_BHASHINI_TTS", "true").lower() == "true"
-USE_GOOGLE = os.getenv("USE_GOOGLE_TTS", "false").lower() == "true"
-USE_GTTS = os.getenv("USE_GTTS", "true").lower() == "true"
+USE_BHASHINI = True  # Always use Bhashini TTS
 
 
 def generate_speech_bhashini(text: str, language: str) -> Optional[bytes]:
     """
-    Generate speech using Bhashini TTS API (Free, excellent for Indian languages)
-    API Documentation: https://bhashini.gov.in/
+    Generate speech using gTTS (primary) with AI4Bharat IndicTTS as fallback
+    - Primary: gTTS (100% reliable, supports all Indian languages)
+    - Fallback: AI4Bharat IndicTTS API (if gTTS fails)
+    
+    IMPORTANT: Only ONE provider should execute - returns immediately on success
     """
     try:
         lang_code = LANGUAGE_MAP.get(language.lower(), "en")
         
-        # Bhashini TTS API endpoint (public API, no key required for basic usage)
-        # Using the Bhashini inference API
-        url = "https://tts-api.ai4bharat.org/inference"
+        # ============================================================
+        # PRIMARY PROVIDER: gTTS
+        # ============================================================
+        try:
+            from gtts import gTTS
+            
+            # gTTS language code mapping
+            gtts_lang_map = {
+                "en": "en",   # English
+                "te": "te",   # Telugu
+                "hi": "hi",   # Hindi
+                "mr": "mr",   # Marathi
+                "bn": "bn",   # Bengali
+                "ta": "ta",   # Tamil
+                "kn": "kn",   # Kannada
+                "ml": "ml",   # Malayalam
+                "gu": "gu",   # Gujarati
+            }
+            
+            tts_lang = gtts_lang_map.get(lang_code, "en")
+            
+            logger.info(f"🎤 [gTTS - PRIMARY] Generating speech for {language} (code: {tts_lang})")
+            
+            # Create gTTS object
+            tts = gTTS(text=text, lang=tts_lang, slow=False)
+            
+            # Save to BytesIO buffer
+            audio_buffer = io.BytesIO()
+            tts.write_to_fp(audio_buffer)
+            audio_buffer.seek(0)
+            audio_data = audio_buffer.read()
+            
+            # Try to convert MP3 to WAV (optional, doesn't fail if not available)
+            try:
+                from pydub import AudioSegment
+                audio_segment = AudioSegment.from_mp3(io.BytesIO(audio_data))
+                wav_buffer = io.BytesIO()
+                audio_segment.export(wav_buffer, format="wav")
+                wav_buffer.seek(0)
+                audio_data = wav_buffer.read()
+                logger.info(f"✅ [gTTS] SUCCESS - Generated {len(audio_data)} bytes (WAV format)")
+            except (ImportError, FileNotFoundError):
+                # FFmpeg not available, MP3 is fine (browsers support it)
+                logger.info(f"✅ [gTTS] SUCCESS - Generated {len(audio_data)} bytes (MP3 format, FFmpeg not available)")
+            except Exception as e:
+                # Any other error during conversion, still return MP3
+                logger.debug(f"⚠️ MP3→WAV conversion skipped: {e}")
+                logger.info(f"✅ [gTTS] SUCCESS - Generated {len(audio_data)} bytes (MP3 format)")
+            
+            # Return immediately - gTTS succeeded
+            return audio_data
+            
+        except ImportError:
+            logger.warning("⚠️ [gTTS] Not installed, trying fallback...")
+        except Exception as gtts_error:
+            logger.warning(f"⚠️ [gTTS] Failed: {gtts_error}")
         
-        # Map to Bhashini language names
-        bhashini_lang_map = {
-            "en": "English",
-            "te": "Telugu",
-            "hi": "Hindi",
-            "mr": "Marathi",
-            "bn": "Bengali",
-            "ta": "Tamil",
-            "kn": "Kannada",
-            "ml": "Malayalam",
-            "gu": "Gujarati",
+        # ============================================================
+        # FALLBACK PROVIDER: AI4Bharat IndicTTS
+        # ============================================================
+        logger.info(f"🎤 [AI4Bharat - FALLBACK] Attempting AI4Bharat IndicTTS for {language}")
+        
+        # Map to IndicTTS language codes
+        indic_lang_map = {
+            "en": "english",
+            "te": "telugu",
+            "hi": "hindi",
+            "mr": "marathi",
+            "bn": "bengali",
+            "ta": "tamil",
+            "kn": "kannada",
+            "ml": "malayalam",
+            "gu": "gujarati",
         }
         
-        lang_name = bhashini_lang_map.get(lang_code, "English")
+        lang_name = indic_lang_map.get(lang_code, "english")
         
-        # Bhashini TTS API v2 endpoint
-        url = "https://tts.bhashini.ai/v2/synthesize"
-        
-        # Truncate text if too long (250 chars without API key)
-        max_length = 250 if not BHASHINI_API_KEY else 5000
+        # Truncate text if too long
+        max_length = 500
         if len(text) > max_length:
             text = text[:max_length]
-            logger.warning(f"⚠️ [Bhashini] Text truncated to {max_length} characters")
+            logger.warning(f"⚠️ [AI4Bharat] Text truncated to {max_length} characters")
         
         payload = {
-            "text": text,
+            "input": text,
             "language": lang_name,
-            "voiceName": "Female1"  # Can be "Female1", "Female2", "Male1", "Male2"
+            "gender": "female",
+            "speed": 1.0
         }
         
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "audio/wav"
-        }
+        headers = {"Content-Type": "application/json"}
         
-        # Add API key if available
-        if BHASHINI_API_KEY:
-            headers["X-API-KEY"] = BHASHINI_API_KEY
-        
-        logger.info(f"🎤 [Bhashini] Generating speech for {language} (code: {lang_code}, name: {lang_name})")
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        response = requests.post(
+            "https://tts-api.ai4bharat.org/synthesize",
+            json=payload,
+            headers=headers,
+            timeout=30
+        )
         
         if response.status_code == 200:
-            audio_data = response.content
-            logger.info(f"✅ [Bhashini] Speech generated successfully ({len(audio_data)} bytes)")
-            return audio_data
+            result = response.json()
+            
+            # Check for audio URL
+            if "audio_url" in result:
+                audio_url = result["audio_url"]
+                audio_response = requests.get(audio_url, timeout=30)
+                if audio_response.status_code == 200:
+                    audio_data = audio_response.content
+                    logger.info(f"✅ [AI4Bharat] SUCCESS - Generated {len(audio_data)} bytes")
+                    return audio_data
+            
+            # Check for base64 audio
+            elif "audio" in result:
+                audio_b64 = result["audio"]
+                audio_data = base64.b64decode(audio_b64)
+                logger.info(f"✅ [AI4Bharat] SUCCESS - Generated {len(audio_data)} bytes")
+                return audio_data
+            
+            logger.warning(f"⚠️ [AI4Bharat] No audio in response: {result}")
+            return None
         else:
-            logger.warning(f"⚠️ [Bhashini] API returned status {response.status_code}: {response.text[:200]}")
+            logger.warning(f"⚠️ [AI4Bharat] API error {response.status_code}: {response.text[:200]}")
             return None
             
     except Exception as e:
-        logger.warning(f"⚠️ [Bhashini] Error: {e}")
+        logger.error(f"❌ [TTS] Unexpected error: {e}")
         return None
 
 
-def generate_speech_google(text: str, language: str) -> Optional[bytes]:
-    """
-    Generate speech using Google Cloud Text-to-Speech API
-    Requires GOOGLE_TTS_API_KEY in environment
-    """
-    if not GOOGLE_TTS_API_KEY:
-        logger.debug("Google TTS API key not configured")
-        return None
-    
-    try:
-        from google.cloud import texttospeech
-        
-        lang_code = LANGUAGE_MAP.get(language.lower(), "en")
-        voice_name = GOOGLE_VOICE_MAP.get(lang_code, "en-US-Neural2-D")
-        
-        client = texttospeech.TextToSpeechClient()
-        
-        synthesis_input = texttospeech.SynthesisInput(text=text)
-        voice = texttospeech.VoiceSelectionParams(
-            language_code=f"{lang_code}-IN" if lang_code != "en" else "en-US",
-            name=voice_name,
-            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
-        )
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.LINEAR16,
-            sample_rate_hertz=24000,
-            speaking_rate=1.0,
-            pitch=0.0
-        )
-        
-        logger.info(f"🎤 [Google] Generating speech for {language} (voice: {voice_name})")
-        response = client.synthesize_speech(
-            input=synthesis_input,
-            voice=voice,
-            audio_config=audio_config
-        )
-        
-        audio_data = response.audio_content
-        logger.info(f"✅ [Google] Speech generated successfully ({len(audio_data)} bytes)")
-        return audio_data
-        
-    except ImportError:
-        logger.warning("⚠️ [Google] google-cloud-texttospeech not installed. Install with: pip install google-cloud-texttospeech")
-        return None
-    except Exception as e:
-        logger.warning(f"⚠️ [Google] Error: {e}")
-        return None
+# Deprecated: Google Cloud TTS removed (using only Bhashini)
+# def generate_speech_google(text: str, language: str) -> Optional[bytes]:
+#     """
+#     Generate speech using Google Cloud Text-to-Speech API
+#     Requires GOOGLE_TTS_API_KEY in environment
+#     """
+#     if not GOOGLE_TTS_API_KEY:
+#         logger.debug("Google TTS API key not configured")
+#         return None
+#     ...
 
-
-def generate_speech_gtts(text: str, language: str) -> Optional[bytes]:
-    """
-    Generate speech using gTTS (Google Text-to-Speech) - Free, simple, reliable
-    """
-    try:
-        from gtts import gTTS
-        import tempfile
-        
-        lang_code = LANGUAGE_MAP.get(language.lower(), "en")
-        
-        # gTTS uses language codes directly
-        tts = gTTS(text=text, lang=lang_code, slow=False)
-        
-        # Save to temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
-            temp_path = tmp_file.name
-        
-        logger.info(f"🎤 [gTTS] Generating speech for {language} (code: {lang_code})")
-        tts.save(temp_path)
-        
-        # Read audio data
-        with open(temp_path, 'rb') as f:
-            audio_data = f.read()
-        
-        # Clean up
-        os.unlink(temp_path)
-        
-        logger.info(f"✅ [gTTS] Speech generated successfully ({len(audio_data)} bytes)")
-        return audio_data
-        
-    except ImportError:
-        logger.warning("⚠️ [gTTS] gTTS not installed. Install with: pip install gtts")
-        return None
-    except Exception as e:
-        logger.warning(f"⚠️ [gTTS] Error: {e}")
-        return None
+# Deprecated: gTTS removed (using only Bhashini)
+# def generate_speech_gtts(text: str, language: str) -> Optional[bytes]:
+#     """
+#     Generate speech using gTTS (Google Text-to-Speech) - Free, simple, reliable
+#     """
+#     try:
+#         from gtts import gTTS
+#         import tempfile
+#         ...
+#     except Exception as e:
+#         logger.warning(f"⚠️ [gTTS] Error: {e}")
+#         return None
 
 
 def generate_speech_coqui(text: str, language: str) -> Optional[bytes]:
@@ -313,7 +320,8 @@ def convert_audio_to_wav(audio_data: bytes, input_format: str = "mp3") -> Option
 def generate_speech(text: str, language: str = "english") -> Optional[str]:
     """
     Generate speech audio from text using best available TTS provider
-    Tries providers in order: Bhashini > Google > gTTS > Coqui
+    Primary: gTTS (reliable, supports all Indian languages)
+    Fallback: AI4Bharat IndicTTS > Coqui TTS
     
     Args:
         text: Text to convert to speech
@@ -333,26 +341,15 @@ def generate_speech(text: str, language: str = "english") -> Optional[str]:
     audio_data = None
     provider = None
     
-    # Try providers in order of preference
+    # Try gTTS/AI4Bharat (primary - reliable for all Indian languages)
     if USE_BHASHINI:
         audio_data = generate_speech_bhashini(text, language)
         if audio_data:
-            provider = "Bhashini"
+            provider = "gTTS/AI4Bharat"
     
-    if not audio_data and USE_GOOGLE and GOOGLE_TTS_API_KEY:
-        audio_data = generate_speech_google(text, language)
-        if audio_data:
-            provider = "Google Cloud"
-    
-    if not audio_data and USE_GTTS:
-        audio_data = generate_speech_gtts(text, language)
-        if audio_data:
-            provider = "gTTS"
-            # Convert MP3 to WAV
-            audio_data = convert_audio_to_wav(audio_data, "mp3")
-    
+    # Fallback to Coqui TTS if primary fails
     if not audio_data:
-        # Last resort: Coqui TTS
+        logger.warning("⚠️ gTTS/AI4Bharat TTS failed, falling back to Coqui TTS")
         audio_data = generate_speech_coqui(text, language)
         if audio_data:
             provider = "Coqui"
@@ -362,10 +359,7 @@ def generate_speech(text: str, language: str = "english") -> Optional[str]:
         return None
     
     # Ensure WAV format
-    if provider in ["gTTS"]:
-        # Already converted above
-        pass
-    elif not audio_data.startswith(b'RIFF'):  # WAV header check
+    if not audio_data.startswith(b'RIFF'):  # WAV header check
         # Try to convert if not WAV
         audio_data = convert_audio_to_wav(audio_data)
     

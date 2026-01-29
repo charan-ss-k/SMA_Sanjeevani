@@ -8,6 +8,8 @@ import { LanguageContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
+import DashboardAppointments from './DashboardAppointments';
+import DashboardReminders from './DashboardReminders';
 
 function speak(text, language) {
   if (!window.speechSynthesis) return;

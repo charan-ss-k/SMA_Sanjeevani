@@ -1,25 +1,12 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import logo from '../assets/Sanjeevani Logo.png';
 import { AuthContext } from '../main';
 import { LanguageContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
-import EnhancedMedicineIdentificationModal from './EnhancedMedicineIdentificationModal';
 
-function speak(text, language) {
-  if (!window.speechSynthesis) return;
-  const ut = new SpeechSynthesisUtterance(text);
-  const langMap = {
-    english: 'en-US', telugu: 'te-IN', hindi: 'hi-IN', marathi: 'mr-IN',
-    bengali: 'bn-IN', tamil: 'ta-IN', kannada: 'kn-IN', malayalam: 'ml-IN', gujarati: 'gu-IN',
-  };
-  ut.lang = langMap[language] || 'en-US';
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(ut);
-}
-
-const MedicineCard = ({ med, onDelete, onEdit, onSpeak, onSetReminder }) => (
+const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language }) => (
   <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500 hover:shadow-lg transition">
     <div className="flex gap-3 items-start">
       <div className="h-14 w-14 bg-gradient-to-br from-green-100 to-blue-100 rounded-md flex items-center justify-center font-bold text-green-700">
@@ -59,7 +46,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak, onSetReminder }) => (
 );
 
 const PrescriptionHandling = () => {
-  const { isAuthenticated } = useContext(AuthContext);
+  const { isAuthenticated, authToken } = useContext(AuthContext);
   const { language } = useContext(LanguageContext);
   const [medicines, setMedicines] = useState([]);
   const [formData, setFormData] = useState({
@@ -72,78 +59,64 @@ const PrescriptionHandling = () => {
     notes: '',
   });
   const [editingId, setEditingId] = useState(null);
-  const [scanning, setScanning] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [upcomingReminders, setUpcomingReminders] = useState([]);
-  const [takenMedicines, setTakenMedicines] = useState([]);
   const [isMuted, setIsMuted] = useState(false);
-  const [showMedicineIdentification, setShowMedicineIdentification] = useState(false);
-  const { authToken } = useContext(AuthContext);
+  
+  // Image analysis state
+  const [file, setFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisError, setAnalysisError] = useState('');
+  const fileInputRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  
+  // Prescription history state
+  const [prescriptionHistory, setPrescriptionHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('prescriptions');
-    const savedTaken = localStorage.getItem('medicinesTaken');
     if (saved) setMedicines(JSON.parse(saved));
-    if (savedTaken) setTakenMedicines(JSON.parse(savedTaken));
-  }, []);
+    
+    // Fetch prescription history from database
+    if (isAuthenticated) {
+      fetchPrescriptionHistory();
+    }
+  }, [isAuthenticated]);
 
   // Save to localStorage
   useEffect(() => {
     localStorage.setItem('prescriptions', JSON.stringify(medicines));
   }, [medicines]);
 
-  useEffect(() => {
-    localStorage.setItem('medicinesTaken', JSON.stringify(takenMedicines));
-  }, [takenMedicines]);
-
-  // Check for upcoming reminders every minute
-  useEffect(() => {
-    const checkReminders = () => {
-      const now = new Date();
-      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      
-      const upcoming = [];
-      medicines.forEach(med => {
-        if (med.reminders) {
-          med.reminders.forEach(reminder => {
-            if (reminder === currentTime) {
-              upcoming.push(med);
-              // Show notification
-              if (Notification.permission === 'granted') {
-                new Notification(`Time to take ${med.name}!`, {
-                  body: `${med.dosage} - ${med.notes}`,
-                  icon: '💊',
-                });
-              }
-              speak(`Time to take ${med.name}, ${med.dosage}`);
-            }
-          });
-        }
+  const fetchPrescriptionHistory = async () => {
+    try {
+      const response = await fetch('/api/prescriptions/', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
       });
-      
-      if (upcoming.length > 0) {
-        setUpcomingReminders(upcoming);
+
+      if (response.ok) {
+        const data = await response.json();
+        setPrescriptionHistory(data);
       }
-    };
-
-    // Request notification permission
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
+    } catch (err) {
+      console.error('Failed to fetch prescription history:', err);
     }
-
-    checkReminders();
-    const interval = setInterval(checkReminders, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, [medicines]);
+  };
 
   const handleMuteToggle = () => {
     setIsMuted(!isMuted);
     if (!isMuted) {
       window.speechSynthesis.cancel();
-      console.log('[PrescriptionHandling] TTS muted');
+    }
+    if (!isMuted) {
+      playTTS(t('voiceMuted', language), language);
     } else {
-      console.log('[PrescriptionHandling] TTS unmuted');
+      playTTS(t('voiceUnmuted', language), language);
     }
   };
 
@@ -179,7 +152,9 @@ const PrescriptionHandling = () => {
       notes: '',
     });
     setShowForm(false);
-    if (!isMuted) speak(editingId ? t('medicineUpdated', language) : t('medicineAdded', language), language);
+    if (!isMuted) {
+      playTTS(editingId ? t('medicineUpdated', language) : t('medicineAdded', language), language);
+    }
   };
 
   const handleEditMedicine = (med) => {
@@ -191,58 +166,206 @@ const PrescriptionHandling = () => {
   const handleDeleteMedicine = (id) => {
     if (confirm(t('deleteThisMedicine', language))) {
       setMedicines(prev => prev.filter(m => m.id !== id));
-      if (!isMuted) speak(t('medicineDeleted', language), language);
+      if (!isMuted) {
+        playTTS(t('medicineDeleted', language), language);
+      }
     }
   };
 
-  const handleAddReminder = (medId, time) => {
-    if (!time) return;
-    setMedicines(prev => prev.map(m => 
-      m.id === medId 
-        ? { ...m, reminders: [...(m.reminders || []), time].sort() }
-        : m
-    ));
-    if (!isMuted) speak(`${t('reminderSetFor', language)} ${time}`, language);
+  const handleSpeakMedicine = (med) => {
+    const text = `${med.name}. ${t('dosage', language)}: ${med.dosage}. ${t('frequency', language)}: ${med.frequency}. ${med.notes}`;
+    playTTS(text, language);
   };
 
-  const handleRemoveReminder = (medId, time) => {
-    setMedicines(prev => prev.map(m => 
-      m.id === medId 
-        ? { ...m, reminders: m.reminders.filter(r => r !== time) }
-        : m
-    ));
+  // Image analysis handlers
+  const handleFileSelect = (event) => {
+    const selectedFile = event.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      setAnalysisError('');
+      setAnalysisResult(null);
+      
+      // Create image preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(selectedFile);
+      
+      if (!isMuted) {
+        playTTS(t('imageSelected', language), language);
+      }
+    }
   };
 
-  const handleMarkTaken = (med) => {
-    const now = new Date().toLocaleString();
-    setTakenMedicines(prev => [...prev, {
-      ...med,
-      takenAt: now,
-    }]);
-    if (!isMuted) speak(`${med.name} ${t('markedAsTaken', language)}`, language);
-    setUpcomingReminders(prev => prev.filter(m => m.id !== med.id));
+  const handleCancelAnalysis = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setAnalyzing(false);
+      setAnalysisError('Analysis cancelled by user');
+      if (!isMuted) {
+        playTTS(t('analysisCancelled', language), language);
+      }
+    }
   };
 
-  const handleSaveMedicineFromIdentification = (medicineData) => {
-    setMedicines(prev => [...prev, {
-      id: Date.now(),
-      name: medicineData.medicine_name,
-      dosage: medicineData.dosage,
-      frequency: medicineData.frequency || 'As prescribed',
-      duration: medicineData.duration,
-      quantity: 0,
-      reminders: [],
-      notes: medicineData.notes,
-    }]);
+  const handleAnalyze = async () => {
+    if (!file) {
+      setAnalysisError('Please select an image first');
+      return;
+    }
+
+    setAnalyzing(true);
+    setAnalysisError('');
+    setAnalysisResult(null);
+    
+    // Create abort controller for cancellation
+    abortControllerRef.current = new AbortController();
+    
     if (!isMuted) {
-      speak(`${medicineData.medicine_name} ${t('addedToPrescriptions', language)}`, language);
+      playTTS(t('analyzingImage', language), language);
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/medicine-identification/analyze', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: formData,
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to analyze medicine image');
+      }
+
+      const data = await response.json();
+
+      if (data.analysis) {
+        setAnalysisResult(data.analysis);
+        if (!isMuted) {
+          playTTS(t('analysisComplete', language), language);
+        }
+      } else {
+        setAnalysisError('No analysis data received');
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setAnalysisError('Analysis cancelled');
+      } else {
+        console.error('Analysis error:', err);
+        setAnalysisError(`Failed to analyze medicine: ${err.message}`);
+        if (!isMuted) {
+          playTTS(t('analysisFailed', language), language);
+        }
+      }
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleSpeakAnalysisResult = () => {
+    if (!analysisResult) return;
+    
+    const text = `${analysisResult.medicine_name || 'Unknown medicine'}. ${
+      analysisResult.dosage ? `${t('dosage', language)}: ${analysisResult.dosage}.` : ''
+    } ${analysisResult.full_information || ''}`;
+    
+    playTTS(text, language);
+  };
+
+  const handleSaveAnalysisResult = async () => {
+    if (!analysisResult) return;
+
+    try {
+      const prescriptionData = {
+        medicine_name: analysisResult.medicine_name || 'Unknown Medicine',
+        dosage: analysisResult.dosage || 'As prescribed',
+        frequency: 'As per prescription',
+        duration: 'As prescribed',
+        notes: analysisResult.full_information || 'Medicine identified from image',
+        doctor_name: 'AI Medicine Identification',
+        category: analysisResult.category,
+        manufacturer: analysisResult.manufacturer,
+        price: analysisResult.price,
+        source: analysisResult.source,
+      };
+
+      const response = await fetch('/api/prescriptions/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify(prescriptionData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save prescription');
+      }
+
+      // Also add to local medicines list
+      setMedicines(prev => [...prev, {
+        id: Date.now(),
+        name: analysisResult.medicine_name || 'Unknown Medicine',
+        dosage: analysisResult.dosage || 'As prescribed',
+        frequency: 'As per prescription',
+        duration: 'As prescribed',
+        quantity: 0,
+        reminders: [],
+        notes: analysisResult.full_information || 'Medicine identified from image',
+      }]);
+
+      // Refresh prescription history
+      fetchPrescriptionHistory();
+      
+      // Reset analysis state
+      setAnalysisResult(null);
+      setFile(null);
+      setImagePreview(null);
+      
+      if (!isMuted) {
+        playTTS(t('prescriptionSaved', language), language);
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      setAnalysisError(`Failed to save: ${err.message}`);
+      if (!isMuted) {
+        playTTS(t('saveFailed', language), language);
+      }
+    }
+  };
+
+  const handleDeletePrescription = async (id) => {
+    if (!confirm(t('deleteThisPrescription', language))) return;
+
+    try {
+      const response = await fetch(`/api/prescriptions/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (response.ok) {
+        setPrescriptionHistory(prev => prev.filter(p => p.id !== id));
+        if (!isMuted) {
+          playTTS(t('prescriptionDeleted', language), language);
+        }
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
     }
   };
 
   const stats = {
     totalMedicines: medicines.length,
-    todayReminders: medicines.reduce((acc, m) => acc + (m.reminders?.length || 0), 0),
-    medicinesTaken: takenMedicines.filter(m => new Date(m.takenAt).toDateString() === new Date().toDateString()).length,
+    totalPrescriptions: prescriptionHistory.length,
   };
 
   return (
@@ -271,62 +394,249 @@ const PrescriptionHandling = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
             <h3 className="text-sm font-semibold opacity-90">{t('totalMedicines', language)}</h3>
             <p className="text-4xl font-bold mt-2">{stats.totalMedicines}</p>
           </div>
           <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{t('todaysReminders', language)}</h3>
-            <p className="text-4xl font-bold mt-2">{stats.todayReminders}</p>
-          </div>
-          <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{t('medicinesTakenToday', language)}</h3>
-            <p className="text-4xl font-bold mt-2">{stats.medicinesTaken}</p>
+            <h3 className="text-sm font-semibold opacity-90">{t('savedPrescriptions', language)}</h3>
+            <p className="text-4xl font-bold mt-2">{stats.totalPrescriptions}</p>
           </div>
         </div>
 
-        {/* Upload Section */}
+        {/* AI Medicine Identification Section - Inline */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">{t('uploadPrescription', language)}</h2>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <button 
-              onClick={() => setShowMedicineIdentification(true)}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-4 rounded-lg text-lg font-semibold transition"
-            >
-              🔍 AI Medicine Identification
-            </button>
-          </div>
-          {scanning && (
-            <div className="mt-4 flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
-              <div className="animate-spin h-6 w-6 border-4 border-blue-300 border-t-blue-700 rounded-full"></div>
-              <div className="text-blue-900 font-semibold">{t('scanningPrescription', language)}</div>
-            </div>
-          )}
-        </div>
-
-        {/* Upcoming Reminders Alert */}
-        {upcomingReminders.length > 0 && (
-          <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-6 mb-8">
-            <h3 className="text-xl font-bold text-red-900 mb-3">{t('timeToTakeMedicines', language)}</h3>
-            <div className="space-y-2">
-              {upcomingReminders.map(med => (
-                <div key={med.id} className="flex items-center justify-between bg-white p-3 rounded">
-                  <div>
-                    <div className="font-bold text-lg">{med.name}</div>
-                    <div className="text-sm text-gray-600">{med.dosage} - {med.notes}</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">🔍 {t('aiMedicineIdentification', language)}</h2>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Upload Section */}
+            <div>
+              <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 bg-blue-50">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                
+                {!imagePreview ? (
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">📸</div>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3 px-6 rounded-lg text-lg font-semibold transition"
+                    >
+                      {t('selectImage', language)}
+                    </button>
+                    <p className="text-sm text-gray-600 mt-3">{t('uploadMedicineImage', language)}</p>
                   </div>
+                ) : (
+                  <div>
+                    <img src={imagePreview} alt="Preview" className="w-full h-64 object-contain rounded-lg mb-4" />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg font-semibold transition"
+                      >
+                        {t('changeImage', language)}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFile(null);
+                          setImagePreview(null);
+                          setAnalysisResult(null);
+                          setAnalysisError('');
+                        }}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-semibold transition"
+                      >
+                        {t('clear', language)}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {file && !analyzing && !analysisResult && (
+                <button
+                  onClick={handleAnalyze}
+                  className="w-full mt-4 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white py-4 rounded-lg text-lg font-bold transition"
+                >
+                  🔍 {t('analyzeNow', language)}
+                </button>
+              )}
+              
+              {analyzing && (
+                <div className="mt-4 flex flex-col items-center gap-3 p-4 bg-blue-50 rounded-lg">
+                  <div className="animate-spin h-8 w-8 border-4 border-blue-300 border-t-blue-700 rounded-full"></div>
+                  <div className="text-blue-900 font-semibold">{t('analyzingPleaseWait', language)}</div>
                   <button
-                    onClick={() => handleMarkTaken(med)}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold"
+                    onClick={handleCancelAnalysis}
+                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition"
                   >
-                    {t('markTaken', language)}
+                    ⛔ {t('stopAnalysis', language)}
                   </button>
                 </div>
-              ))}
+              )}
+              
+              {analysisError && (
+                <div className="mt-4 p-4 bg-red-50 border-l-4 border-red-500 rounded">
+                  <p className="text-red-800 font-semibold">{analysisError}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Analysis Results Section */}
+            <div>
+              {analysisResult ? (
+                <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-6 border-2 border-green-300">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-gray-800">📋 {t('analysisResults', language)}</h3>
+                    <button
+                      onClick={handleSpeakAnalysisResult}
+                      className="bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-lg transition"
+                      title={t('listenToResults', language)}
+                    >
+                      🔊
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {analysisResult.medicine_name && (
+                      <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border-2 border-green-300 shadow-md">
+                        <div className="text-xs uppercase tracking-wider text-green-700 font-bold mb-1">{t('medicineName', language)}</div>
+                        <div className="text-2xl font-extrabold text-green-900 bg-yellow-100 px-3 py-2 rounded inline-block">
+                          💊 {analysisResult.medicine_name}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {analysisResult.dosage && (
+                      <div className="bg-white p-4 rounded-lg border-l-4 border-blue-500 shadow-sm">
+                        <div className="text-xs uppercase tracking-wider text-blue-700 font-bold mb-1">{t('dosage', language)}</div>
+                        <div className="text-lg font-semibold text-gray-800">💉 {analysisResult.dosage}</div>
+                      </div>
+                    )}
+                    
+                    {analysisResult.category && (
+                      <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-sm">
+                        <div className="text-xs uppercase tracking-wider text-purple-700 font-bold mb-1">{t('category', language)}</div>
+                        <div className="text-lg font-semibold text-gray-800">🏷️ {analysisResult.category}</div>
+                      </div>
+                    )}
+                    
+                    {analysisResult.manufacturer && (
+                      <div className="bg-white p-4 rounded-lg border-l-4 border-indigo-500 shadow-sm">
+                        <div className="text-xs uppercase tracking-wider text-indigo-700 font-bold mb-1">{t('manufacturer', language)}</div>
+                        <div className="text-lg font-semibold text-gray-800">🏭 {analysisResult.manufacturer}</div>
+                      </div>
+                    )}
+                    
+                    {analysisResult.price && (
+                      <div className="bg-white p-4 rounded-lg border-l-4 border-amber-500 shadow-sm">
+                        <div className="text-xs uppercase tracking-wider text-amber-700 font-bold mb-1">{t('price', language)}</div>
+                        <div className="text-xl font-bold text-amber-800">💰 {analysisResult.price}</div>
+                      </div>
+                    )}
+                    
+                    {analysisResult.full_information && (
+                      <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 shadow-sm">
+                        <div className="text-xs uppercase tracking-wider text-blue-800 font-bold mb-2">ℹ️ {t('additionalInformation', language)}</div>
+                        <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{analysisResult.full_information}</div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button
+                    onClick={handleSaveAnalysisResult}
+                    className="w-full mt-4 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white py-3 rounded-lg font-bold transition"
+                  >
+                    ✓ {t('saveToPrescriptions', language)}
+                  </button>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                  <div className="text-center text-gray-500">
+                    <div className="text-6xl mb-3">🔍</div>
+                    <p className="font-semibold">{t('analysisResultsWillAppearHere', language)}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Prescription History Section - Inline */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">📚 {t('prescriptionHistory', language)}</h2>
+            <button
+              onClick={() => {
+                setShowHistory(!showHistory);
+                fetchPrescriptionHistory();
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+            >
+              {showHistory ? t('hide', language) : t('show', language)}
+            </button>
+          </div>
+          
+          {showHistory && (
+            prescriptionHistory.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>{t('noPrescriptionHistory', language)}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{t('medicineName', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{t('dosage', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{t('frequency', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{t('duration', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{t('date', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{t('actions', language)}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prescriptionHistory.map(prescription => (
+                      <tr key={prescription.id} className="border-t hover:bg-gray-50">
+                        <td className="px-4 py-3 font-semibold">{prescription.medicine_name}</td>
+                        <td className="px-4 py-3">{prescription.dosage}</td>
+                        <td className="px-4 py-3">{prescription.frequency}</td>
+                        <td className="px-4 py-3">{prescription.duration}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {new Date(prescription.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => playTTS(
+                                `${prescription.medicine_name}. ${prescription.dosage}. ${prescription.frequency}. ${prescription.notes}`,
+                                language
+                              )}
+                              className="p-2 bg-amber-50 rounded hover:bg-amber-100"
+                            >
+                              🔊
+                            </button>
+                            <button
+                              onClick={() => handleDeletePrescription(prescription.id)}
+                              className="p-2 bg-red-50 rounded hover:bg-red-100"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+        </div>
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -357,10 +667,10 @@ const PrescriptionHandling = () => {
                     <MedicineCard
                       key={med.id}
                       med={med}
+                      language={language}
                       onDelete={() => handleDeleteMedicine(med.id)}
                       onEdit={() => handleEditMedicine(med)}
-                      onSpeak={() => speak(`${med.name}, ${med.dosage}, ${med.frequency}, ${med.notes}`, language)}
-                      onSetReminder={(time) => handleAddReminder(med.id, time)}
+                      onSpeak={() => handleSpeakMedicine(med)}
                     />
                   ))}
                 </div>
@@ -368,7 +678,7 @@ const PrescriptionHandling = () => {
             </div>
           </div>
 
-          {/* Right Column - Form & Reminders */}
+          {/* Right Column - Form */}
           <aside className="space-y-6">
             
             {/* Add/Edit Form */}
@@ -497,38 +807,12 @@ const PrescriptionHandling = () => {
               </div>
             )}
 
-            {/* Today's History */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">{t('todaysIntakeHistory', language)}</h3>
-              {takenMedicines.filter(m => new Date(m.takenAt).toDateString() === new Date().toDateString()).length === 0 ? (
-                <p className="text-gray-500 text-sm">{t('noMedicinesTakenToday', language)}</p>
-              ) : (
-                <div className="space-y-2">
-                  {takenMedicines
-                    .filter(m => new Date(m.takenAt).toDateString() === new Date().toDateString())
-                    .map((m, i) => (
-                      <div key={i} className="p-3 bg-green-50 rounded text-sm border-l-4 border-green-500">
-                        <div className="font-semibold">{m.name} - {m.dosage}</div>
-                        <div className="text-xs text-gray-600">{t('takenAt', language)} {m.takenAt}</div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-
           </aside>
 
         </div>
 
       </div>
       </div>
-
-      {/* Enhanced Medicine Identification Modal with Comprehensive Information */}
-      <EnhancedMedicineIdentificationModal 
-        open={showMedicineIdentification}
-        onClose={() => setShowMedicineIdentification(false)}
-        onSave={handleSaveMedicineFromIdentification}
-      />
     </>
   );
 };

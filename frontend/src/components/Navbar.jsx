@@ -11,12 +11,13 @@ const Navbar = ({ language, onLanguageChange }) => {
   const { isAuthenticated, user, logout } = useContext(AuthContext);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const langContext = { language };
 
   const getLinkClass = (path) => {
     return location.pathname === path
-      ? 'text-green-800 border-b-2 border-green-500 px-3 py-2'
-      : 'text-green-800 border-b-2 border-transparent hover:bg-amber-50 rounded-md px-3 py-2';
+      ? 'text-green-800 font-semibold border-b-2 border-green-600 px-4 py-2'
+      : 'text-green-800 hover:text-green-900 hover:bg-amber-50 rounded-md px-4 py-2 transition-all duration-200';
   };
 
   return (
@@ -25,24 +26,30 @@ const Navbar = ({ language, onLanguageChange }) => {
       <div className="bg-green-800 h-3" />
 
       {/* Main header */}
-      <div className="bg-amber-100 h-20 flex items-center">
-        <div className="container mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Link to="/" className="flex items-center gap-3">
-              <img src={logo} alt="Sanjeevani" className="h-20 w-20 object-contain" />
-              <span className="text-green-800 text-3xl font-bold">{t('sanjeevani', language)}</span>
+      <div className="bg-amber-100 h-20 flex items-center shadow-sm">
+        <div className="container mx-auto px-8 flex items-center justify-between">
+          <div className="flex items-center">
+            <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+              <img src={logo} alt="Sanjeevani" className="h-16 w-16 object-contain" />
+              <span className="text-green-800 text-2xl font-bold tracking-wide">{t('sanjeevani', language)}</span>
             </Link>
           </div>
 
-          <ul className="flex items-center space-x-6 text-lg">
+          {/* Primary Navigation - Key Features Only */}
+          <ul className="flex items-center space-x-2 text-base font-medium">
             <li>
               <Link to="/" className={getLinkClass('/')}>
-                {t('home', language)}
+                🏠 {t('home', language)}
               </Link>
             </li>
             <li>
               <Link to="/medicine-recommendation" className={getLinkClass('/medicine-recommendation')}>
                 💊 {t('medicine', language)}
+              </Link>
+            </li>
+            <li>
+              <Link to="/consult" className={getLinkClass('/consult')}>
+                🏥 Consult
               </Link>
             </li>
             <li>
@@ -52,23 +59,56 @@ const Navbar = ({ language, onLanguageChange }) => {
             </li>
             <li>
               <Link to="/prescription" className={getLinkClass('/prescription')}>
-                {t('prescription', language)}
+                📋 {t('prescription', language)}
               </Link>
             </li>
-            <li>
-              <Link to="/services" className={getLinkClass('/services')}>
-                {t('services', language)}
-              </Link>
-            </li>
-            <li>
-              <Link to="/about" className={getLinkClass('/about')}>
-                {t('about', language)}
-              </Link>
-            </li>
-            <li>
-              <Link to="/contact" className={getLinkClass('/contact')}>
-                {t('contact', language)}
-              </Link>
+            
+            {/* More dropdown for secondary items */}
+            <li className="relative">
+              <button 
+                onClick={() => setShowMoreMenu(!showMoreMenu)}
+                className={`${
+                  ['/reminders', '/services', '/about', '/contact'].includes(location.pathname)
+                    ? 'text-green-800 font-semibold'
+                    : 'text-green-800 hover:text-green-900'
+                } hover:bg-amber-50 rounded-md px-4 py-2 flex items-center gap-1 transition-all duration-200`}
+              >
+                ⋯ More
+                <span className="text-xs">▾</span>
+              </button>
+              
+              {showMoreMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  <Link 
+                    to="/reminders" 
+                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100"
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    ⏰ {t('reminders', language)}
+                  </Link>
+                  <Link 
+                    to="/services" 
+                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100"
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    🛠️ {t('services', language)}
+                  </Link>
+                  <Link 
+                    to="/about" 
+                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100"
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    ℹ️ {t('about', language)}
+                  </Link>
+                  <Link 
+                    to="/contact" 
+                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors rounded-b-lg"
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    📞 {t('contact', language)}
+                  </Link>
+                </div>
+              )}
             </li>
           </ul>
 
