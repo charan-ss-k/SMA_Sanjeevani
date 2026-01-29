@@ -2,42 +2,109 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 from app.core.security import verify_token
+from app.core.database import SessionLocal
+from app.models.models import User
 
 security = HTTPBearer(auto_error=False)
 
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """
     Dependency to extract and verify JWT token from Authorization header.
-    Returns user_id if token is valid.
-    Makes authentication optional for now to prevent 500 errors.
-    For anonymous users, returns user_id = 0.
+    Returns User object if token is valid.
+    For anonymous users, returns the anonymous user (user_id = 0).
     """
-    # If no credentials provided, allow access with anonymous user (user_id = 0)
-    if credentials is None:
-        return 0
-    
-    token = credentials.credentials
-    
+    db = SessionLocal()
     try:
-        user_id = verify_token(token)
-        return user_id
-    except HTTPException as e:
-        # For now, allow access with anonymous user (user_id = 0) instead of raising error
-        return 0
-    except Exception:
-        # For now, allow access with anonymous user (user_id = 0) instead of raising error
-        return 0
+        # If no credentials provided, return anonymous user
+        if credentials is None:
+            anonymous_user = db.query(User).filter(User.id == 0).first()
+            if anonymous_user:
+                return anonymous_user
+            # Create anonymous user if doesn't exist
+            anonymous_user = User(
+                id=0,
+                username="anonymous",
+                email="anonymous@sanjeevani.local",
+                password_hash="disabled",
+                is_active=True
+            )
+            db.add(anonymous_user)
+            db.commit()
+            return anonymous_user
+        
+        token = credentials.credentials
+        
+        try:
+            user_id = verify_token(token)
+            # Fetch the actual User object from database
+            user = db.query(User).filter(User.id == user_id).first()
+            if user:
+                return user
+            else:
+                # If user not found, return anonymous user
+                anonymous_user = db.query(User).filter(User.id == 0).first()
+                if anonymous_user:
+                    return anonymous_user
+                # Create if doesn't exist
+                anonymous_user = User(
+                    id=0,
+                    username="anonymous",
+                    email="anonymous@sanjeevani.local",
+                    password_hash="disabled",
+                    is_active=True
+                )
+                db.add(anonymous_user)
+                db.commit()
+                return anonymous_user
+        except HTTPException:
+            # Return anonymous user on auth failure
+            anonymous_user = db.query(User).filter(User.id == 0).first()
+            if anonymous_user:
+                return anonymous_user
+            anonymous_user = User(
+                id=0,
+                username="anonymous",
+                email="anonymous@sanjeevani.local",
+                password_hash="disabled",
+                is_active=True
+            )
+            db.add(anonymous_user)
+            db.commit()
+            return anonymous_user
+        except Exception:
+            # Return anonymous user on any error
+            anonymous_user = db.query(User).filter(User.id == 0).first()
+            if anonymous_user:
+                return anonymous_user
+            anonymous_user = User(
+                id=0,
+                username="anonymous",
+                email="anonymous@sanjeevani.local",
+                password_hash="disabled",
+                is_active=True
+            )
+            db.add(anonymous_user)
+            db.commit()
+            return anonymous_user
+    finally:
+        db.close()
 
 async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """
-    Optional authentication - returns user_id if token present and valid, None otherwise.
+    Optional authentication - returns User object if token present and valid, None otherwise.
     """
-    if not credentials:
-        return None
-    
+    db = SessionLocal()
     try:
-        token = credentials.credentials
-        user_id = verify_token(token)
-        return user_id
-    except:
-        return None
+        if not credentials:
+            return None
+        
+        try:
+            token = credentials.credentials
+            user_id = verify_token(token)
+            # Fetch the actual User object from database
+            user = db.query(User).filter(User.id == user_id).first()
+            return user
+        except:
+            return None
+    finally:
+        db.close()

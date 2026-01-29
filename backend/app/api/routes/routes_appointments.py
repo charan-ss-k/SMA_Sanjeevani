@@ -11,8 +11,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
-from app.models.models import User
+from app.core.database import SessionLocal, get_db
+from app.models.models import User, Appointment
 from app.core.middleware import get_current_user
 
 # ============================================
@@ -57,13 +57,13 @@ class DoctorSearchRequest(BaseModel):
 
 class AppointmentBookRequest(BaseModel):
     """Request to book an appointment"""
-    doctor_id: str = Field(..., description="Employee ID of the doctor")
-    patient_name: str = Field(..., min_length=2, max_length=100)
-    patient_email: str
-    patient_phone: str
+    doctor_id: str = Field(..., description="Employee ID of the doctor", min_length=1)
+    patient_name: str = Field(..., min_length=2, max_length=100, description="Patient full name")
+    patient_email: str = Field(..., min_length=5, max_length=120, description="Valid email address")
+    patient_phone: str = Field(..., min_length=10, max_length=20, description="Valid phone number")
     appointment_date: str = Field(..., description="Date in format YYYY-MM-DD")
     appointment_time: str = Field(..., description="Time in format HH:MM")
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=500, description="Optional appointment notes")
 
 
 class AppointmentResponse(BaseModel):
@@ -264,13 +264,35 @@ async def search_doctors(criteria: DoctorSearchRequest):
 @router.post("/book")
 async def book_appointment(
     appointment: AppointmentBookRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Book an appointment with a doctor.
-    Validates doctor exists and creates appointment record.
+    Validates doctor exists and saves to database.
     """
     try:
+        print(f"\n🔔 Appointment booking request received:")
+        print(f"  - Current User Type: {type(current_user)} | Value: {current_user}")
+        print(f"  - Doctor ID: {appointment.doctor_id}")
+        print(f"  - Patient Name: {appointment.patient_name}")
+        print(f"  - Patient Email: {appointment.patient_email}")
+        print(f"  - Patient Phone: {appointment.patient_phone}")
+        print(f"  - Date: {appointment.appointment_date}")
+        print(f"  - Time: {appointment.appointment_time}")
+        print(f"  - Notes: {appointment.notes}")
+        
+        # Verify current_user is actually a User object
+        if not hasattr(current_user, 'id'):
+            print(f"❌ ERROR: current_user is not a User object. Type: {type(current_user)}, Value: {current_user}")
+            raise HTTPException(
+                status_code=401,
+                detail=f"Authentication error: current_user type is {type(current_user).__name__}, expected User object"
+            )
+        
+        user_id = current_user.id
+        print(f"  - User ID: {user_id} (type: {type(user_id)})")
+        
         # Load doctors to verify doctor exists
         doctors = load_doctors_from_csv()
         doctor_found = None
@@ -280,30 +302,72 @@ async def book_appointment(
                 break
         
         if not doctor_found:
-            raise HTTPException(status_code=404, detail="Doctor not found")
+            print(f"❌ Doctor not found with ID: {appointment.doctor_id}")
+            raise HTTPException(status_code=404, detail=f"Doctor with ID {appointment.doctor_id} not found")
         
         # Validate date and time format
         try:
-            datetime.strptime(appointment.appointment_date, "%Y-%m-%d")
-            datetime.strptime(appointment.appointment_time, "%H:%M")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date/time format. Use YYYY-MM-DD and HH:MM")
+            date_str = appointment.appointment_date.strip()
+            time_str = appointment.appointment_time.strip()
+            datetime_str = f"{date_str} {time_str}"
+            print(f"  - Parsing datetime: '{datetime_str}'")
+            
+            appointment_datetime = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
+            print(f"✅ Date/Time validation passed: {appointment_datetime}")
+        except ValueError as ve:
+            print(f"❌ Date/Time format error: {ve}")
+            print(f"  - Expected format: YYYY-MM-DD HH:MM")
+            print(f"  - Received date: {appointment.appointment_date}")
+            print(f"  - Received time: {appointment.appointment_time}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid date/time format. Date must be YYYY-MM-DD, time must be HH:MM. Received: {appointment.appointment_date} {appointment.appointment_time}"
+            )
         
-        # Generate appointment ID
-        appointment_id = f"APT-{datetime.now().strftime('%Y%m%d%H%M%S')}-{appointment.doctor_id}"
+        # Save appointment to database
+        print(f"💾 Creating Appointment object...")
+        new_appointment = Appointment(
+            user_id=user_id,
+            doctor_name=doctor_found.name,
+            doctor_id=doctor_found.employee_id,
+            specialization=doctor_found.specialization,
+            hospital_name=doctor_found.hospital,
+            locality=doctor_found.locality,
+            city=doctor_found.city,
+            state=doctor_found.state,
+            doctor_email=doctor_found.email,
+            doctor_phone=doctor_found.phone,
+            patient_name=appointment.patient_name.strip(),
+            patient_email=appointment.patient_email.strip().lower(),
+            patient_phone=appointment.patient_phone.strip(),
+            appointment_date=appointment_datetime,
+            appointment_time=appointment.appointment_time,
+            notes=appointment.notes.strip() if appointment.notes else None,
+            status="scheduled"
+        )
         
-        # In a real system, you would save this to database
-        # For now, we'll return success with the appointment details
+        print(f"💾 Saving appointment to database...")
+        print(f"  - Appointment object created: {new_appointment}")
+        db.add(new_appointment)
+        db.commit()
+        print(f"  - Commit successful, refreshing object...")
+        db.refresh(new_appointment)
+        
+        print(f"✅ Appointment {new_appointment.id} booked successfully for user {user_id}")
         
         return {
             "success": True,
-            "appointment_id": appointment_id,
+            "appointment_id": new_appointment.id,
             "message": "Appointment booked successfully!",
             "doctor_info": doctor_found,
             "appointment_details": {
+                "appointment_id": new_appointment.id,
                 "patient_name": appointment.patient_name,
                 "patient_email": appointment.patient_email,
                 "patient_phone": appointment.patient_phone,
+                "doctor_name": doctor_found.name,
+                "doctor_phone": doctor_found.phone,
+                "hospital": doctor_found.hospital,
                 "date": appointment.appointment_date,
                 "time": appointment.appointment_time,
                 "notes": appointment.notes or "No notes provided"
@@ -312,7 +376,126 @@ async def book_appointment(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Error booking appointment: {e}")
+        print(f"❌ Error booking appointment: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Booking failed: {str(e)}")
+
+
+@router.get("/my-appointments")
+async def get_my_appointments(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all appointments for the current user.
+    """
+    try:
+        appointments = db.query(Appointment).filter(Appointment.user_id == current_user.id).order_by(Appointment.appointment_date.desc()).all()
+        
+        return {
+            "success": True,
+            "total": len(appointments),
+            "appointments": [
+                {
+                    "id": apt.id,
+                    "doctor_name": apt.doctor_name,
+                    "specialization": apt.specialization,
+                    "hospital": apt.hospital_name,
+                    "locality": apt.locality,
+                    "city": apt.city,
+                    "state": apt.state,
+                    "doctor_phone": apt.doctor_phone,
+                    "doctor_email": apt.doctor_email,
+                    "appointment_date": apt.appointment_date.isoformat(),
+                    "appointment_time": apt.appointment_time,
+                    "status": apt.status,
+                    "notes": apt.notes,
+                    "created_at": apt.created_at.isoformat()
+                }
+                for apt in appointments
+            ]
+        }
+    except Exception as e:
+        print(f"❌ Error fetching appointments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/upcoming-appointments")
+async def get_upcoming_appointments(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get upcoming appointments (not yet passed) for the current user.
+    """
+    try:
+        now = datetime.utcnow()
+        upcoming = db.query(Appointment).filter(
+            Appointment.user_id == current_user.id,
+            Appointment.appointment_date >= now,
+            Appointment.status == "scheduled"
+        ).order_by(Appointment.appointment_date).all()
+        
+        return {
+            "success": True,
+            "total": len(upcoming),
+            "appointments": [
+                {
+                    "id": apt.id,
+                    "doctor_name": apt.doctor_name,
+                    "specialization": apt.specialization,
+                    "hospital": apt.hospital_name,
+                    "locality": apt.locality,
+                    "city": apt.city,
+                    "state": apt.state,
+                    "doctor_phone": apt.doctor_phone,
+                    "doctor_email": apt.doctor_email,
+                    "appointment_date": apt.appointment_date.isoformat(),
+                    "appointment_time": apt.appointment_time,
+                    "notes": apt.notes
+                }
+                for apt in upcoming
+            ]
+        }
+    except Exception as e:
+        print(f"❌ Error fetching upcoming appointments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/appointment/{appointment_id}")
+async def update_appointment(
+    appointment_id: int,
+    status: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update appointment status (completed, cancelled, etc).
+    """
+    try:
+        appointment = db.query(Appointment).filter(
+            Appointment.id == appointment_id,
+            Appointment.user_id == current_user.id
+        ).first()
+        
+        if not appointment:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+        
+        appointment.status = status
+        appointment.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(appointment)
+        
+        return {
+            "success": True,
+            "message": f"Appointment status updated to {status}",
+            "appointment_id": appointment.id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating appointment: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

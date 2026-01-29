@@ -1,8 +1,10 @@
 """
 SMA Sanjeevani Backend - Main Application Entry Point
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 import logging
 
 from app.core.config import settings
@@ -50,6 +52,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Custom exception handler for validation errors
+@app.exception_handler(ValidationError)
+async def validation_exception_handler(request: Request, exc: ValidationError):
+    """Handle Pydantic validation errors with detailed messages"""
+    logger.error(f"❌ Validation error: {exc}")
+    errors = []
+    for error in exc.errors():
+        field = ".".join(str(x) for x in error["loc"])
+        msg = error["msg"]
+        errors.append(f"{field}: {msg}")
+    
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "Validation error",
+            "errors": errors,
+            "message": "; ".join(errors)
+        }
+    )
 
 
 @app.on_event("startup")

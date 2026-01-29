@@ -37,6 +37,7 @@ class User(Base):
     reminders = relationship("Reminder", back_populates="user", cascade="all, delete-orphan")
     qa_history = relationship("QAHistory", back_populates="user", cascade="all, delete-orphan")
     dashboard_data = relationship("DashboardData", back_populates="user", cascade="all, delete-orphan")
+    appointments = relationship("Appointment", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, username={self.username}, email={self.email})>"
@@ -160,3 +161,37 @@ class DashboardData(Base):
 
     def __repr__(self):
         return f"<DashboardData(user_id={self.user_id}, health_score={self.health_score})>"
+
+
+class Appointment(Base):
+    """Doctor appointment bookings"""
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    doctor_name = Column(String(255), nullable=False)
+    doctor_id = Column(String(50), nullable=False)  # Employee ID from CSV
+    specialization = Column(String(100), nullable=False)
+    hospital_name = Column(String(255), nullable=False)
+    locality = Column(String(100), nullable=False)
+    city = Column(String(100), nullable=False)
+    state = Column(String(100), nullable=False)
+    doctor_email = Column(String(120), nullable=False)
+    doctor_phone = Column(String(20), nullable=False)
+    patient_name = Column(String(255), nullable=False)
+    patient_email = Column(String(120), nullable=False)
+    patient_phone = Column(String(20), nullable=False)
+    appointment_date = Column(DateTime, nullable=False, index=True)
+    appointment_time = Column(String(10), nullable=False)  # HH:MM format
+    notes = Column(Text, nullable=True)
+    status = Column(String(50), default="scheduled")  # scheduled, completed, cancelled
+    reminder_set = Column(Boolean, default=False)
+    reminder_sent = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationship
+    user = relationship("User", back_populates="appointments")
+
+    def __repr__(self):
+        return f"<Appointment(user_id={self.user_id}, doctor={self.doctor_name}, date={self.appointment_date})>"

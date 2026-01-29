@@ -9,6 +9,7 @@ const ConsultPage = () => {
   const [isMuted, setIsMuted] = useState(false);
   
   // State management
+  const [tab, setTab] = useState('book'); // book, history, reminders
   const [step, setStep] = useState('search'); // search, results, booking
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -46,10 +47,15 @@ const ConsultPage = () => {
     appointment_time: '',
     notes: ''
   });
+
+  // Appointment History
+  const [appointmentHistory, setAppointmentHistory] = useState([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   
-  // Load search options on mount
+  // Load search options and appointments on mount
   useEffect(() => {
     loadSearchOptions();
+    loadAppointments();
   }, []);
   
   const loadSearchOptions = async () => {
@@ -72,6 +78,34 @@ const ConsultPage = () => {
     } catch (err) {
       console.error('❌ Error loading search options:', err);
       setError('Failed to load doctor information');
+    }
+  };
+
+  const loadAppointments = async () => {
+    try {
+      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+      
+      // Fetch all appointments
+      const allResponse = await fetch(`${apiBase}/api/appointments/my-appointments`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      });
+      
+      if (allResponse.ok) {
+        const allData = await allResponse.json();
+        setAppointmentHistory(allData.appointments || []);
+      }
+      
+      // Fetch upcoming appointments
+      const upcomingResponse = await fetch(`${apiBase}/api/appointments/upcoming-appointments`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      });
+      
+      if (upcomingResponse.ok) {
+        const upcomingData = await upcomingResponse.json();
+        setUpcomingAppointments(upcomingData.appointments || []);
+      }
+    } catch (err) {
+      console.error('❌ Error loading appointments:', err);
     }
   };
   
@@ -156,29 +190,67 @@ const ConsultPage = () => {
       return;
     }
     
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(bookingForm.patient_email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    
+    // Validate phone format
+    if (bookingForm.patient_phone.length < 10) {
+      setError('Please enter a valid phone number');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     
     try {
       const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+      const token = localStorage.getItem('access_token');
+      
+      const payload = {
+        doctor_id: selectedDoctor.employee_id,
+        patient_name: bookingForm.patient_name.trim(),
+        patient_email: bookingForm.patient_email.trim(),
+        patient_phone: bookingForm.patient_phone.trim(),
+        appointment_date: bookingForm.appointment_date, // YYYY-MM-DD format from date input
+        appointment_time: bookingForm.appointment_time, // HH:MM format from time input
+        notes: bookingForm.notes || null
+      };
+      
+      console.log('📤 Sending appointment booking:', payload);
+      
       const response = await fetch(`${apiBase}/api/appointments/book`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          doctor_id: selectedDoctor.employee_id,
-          ...bookingForm
-        })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
       });
       
       const data = await response.json();
+      console.log('📋 Booking response:', response.status, data);
       
       if (!response.ok) {
-        throw new Error(data.detail || 'Booking failed');
+        // Better error handling
+        let errorMsg = 'Booking failed';
+        if (data.detail) {
+          errorMsg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+        } else if (data.message) {
+          errorMsg = data.message;
+        }
+        throw new Error(errorMsg);
       }
       
       if (data.success) {
         setMessage(`✅ Appointment booked successfully! ID: ${data.appointment_id}`);
         if (!isMuted) playTTS('Appointment booked successfully', language);
+        
+        // Reload appointments
+        loadAppointments();
         
         // Reset and go back to search
         setTimeout(() => {
@@ -221,7 +293,7 @@ const ConsultPage = () => {
       <div className="consult-header">
         <div className="header-content">
           <h1>🏥 Doctor Consultation</h1>
-          <p>Book an appointment with our verified doctors</p>
+          <p>Book appointments and manage your consultations</p>
         </div>
         <button
           onClick={handleMuteToggle}
@@ -230,6 +302,43 @@ const ConsultPage = () => {
         >
           {isMuted ? '🔇' : '🔊'}
         </button>
+      </div>
+      
+      {/* Tabs */}
+      <div className="section" style={{ marginBottom: '30px' }}>
+        <div className="tabs">
+          <button
+            className={`tab-btn ${tab === 'book' ? 'active' : ''}`}
+            onClick={() => {
+              setTab('book');
+              setStep('search');
+              setError('');
+              setMessage('');
+            }}
+          >
+            📅 Book Appointment
+          </button>
+          <button
+            className={`tab-btn ${tab === 'history' ? 'active' : ''}`}
+            onClick={() => {
+              setTab('history');
+              setError('');
+              setMessage('');
+            }}
+          >
+            📋 Appointment History
+          </button>
+          <button
+            className={`tab-btn ${tab === 'reminders' ? 'active' : ''}`}
+            onClick={() => {
+              setTab('reminders');
+              setError('');
+              setMessage('');
+            }}
+          >
+            ⏰ Reminders & Upcoming
+          </button>
+        </div>
       </div>
       
       {/* Messages */}
@@ -243,6 +352,10 @@ const ConsultPage = () => {
           ⚠️ {error}
         </div>
       )}
+      
+      {/* BOOKING TAB */}
+      {tab === 'book' && (
+        <>
       
       {/* Step 1: Search */}
       {step === 'search' && (
@@ -544,6 +657,145 @@ const ConsultPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+        </>
+      )}
+      
+      {/* HISTORY TAB */}
+      {tab === 'history' && (
+        <div className="section">
+          <div className="section-content">
+            <h2>📋 Your Appointment History</h2>
+            <p className="section-subtitle">View all your past and current appointments</p>
+            
+            {appointmentHistory && appointmentHistory.length > 0 ? (
+              <div className="appointment-list">
+                {appointmentHistory.map(apt => {
+                  const aptDate = new Date(apt.appointment_date);
+                  const now = new Date();
+                  const isPast = aptDate < now;
+                  
+                  return (
+                    <div key={apt.id} className={`appointment-card ${isPast ? 'past' : 'upcoming'}`}>
+                      <span className={`appointment-status ${apt.status}`}>
+                        {apt.status.toUpperCase()}
+                      </span>
+                      <h3>Dr. {apt.doctor_name}</h3>
+                      <div className="appointment-detail">
+                        <span className="label">Specialization:</span>
+                        <span className="value">{apt.specialization}</span>
+                      </div>
+                      <div className="appointment-detail">
+                        <span className="label">Hospital:</span>
+                        <span className="value">{apt.hospital}</span>
+                      </div>
+                      <div className="appointment-detail">
+                        <span className="label">Location:</span>
+                        <span className="value">{apt.city}, {apt.state}</span>
+                      </div>
+                      <div className="appointment-detail">
+                        <span className="label">Date & Time:</span>
+                        <span className="value">
+                          {new Date(apt.appointment_date).toLocaleDateString()} {apt.appointment_time}
+                        </span>
+                      </div>
+                      <div className="appointment-detail">
+                        <span className="label">Doctor Phone:</span>
+                        <span className="value">{apt.doctor_phone}</span>
+                      </div>
+                      {apt.notes && (
+                        <div className="appointment-detail">
+                          <span className="label">Notes:</span>
+                          <span className="value">{apt.notes}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-state-icon">📭</div>
+                <h3>No Appointment History</h3>
+                <p>You haven't booked any appointments yet. Book one now!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* REMINDERS & UPCOMING TAB */}
+      {tab === 'reminders' && (
+        <div className="section">
+          <div className="section-content">
+            <h2>⏰ Upcoming Appointments & Reminders</h2>
+            <p className="section-subtitle">Your scheduled appointments coming up</p>
+            
+            {upcomingAppointments && upcomingAppointments.length > 0 ? (
+              <div className="appointment-list">
+                {upcomingAppointments.map(apt => {
+                  const aptDate = new Date(apt.appointment_date);
+                  const daysUntil = Math.ceil((aptDate - new Date()) / (1000 * 60 * 60 * 24));
+                  
+                  return (
+                    <div key={apt.id} className="appointment-card upcoming">
+                      <span className="appointment-status scheduled">
+                        {daysUntil === 0 ? 'TODAY' : daysUntil === 1 ? 'TOMORROW' : `${daysUntil} DAYS`}
+                      </span>
+                      <h3>Dr. {apt.doctor_name}</h3>
+                      <div className="appointment-detail">
+                        <span className="label">Specialization:</span>
+                        <span className="value">{apt.specialization}</span>
+                      </div>
+                      <div className="appointment-detail">
+                        <span className="label">Hospital:</span>
+                        <span className="value">{apt.hospital}</span>
+                      </div>
+                      <div className="appointment-detail">
+                        <span className="label">Location:</span>
+                        <span className="value">{apt.locality}, {apt.city}</span>
+                      </div>
+                      <div className="appointment-detail">
+                        <span className="label">⏰ Time:</span>
+                        <span className="value">{apt.appointment_time}</span>
+                      </div>
+                      <div className="appointment-detail">
+                        <span className="label">📞 Contact:</span>
+                        <span className="value">{apt.doctor_phone}</span>
+                      </div>
+                      {apt.notes && (
+                        <div className="appointment-detail">
+                          <span className="label">Notes:</span>
+                          <span className="value">{apt.notes}</span>
+                        </div>
+                      )}
+                      <div className="appointment-actions">
+                        <button className="btn btn-primary" onClick={() => {
+                          if (!isMuted) playTTS(`Your appointment with Dr. ${apt.doctor_name} is coming up in ${daysUntil} days at ${apt.appointment_time}`, language);
+                        }}>
+                          🔔 Set Reminder
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => {
+                          if (window.confirm('Cancel this appointment?')) {
+                            // TODO: Add cancel appointment functionality
+                          }
+                        }}>
+                          ❌ Cancel
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-state-icon">✅</div>
+                <h3>No Upcoming Appointments</h3>
+                <p>You don't have any upcoming appointments. Book one in the "Book Appointment" tab!</p>
+              </div>
+            )}
           </div>
         </div>
       )}

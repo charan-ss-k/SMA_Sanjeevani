@@ -9,18 +9,45 @@ const DashboardAppointments = ({ language = 'en' }) => {
     loadAppointments();
   }, []);
 
-  const loadAppointments = () => {
+  const loadAppointments = async () => {
     try {
-      const savedAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
-      const upcomingAppointments = savedAppointments.filter(apt => {
-        const aptDate = new Date(apt.appointment_date);
-        return aptDate >= new Date();
+      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+      const token = localStorage.getItem('access_token');
+      
+      // Try to fetch from API first
+      const response = await fetch(`${apiBase}/api/appointments/upcoming-appointments`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      setAppointments(upcomingAppointments.sort((a, b) => 
-        new Date(a.appointment_date) - new Date(b.appointment_date)
-      ));
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAppointments(data.appointments || []);
+      } else {
+        // Fallback to localStorage if API fails
+        const savedAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
+        const upcomingAppointments = savedAppointments.filter(apt => {
+          const aptDate = new Date(apt.appointment_date);
+          return aptDate >= new Date();
+        });
+        setAppointments(upcomingAppointments.sort((a, b) => 
+          new Date(a.appointment_date) - new Date(b.appointment_date)
+        ));
+      }
     } catch (error) {
       console.error('Error loading appointments:', error);
+      // Fallback to localStorage
+      try {
+        const savedAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
+        const upcomingAppointments = savedAppointments.filter(apt => {
+          const aptDate = new Date(apt.appointment_date);
+          return aptDate >= new Date();
+        });
+        setAppointments(upcomingAppointments.sort((a, b) => 
+          new Date(a.appointment_date) - new Date(b.appointment_date)
+        ));
+      } catch (e) {
+        console.error('Error loading from localStorage:', e);
+      }
     } finally {
       setLoading(false);
     }
