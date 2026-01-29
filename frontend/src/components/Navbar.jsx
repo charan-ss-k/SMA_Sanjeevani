@@ -54,7 +54,7 @@ const Navbar = ({ language, onLanguageChange }) => {
             </li>
             <li>
               <Link to="/dashboard" className={getLinkClass('/dashboard')}>
-                📊 {t('dashboard', language)}
+                📊 {t('analysis', language) || 'Analysis'}
               </Link>
             </li>
             <li>

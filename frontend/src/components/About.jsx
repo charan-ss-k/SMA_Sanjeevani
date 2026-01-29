@@ -115,7 +115,7 @@ const About = () => {
         </div>
 
         {/* Core Values */}
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-2xl shadow-xl p-12 text-white mb-16">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-2xl shadow-xl p-12 text-black mb-16">
           <h2 className="text-4xl font-bold text-center mb-12">
             {t('ourValues', language)}
           </h2>

@@ -11,6 +11,7 @@ export const translations = {
     services: 'Services',
     contact: 'Contact',
     dashboard: 'Dashboard',
+    analysis: 'Analysis',
     login: 'Login',
     logout: 'Logout',
     
