@@ -133,37 +133,71 @@ def load_doctors_from_csv() -> List[DoctorData]:
 def filter_doctors(doctors: List[DoctorData], search_criteria: DoctorSearchRequest) -> List[DoctorData]:
     """
     Filter doctors based on search criteria.
-    Returns doctors matching ANY of the provided criteria.
+    Returns doctors matching ALL provided criteria (AND logic).
     """
     if not any([search_criteria.state, search_criteria.city, search_criteria.locality,
                 search_criteria.specialization, search_criteria.native_language, 
                 search_criteria.languages_known]):
         return doctors
     
+    # Count how many criteria are actually provided (not empty)
+    criteria_count = sum(1 for criterion in [
+        search_criteria.state, 
+        search_criteria.city, 
+        search_criteria.locality,
+        search_criteria.specialization, 
+        search_criteria.native_language, 
+        search_criteria.languages_known
+    ] if criterion)
+    
     filtered = []
     for doctor in doctors:
         matches = 0
         
-        # Check each criterion
-        if search_criteria.state and doctor.state.lower() == search_criteria.state.lower():
-            matches += 1
-        if search_criteria.city and doctor.city.lower() == search_criteria.city.lower():
-            matches += 1
-        if search_criteria.locality and search_criteria.locality.lower() in doctor.locality.lower():
-            matches += 1
-        if search_criteria.specialization and doctor.specialization.lower() == search_criteria.specialization.lower():
-            matches += 1
-        if search_criteria.native_language and doctor.native_language.lower() == search_criteria.native_language.lower():
-            matches += 1
+        # Check each criterion - ALL must match
+        if search_criteria.state:
+            if doctor.state.lower() == search_criteria.state.lower():
+                matches += 1
+            else:
+                continue  # Skip this doctor if state doesn't match
+                
+        if search_criteria.city:
+            if doctor.city.lower() == search_criteria.city.lower():
+                matches += 1
+            else:
+                continue  # Skip this doctor if city doesn't match
+                
+        if search_criteria.locality:
+            if search_criteria.locality.lower() in doctor.locality.lower():
+                matches += 1
+            else:
+                continue  # Skip this doctor if locality doesn't match
+                
+        if search_criteria.specialization:
+            if doctor.specialization.lower() == search_criteria.specialization.lower():
+                matches += 1
+            else:
+                continue  # Skip this doctor if specialization doesn't match
+                
+        if search_criteria.native_language:
+            if doctor.native_language.lower() == search_criteria.native_language.lower():
+                matches += 1
+            else:
+                continue  # Skip this doctor if native language doesn't match
+                
         if search_criteria.languages_known:
             search_langs = [l.strip().lower() for l in search_criteria.languages_known.split(',')]
+            found_language = False
             for lang in search_langs:
                 if any(lang == dl.lower() for dl in doctor.languages_known):
+                    found_language = True
                     matches += 1
                     break
+            if not found_language:
+                continue  # Skip this doctor if none of the languages match
         
-        # Include if matches at least one criterion
-        if matches > 0:
+        # Include only if ALL criteria matched
+        if matches == criteria_count:
             filtered.append(doctor)
     
     return filtered
