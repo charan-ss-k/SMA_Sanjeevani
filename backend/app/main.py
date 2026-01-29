@@ -54,6 +54,24 @@ app.add_middleware(
 )
 
 
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests and responses"""
+    # Log incoming request
+    if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+        logger.info(f"📨 [{request.method}] {request.url.path} - From: {request.client.host if request.client else 'unknown'}")
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Log response
+    if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+        logger.info(f"📤 [{request.method}] {request.url.path} - Status: {response.status_code}")
+    
+    return response
+
+
 # Custom exception handler for validation errors
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):

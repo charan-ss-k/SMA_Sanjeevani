@@ -14,6 +14,10 @@ from app.core.security import (
     verify_token,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+import logging
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -81,9 +85,12 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     
     Returns a JWT token for immediate login
     """
+    logger.info(f"📨 [SIGNUP] Incoming request from user: {request.username}, email: {request.email}")
+    
     # Check if username already exists
     existing_user = db.query(User).filter(User.username == request.username).first()
     if existing_user:
+        logger.warning(f"⚠️ [SIGNUP] Username '{request.username}' already exists")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered"
@@ -92,6 +99,7 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     # Check if email already exists
     existing_email = db.query(User).filter(User.email == request.email).first()
     if existing_email:
+        logger.warning(f"⚠️ [SIGNUP] Email '{request.email}' already registered")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
@@ -112,6 +120,7 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    logger.info(f"✅ [SIGNUP] User '{request.username}' created successfully with ID: {new_user.id}")
     
     # Create JWT token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -120,12 +129,17 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
         expires_delta=access_token_expires
     )
     
-    return {
+    logger.info(f"✅ [SIGNUP] Token generated for user '{request.username}', expires in {ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
+    
+    response_data = {
         "access_token": access_token,
         "token_type": "bearer",
         "user": UserResponse.model_validate(new_user),
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
     }
+    
+    logger.info(f"📤 [SIGNUP] Response sent: token_length={len(access_token)}, user_id={new_user.id}")
+    return response_data
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -138,26 +152,35 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     
     Returns a JWT token for authentication
     """
+    logger.info(f"🔐 [LOGIN] Incoming login attempt for: {request.username}")
+    
     # Find user by username or email
     user = db.query(User).filter(
         (User.username == request.username) | (User.email == request.username)
     ).first()
     
     if not user:
+        logger.warning(f"❌ [LOGIN] User not found: {request.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
         )
+    
+    logger.info(f"✅ [LOGIN] User found: {user.username} (ID: {user.id}), verifying password...")
     
     # Verify password
     if not verify_password(request.password, user.password_hash):
+        logger.warning(f"❌ [LOGIN] Password verification failed for user: {request.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
         )
     
+    logger.info(f"✅ [LOGIN] Password verified for user: {request.username}")
+    
     # Check if user is active
     if not user.is_active:
+        logger.warning(f"❌ [LOGIN] User account inactive: {request.username}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive"
@@ -170,12 +193,18 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         expires_delta=access_token_expires
     )
     
-    return {
+    logger.info(f"✅ [LOGIN] Token generated for user: {request.username}, expires in {ACCESS_TOKEN_EXPIRE_MINUTES} minutes")
+    
+    response_data = {
         "access_token": access_token,
         "token_type": "bearer",
         "user": UserResponse.model_validate(user),
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
     }
+    
+    logger.info(f"📤 [LOGIN] Response sent: token_length={len(access_token)}, user_id={user.id}, username={user.username}")
+    
+    return response_data
 
 
 @router.get("/me", response_model=UserResponse)

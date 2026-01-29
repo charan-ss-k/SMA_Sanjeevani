@@ -84,7 +84,7 @@ const SymptomChecker = ({ onResult }) => {
       };
 
       // Use configurable API base URL (defaults to localhost:8000)
-      const apiBase = window.__API_BASE__ || 'http://127.0.0.1:8000';
+      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
       const url = `${apiBase}/api/symptoms/recommend`;
       
       console.log('[SymptomChecker] Sending POST to:', url);

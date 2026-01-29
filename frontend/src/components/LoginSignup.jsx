@@ -5,7 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
 
-const API_BASE = window.__API_BASE__ || 'http://127.0.0.1:8000';
+const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
 
 export function LoginSignup() {
   const navigate = useNavigate();
@@ -72,6 +72,13 @@ export function LoginSignup() {
     setLoading(true);
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/signup';
+      const fullUrl = `${API_BASE}${endpoint}`;
+      
+      console.log('🔐 Auth Request:', {
+        url: fullUrl,
+        method: 'POST',
+        isLogin: isLogin
+      });
       
       let payload;
       if (isLogin) {
@@ -107,14 +114,20 @@ export function LoginSignup() {
         };
       }
 
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+      console.log('📤 Payload:', payload);
+
+      const response = await fetch(fullUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
+      console.log('📥 Response Status:', response.status, response.statusText);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Authentication failed' }));
+        console.error('❌ Auth Error Response:', errorData);
+        
         // Handle validation errors (422) - show detailed error messages
         if (response.status === 422 && errorData.detail) {
           if (Array.isArray(errorData.detail)) {
@@ -127,23 +140,33 @@ export function LoginSignup() {
             throw new Error(errorData.detail);
           }
         }
-        throw new Error(errorData.detail || errorData.message || 'Authentication failed');
+        throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}: Authentication failed`);
       }
 
       const data = await response.json();
+      console.log('✅ Auth Success:', {
+        user: data.user?.username,
+        tokenLength: data.access_token?.length
+      });
       
       // Store token and user info
+      localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
       setUser(data.user);
       setToken(data.access_token);
       
+      console.log('💾 Stored:', {
+        token: localStorage.getItem('token') ? '✓' : '✗',
+        user: localStorage.getItem('user') ? '✓' : '✗'
+      });
+      
       // Redirect to home
-      navigate('/home');
+      setTimeout(() => navigate('/home'), 500);
     } catch (err) {
       setError(err.message || t('authenticationFailed', language));
-      console.error('Auth error:', err);
+      console.error('❌ Auth error:', err);
     } finally {
       setLoading(false);
     }
