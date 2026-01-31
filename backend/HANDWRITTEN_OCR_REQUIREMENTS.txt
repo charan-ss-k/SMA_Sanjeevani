@@ -1,0 +1,21 @@
+# Handwritten Prescription OCR Dependencies
+# Add these to your backend/requirements.txt
+
+# TrOCR components
+transformers>=4.30.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Text detection (optional, CRAFT)
+# craft-text-detector>=0.4.1  # Uncomment to enable CRAFT-based detection
+
+# Image processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# ML/AI
+scikit-image>=0.20.0
+
+# Optional: For GPU acceleration (if using CUDA)
+# torch-cuda  # Install appropriate version from PyTorch website
