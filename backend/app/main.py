@@ -19,6 +19,7 @@ from app.api.routes.routes_qa_history import router as qa_history_router
 from app.api.routes.routes_reminders import router as reminders_router
 from app.api.routes.routes_hospital_reports import router as hospital_reports_router
 from app.api.routes.routes_hospital_report_history import router as hospital_report_history_router
+from app.api.routes.routes_handwritten_prescriptions import router as handwritten_prescriptions_router
 from app.services.symptoms_recommendation import router as symptoms_router
 
 # Configure logging
@@ -169,6 +170,8 @@ if HAVE_MEDICINE_IDENTIFICATION:
 else:
     logger.info("ℹ️ Medicine identification feature requires additional dependencies")
 app.include_router(symptoms_router, prefix="", tags=["Symptoms & Recommendations"])
+app.include_router(handwritten_prescriptions_router, tags=["Handwritten Prescriptions"])
+logger.info("✅ Handwritten Prescription Analyzer router registered")
 
 
 if __name__ == "__main__":

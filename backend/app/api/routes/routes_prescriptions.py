@@ -278,9 +278,10 @@ async def analyze_handwritten_prescription(
         
         # Run prescription analysis (line-based OCR + LLM)
         logger.info("🏥 Starting prescription analysis pipeline...")
-        from app.services.handwritten_prescription_analyzer import HandwrittenPrescriptionAnalyzer
+        from app.services.handwritten_prescription_analyzer import HybridHandwrittenPrescriptionAnalyzer
         
-        result = HandwrittenPrescriptionAnalyzer.analyze_handwritten_prescription(temp_file_path)
+        analyzer = HybridHandwrittenPrescriptionAnalyzer()
+        result = analyzer.analyze_prescription(temp_file_path)
         
         # Fail fast on pipeline errors
         if result.get("status") == "error":

@@ -1,37 +1,22 @@
 """
-Handwritten Prescription OCR Service
-Implements the complete correct pipeline:
-Upload → Normalize → Detect Lines → Crop → Preprocess Each → TrOCR → Sort → Merge
+Multi-Method Handwritten Text OCR Handler
+Combines EasyOCR, Tesseract, and PaddleOCR for maximum accuracy
 """
 
-import cv2
+import easyocr
+import pytesseract
 import numpy as np
 import logging
-from typing import Dict, Any, List, Tuple, Optional
-from PIL import Image
-import tempfile
-import os
+from typing import Dict, List, Tuple, Optional
+import json
+
+try:
+    from paddleocr import PaddleOCR
+    PADDLE_AVAILABLE = True
+except ImportError:
+    PADDLE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
-
-# Try to import TrOCR components
-HAVE_TROCR = False
-try:
-    from transformers import TrOCRProcessor, VisionEncoderDecoderModel
-    import torch
-    HAVE_TROCR = True
-    logger.info("✅ TrOCR components loaded successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ TrOCR not available: {e}")
-
-# Try to import text detection (CRAFT or DBNet)
-HAVE_CRAFT = False
-try:
-    import craft_text_detector
-    HAVE_CRAFT = True
-    logger.info("✅ CRAFT text detector loaded successfully")
-except ImportError:
-    logger.debug("⚠️ CRAFT not available, will use alternative detection")
 
 
 class TextLineDetector:

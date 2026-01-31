@@ -24,6 +24,8 @@ scikit-image>=0.21.0  # For advanced image processing and morphological operatio
 # OCR (pytesseract = Python bindings; install Tesseract engine from https://github.com/UB-Mannheim/tesseract/wiki)
 pytesseract>=0.3.10
 easyocr>=1.7.0
+paddleocr>=2.7.0  # Multi-method OCR for improved accuracy
+imutils>=0.5.4  # Image utilities for preprocessing (deskew, contour detection, etc.)
 
 # Handwritten Text Recognition (HTR) - TrOCR for prescription analysis
 transformers>=4.35.0  # TrOCR model from Hugging Face
