@@ -36,6 +36,7 @@ class User(Base):
     prescriptions = relationship("Prescription", back_populates="user", cascade="all, delete-orphan")
     reminders = relationship("Reminder", back_populates="user", cascade="all, delete-orphan")
     qa_history = relationship("QAHistory", back_populates="user", cascade="all, delete-orphan")
+    hospital_report_history = relationship("HospitalReportHistory", back_populates="user", cascade="all, delete-orphan")
     dashboard_data = relationship("DashboardData", back_populates="user", cascade="all, delete-orphan")
     appointments = relationship("Appointment", back_populates="user", cascade="all, delete-orphan")
 
@@ -195,3 +196,23 @@ class Appointment(Base):
 
     def __repr__(self):
         return f"<Appointment(user_id={self.user_id}, doctor={self.doctor_name}, date={self.appointment_date})>"
+
+
+class HospitalReportHistory(Base):
+    """History of saved hospital report analyses for each user"""
+    __tablename__ = "hospital_report_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    report_title = Column(String(255), nullable=True)
+    uploaded_file = Column(String(255), nullable=True)
+    ocr_method = Column(String(100), nullable=True)
+    extracted_text = Column(Text, nullable=True)
+    structured_data = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Relationship
+    user = relationship("User", back_populates="hospital_report_history")
+
+    def __repr__(self):
+        return f"<HospitalReportHistory(user_id={self.user_id}, title={self.report_title})>"
