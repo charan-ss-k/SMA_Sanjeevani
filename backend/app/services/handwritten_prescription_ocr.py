@@ -110,16 +110,20 @@ class TextLineDetector:
         else:
             gray = image
         
-        # Apply adaptive thresholding
+        # Apply adaptive thresholding (invert so text is white)
         binary = cv2.adaptiveThreshold(
             gray, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
+            cv2.THRESH_BINARY_INV,
             21, 5
         )
+
+        # Connect characters within the same line to form line contours
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 3))
+        connected = cv2.dilate(binary, kernel, iterations=1)
         
         # Find contours
-        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(connected, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         # Filter and get bounding rectangles for text-like contours
         boxes = []
@@ -208,19 +212,38 @@ class TextCropPreprocessor:
             gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
         else:
             gray = crop
-        
-        # Apply adaptive thresholding
+
+        # Contrast enhancement (CLAHE)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+
+        # Adaptive thresholding (text = black on white background)
         binary = cv2.adaptiveThreshold(
-            gray, 255,
+            enhanced, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY,
             31,  # Block size (must be odd)
             11   # Constant subtracted from mean
         )
-        
+
+        # Add padding to avoid clipped characters
+        pad = 8
+        binary = cv2.copyMakeBorder(
+            binary, pad, pad, pad, pad,
+            borderType=cv2.BORDER_CONSTANT,
+            value=255
+        )
+
+        # Resize to a consistent height while keeping aspect ratio
+        target_h = 64
+        h, w = binary.shape
+        scale = target_h / max(h, 1)
+        new_w = max(1, int(w * scale))
+        resized = cv2.resize(binary, (new_w, target_h), interpolation=cv2.INTER_CUBIC)
+
         # Convert to PIL Image and ensure RGB (TrOCR expects RGB)
-        pil_image = Image.fromarray(binary).convert("RGB")
-        
+        pil_image = Image.fromarray(resized).convert("RGB")
+
         return pil_image
     
     @staticmethod
@@ -255,12 +278,95 @@ class TextCropPreprocessor:
             
             # Extract crop
             crop = image[y1:y2, x1:x2]
-            
-            # Store with Y coordinate for sorting
-            line_crops.append((y1, crop))
+
+            # Only split very tall crops (> 100px height) to avoid over-fragmenting
+            crop_h = y2 - y1
+            if crop_h > 100:
+                split_crops = TextCropPreprocessor._split_lines_in_crop(crop)
+                if len(split_crops) > 1:
+                    for split_y, split_crop in split_crops:
+                        # Store with Y coordinate for sorting (relative to original image)
+                        line_crops.append((y1 + split_y, split_crop))
+                else:
+                    # Store with Y coordinate for sorting
+                    line_crops.append((y1, crop))
+            else:
+                # Store with Y coordinate for sorting
+                line_crops.append((y1, crop))
         
         logger.debug(f"✅ Extracted {len(line_crops)} valid crops")
         return line_crops
+
+    @staticmethod
+    def _split_lines_in_crop(crop: np.ndarray) -> List[Tuple[int, np.ndarray]]:
+        """
+        Attempt to split a large crop into multiple text lines using horizontal projection.
+        Returns list of (y_offset, crop) tuples. Empty list means no reliable split.
+        """
+        try:
+            if crop is None or crop.size == 0:
+                return []
+
+            # Convert to grayscale
+            if len(crop.shape) == 3:
+                gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = crop
+
+            # Binarize (text = white)
+            binary = cv2.adaptiveThreshold(
+                gray, 255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY_INV,
+                21, 5
+            )
+
+            h, w = binary.shape
+            if h < 40:
+                return []
+
+            # Horizontal projection: sum of white pixels per row
+            row_sum = (binary > 0).sum(axis=1)
+            threshold = max(5, int(0.02 * w))
+
+            # Identify rows that likely contain text
+            text_rows = row_sum > threshold
+
+            # Find contiguous text row ranges
+            lines = []
+            in_line = False
+            start = 0
+            for i, is_text in enumerate(text_rows):
+                if is_text and not in_line:
+                    in_line = True
+                    start = i
+                elif not is_text and in_line:
+                    end = i
+                    if end - start >= 8:  # minimum line height
+                        lines.append((start, end))
+                    in_line = False
+            if in_line:
+                end = h
+                if end - start >= 8:
+                    lines.append((start, end))
+
+            # If only one line detected, no split
+            if len(lines) <= 1:
+                return []
+
+            # Build crops with padding
+            results = []
+            pad = 6
+            for (y_start, y_end) in lines:
+                y1 = max(0, y_start - pad)
+                y2 = min(h, y_end + pad)
+                line_crop = crop[y1:y2, :]
+                results.append((y1, line_crop))
+
+            return results
+        except Exception as e:
+            logger.debug(f"Line split failed: {e}")
+            return []
 
 
 class TrOCRRecognizer:
@@ -272,6 +378,7 @@ class TrOCRRecognizer:
     _processor = None
     _model = None
     _device = None
+    MODEL_NAME = "microsoft/trocr-large-handwritten"  # Use large model for better accuracy
     
     @staticmethod
     def _initialize_trocr():
@@ -284,20 +391,58 @@ class TrOCRRecognizer:
         
         logger.info("📥 Loading TrOCR model...")
         
-        # Determine device
-        TrOCRRecognizer._device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
-        logger.info(f"Using device: {TrOCRRecognizer._device}")
+        # Determine device with detailed GPU detection
+        if torch.cuda.is_available():
+            TrOCRRecognizer._device = torch.device("cuda")
+            gpu_name = torch.cuda.get_device_name(0)
+            logger.info(f"✅ GPU detected: {gpu_name}")
+            logger.info(f"Using device: cuda (GPU acceleration enabled)")
+        else:
+            TrOCRRecognizer._device = torch.device("cpu")
+            logger.warning("⚠️ No GPU detected. Using CPU (slower). Install CUDA PyTorch for GPU support.")
+            logger.info(f"Using device: cpu")
         
-        # Load processor and model
-        TrOCRRecognizer._processor = TrOCRProcessor.from_pretrained(
-            "microsoft/trocr-base-handwritten"
-        )
+        # Load processor and model (prefer local cache on network failure)
+        model_name = TrOCRRecognizer.MODEL_NAME
+        logger.info(f"Loading model: {model_name}")
         
-        TrOCRRecognizer._model = VisionEncoderDecoderModel.from_pretrained(
-            "microsoft/trocr-base-handwritten"
-        ).to(TrOCRRecognizer._device)
+        try:
+            TrOCRRecognizer._processor = TrOCRProcessor.from_pretrained(
+                model_name,
+                use_fast=False
+            )
+            TrOCRRecognizer._model = VisionEncoderDecoderModel.from_pretrained(
+                model_name
+            )
+            logger.info(f"✅ Model loaded from online/cache")
+        except Exception as e:
+            logger.warning(f"⚠️ Large model load failed: {e}. Falling back to base model...")
+            model_name = "microsoft/trocr-base-handwritten"
+            try:
+                TrOCRRecognizer._processor = TrOCRProcessor.from_pretrained(
+                    model_name,
+                    use_fast=False
+                )
+                TrOCRRecognizer._model = VisionEncoderDecoderModel.from_pretrained(
+                    model_name
+                )
+                logger.info(f"✅ Base model loaded as fallback")
+            except Exception as e2:
+                logger.warning(f"⚠️ Online load failed: {e2}. Trying local cache...")
+                TrOCRRecognizer._processor = TrOCRProcessor.from_pretrained(
+                    model_name,
+                    use_fast=False,
+                    local_files_only=True
+                )
+                TrOCRRecognizer._model = VisionEncoderDecoderModel.from_pretrained(
+                    model_name,
+                    local_files_only=True
+                )
+                logger.info(f"✅ Loaded from local cache")
+        
+        # Move to device
+        TrOCRRecognizer._model = TrOCRRecognizer._model.to(TrOCRRecognizer._device)
+        TrOCRRecognizer._model.eval()  # Set to evaluation mode
         
         logger.info("✅ TrOCR model loaded successfully")
     
@@ -321,9 +466,14 @@ class TrOCRRecognizer:
                 return_tensors="pt"
             ).pixel_values.to(TrOCRRecognizer._device)
             
-            # Generate text
+            # Generate text with increased max length for full medicine names
             with torch.no_grad():
-                generated_ids = TrOCRRecognizer._model.generate(pixel_values)
+                generated_ids = TrOCRRecognizer._model.generate(
+                    pixel_values,
+                    max_length=128,
+                    num_beams=5,
+                    early_stopping=True
+                )
             
             # Decode
             text = TrOCRRecognizer._processor.batch_decode(

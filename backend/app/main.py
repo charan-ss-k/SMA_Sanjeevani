@@ -17,6 +17,7 @@ from app.api.routes.routes_medicine_history import router as medicine_history_ro
 from app.api.routes.routes_prescriptions import router as prescriptions_router
 from app.api.routes.routes_qa_history import router as qa_history_router
 from app.api.routes.routes_reminders import router as reminders_router
+from app.api.routes.routes_hospital_reports import router as hospital_reports_router
 from app.services.symptoms_recommendation import router as symptoms_router
 
 # Configure logging
@@ -156,6 +157,8 @@ app.include_router(doctors_router, tags=["Doctors"])
 app.include_router(appointments_router, tags=["Appointments"])
 app.include_router(medicine_history_router, tags=["Medicine History"])
 app.include_router(prescriptions_router, tags=["Prescriptions"])
+app.include_router(hospital_reports_router, tags=["Hospital Reports"])
+logger.info("✅ Hospital Report Analyzer router registered")
 app.include_router(qa_history_router, tags=["QA History"])
 app.include_router(reminders_router, tags=["Reminders"])
 if HAVE_MEDICINE_IDENTIFICATION:

@@ -276,12 +276,19 @@ async def analyze_handwritten_prescription(
         
         logger.debug(f"Image validated. Size: {image.shape}")
         
-        # Run prescription analysis
+        # Run prescription analysis (line-based OCR + LLM)
         logger.info("🏥 Starting prescription analysis pipeline...")
-        from app.services.prescription_analyzer_service import PrescriptionAnalyzerService
+        from app.services.handwritten_prescription_analyzer import HandwrittenPrescriptionAnalyzer
         
-        result = PrescriptionAnalyzerService.analyze_prescription_image(temp_file_path)
+        result = HandwrittenPrescriptionAnalyzer.analyze_handwritten_prescription(temp_file_path)
         
+        # Fail fast on pipeline errors
+        if result.get("status") == "error":
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result.get("error", "Prescription analysis failed")
+            )
+
         # Add user context to result
         if user and user.id != 0:
             result['user_id'] = user.id
@@ -289,7 +296,7 @@ async def analyze_handwritten_prescription(
         
         # Log success
         medicines_count = len(result.get('medicines', []))
-        logger.info(f"✅ Prescription analysis successful. Found {medicines_count} medicines")
+        logger.info(f"✅ Prescription analysis completed. Found {medicines_count} medicines")
         
         return result
         

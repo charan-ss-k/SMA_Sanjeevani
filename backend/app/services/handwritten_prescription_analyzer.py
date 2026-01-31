@@ -6,7 +6,7 @@ Connects the handwritten prescription OCR service with prescription analysis and
 import logging
 from typing import Dict, Any
 
-from app.services.handwritten_prescription_ocr import HandwrittenPrescriptionOCR
+from app.services.hybrid_prescription_ocr import HybridPrescriptionOCR
 from app.services.enhanced_medicine_llm_generator import EnhancedMedicineLLMGenerator
 
 logger = logging.getLogger(__name__)
@@ -34,9 +34,9 @@ class HandwrittenPrescriptionAnalyzer:
         logger.info(f"🏥 Starting handwritten prescription analysis for: {image_path}")
         
         try:
-            # PHASE 1: Extract text using proper line-based OCR
-            logger.info("📝 PHASE 1: Extracting text with line-based TrOCR...")
-            ocr_result = HandwrittenPrescriptionOCR.process_prescription_image(image_path)
+            # PHASE 1: Extract text using hybrid OCR (auto-detects printed vs handwritten)
+            logger.info("📝 PHASE 1: Extracting text with hybrid OCR (auto-detect)...")
+            ocr_result = HybridPrescriptionOCR.process_prescription(image_path)
             
             if ocr_result["status"] != "success":
                 logger.warning(f"⚠️ OCR phase resulted in: {ocr_result['status']}")
@@ -65,9 +65,40 @@ class HandwrittenPrescriptionAnalyzer:
                     "error": "Insufficient text recognized"
                 }
             
-            # PHASE 2: Decipher with LLM
-            logger.info("🧠 PHASE 2: Deciphering prescription with Enhanced Medicine LLM...")
-            deciphered = EnhancedMedicineLLMGenerator.decipher_prescription_text(ocr_text)
+            # PHASE 2: Decipher with LLM (HIGH ACCURACY MODE)
+            logger.info("🧠 PHASE 2: Deciphering prescription with Enhanced Medicine LLM (HIGH ACCURACY)...")
+            
+            # Use medical document parser for better accuracy
+            from app.services.medical_document_parser import MedicalDocumentParser
+            deciphered = MedicalDocumentParser.parse_handwritten_prescription_accurate(
+                ocr_text,
+                max_retries=5,
+                timeout=120  # 2 minutes for accurate parsing
+            )
+
+            if deciphered.get("status") == "error":
+                logger.error(f"❌ LLM deciphering failed: {deciphered.get('error')}")
+                return {
+                    "status": "partial",
+                    "message": "OCR succeeded but LLM deciphering failed",
+                    "ocr_phase": {
+                        "status": "✅ Complete",
+                        "text_lines_detected": len(text_lines),
+                        "ocr_text": ocr_text,
+                        "text_lines": text_lines
+                    },
+                    "llm_phase": {
+                        "status": "❌ Failed",
+                        "error": deciphered.get("error"),
+                        "raw_llm_output": deciphered.get("llm_output", ""),
+                        "generated_at": deciphered.get("generated_at", "")
+                    },
+                    "medicines": [],
+                    "warnings": [
+                        "LLM service is unavailable or failed to respond",
+                        "Please verify the prescription manually"
+                    ]
+                }
             
             medicines = deciphered.get("medicines", [])
             logger.info(f"✅ LLM deciphering found {len(medicines)} medicines")
@@ -129,8 +160,8 @@ class HandwrittenPrescriptionAnalyzer:
         logger.info(f"📥 Received prescription image for analysis: {filename}")
         
         try:
-            # Use OCR service to handle bytes
-            ocr_result = HandwrittenPrescriptionOCR.process_prescription_from_bytes(image_bytes, filename)
+            # Use hybrid OCR service to handle bytes
+            ocr_result = HybridPrescriptionOCR.process_from_bytes(image_bytes, filename)
             
             if ocr_result["status"] != "success":
                 logger.warning(f"⚠️ OCR phase resulted in: {ocr_result['status']}")
@@ -159,6 +190,31 @@ class HandwrittenPrescriptionAnalyzer:
             # Decipher with LLM
             logger.info("🧠 Deciphering prescription with Enhanced Medicine LLM...")
             deciphered = EnhancedMedicineLLMGenerator.decipher_prescription_text(ocr_text)
+
+            if deciphered.get("status") == "error":
+                logger.error(f"❌ LLM deciphering failed: {deciphered.get('error')}")
+                return {
+                    "status": "partial",
+                    "message": "OCR succeeded but LLM deciphering failed",
+                    "uploaded_file": filename,
+                    "ocr_phase": {
+                        "status": "✅ Complete",
+                        "text_lines_detected": len(text_lines),
+                        "ocr_text": ocr_text,
+                        "text_lines": text_lines
+                    },
+                    "llm_phase": {
+                        "status": "❌ Failed",
+                        "error": deciphered.get("error"),
+                        "raw_llm_output": deciphered.get("llm_output", ""),
+                        "generated_at": deciphered.get("generated_at", "")
+                    },
+                    "medicines": [],
+                    "warnings": [
+                        "LLM service is unavailable or failed to respond",
+                        "Please verify the prescription manually"
+                    ]
+                }
             
             medicines = deciphered.get("medicines", [])
             logger.info(f"✅ LLM deciphering found {len(medicines)} medicines")
@@ -199,13 +255,20 @@ class HandwrittenPrescriptionAnalyzer:
     @staticmethod
     def get_service_info() -> Dict[str, Any]:
         """Get comprehensive service information."""
-        ocr_info = HandwrittenPrescriptionOCR.get_service_info()
         
         return {
-            "service_name": "Handwritten Prescription Analysis Service",
-            "description": "Complete pipeline for analyzing handwritten prescriptions with line-based OCR and LLM deciphering",
+            "service_name": "Hybrid Prescription Analysis Service",
+            "description": "Complete pipeline for analyzing printed and handwritten prescriptions with auto-detection and LLM deciphering",
             "phases": {
-                "phase_1_ocr": ocr_info,
+                "phase_1_ocr": {
+                    "name": "Hybrid OCR (Auto-detect)",
+                    "module": "HybridPrescriptionOCR",
+                    "engines": {
+                        "printed": "Tesseract / EasyOCR (fast, accurate for printed text)",
+                        "handwritten": "TrOCR Large (specialized for handwriting)"
+                    },
+                    "capability": "Automatically detects printed vs handwritten and uses optimal OCR"
+                },
                 "phase_2_llm": {
                     "name": "Medicine Extraction with LLM",
                     "module": "EnhancedMedicineLLMGenerator",

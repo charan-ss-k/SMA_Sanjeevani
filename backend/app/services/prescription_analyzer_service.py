@@ -65,8 +65,30 @@ class PrescriptionAnalyzerService:
             
             # Step 3: Decipher messy text using specialized LLM prompt
             logger.info("🧠 Step 3: Deciphering prescription with LLM...")
-            deciphered = EnhancedMedicineLLMGenerator.decipher_prescription_text(ocr_text)
-            logger.info(f"✅ Deciphering complete. Found {len(deciphered.get('medicines', []))} medicines")
+                deciphered = EnhancedMedicineLLMGenerator.decipher_prescription_text(ocr_text)
+
+                if deciphered.get("status") == "error":
+                    logger.error(f"❌ LLM deciphering failed: {deciphered.get('error')}")
+                    return {
+                        "status": "partial",
+                        "message": "OCR succeeded but LLM deciphering failed",
+                        "pipeline": {
+                            "preprocessing": "✅ Complete",
+                            "htr": "✅ Complete",
+                            "llm_deciphering": "❌ Failed"
+                        },
+                        "ocr_text": ocr_text,
+                        "medicines": [],
+                        "raw_llm_output": deciphered.get("llm_output", ""),
+                        "generated_at": deciphered.get("generated_at", ""),
+                        "llm_error": deciphered.get("error"),
+                        "warnings": [
+                            "LLM service is unavailable or failed to respond",
+                            "Please verify the prescription manually"
+                        ]
+                    }
+
+                logger.info(f"✅ Deciphering complete. Found {len(deciphered.get('medicines', []))} medicines")
             
             # Combine all results
             result = {

@@ -12,8 +12,13 @@ import io
 import base64
 import logging
 import tempfile
+import warnings
 from typing import Optional
 import requests
+
+# Suppress FFmpeg warnings from pydub
+logging.getLogger('pydub.utils').setLevel(logging.ERROR)
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='pydub.utils')
 
 logger = logging.getLogger(__name__)
 

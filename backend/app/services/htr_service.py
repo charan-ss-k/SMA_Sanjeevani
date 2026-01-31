@@ -40,8 +40,11 @@ class HTRService:
         try:
             from transformers import TrOCRProcessor, VisionEncoderDecoderModel
             
-            # Load processor
-            processor = TrOCRProcessor.from_pretrained(HTRService.MODEL_NAME)
+            # Load processor (use slow processor for consistent output)
+            processor = TrOCRProcessor.from_pretrained(
+                HTRService.MODEL_NAME,
+                use_fast=False
+            )
             logger.info("✅ TrOCRProcessor loaded")
             
             # Load model

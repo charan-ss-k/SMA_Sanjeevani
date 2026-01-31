@@ -885,9 +885,14 @@ CRITICAL: Return ONLY the JSON array, nothing else. Start with [ and end with ]"
                 )
                 
                 if response.status_code == 200:
-                    return response.json().get('response', '')
+                    response_text = response.json().get('response', '')
+                    if not response_text:
+                        raise RuntimeError("LLM returned empty response")
+                    return response_text
                 else:
-                    logger.warning(f"LLM returned status {response.status_code}")
+                    logger.warning(
+                        f"LLM returned status {response.status_code}: {response.text[:200]}"
+                    )
                     
             except requests.Timeout:
                 logger.warning(f"Timeout on attempt {attempt + 1}/{max_retries}")

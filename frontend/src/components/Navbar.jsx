@@ -62,6 +62,11 @@ const Navbar = ({ language, onLanguageChange }) => {
                 📋 {t('prescription', language)}
               </Link>
             </li>
+            <li>
+              <Link to="/hospital-report" className={getLinkClass('/hospital-report')}>
+                🏥 Report
+              </Link>
+            </li>
             
             {/* More dropdown for secondary items */}
             <li className="relative">
