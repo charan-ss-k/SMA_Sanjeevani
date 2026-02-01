@@ -14,6 +14,10 @@ from .translation_service import (
     translation_service
 )
 
+# Import new translation and TTS services
+from app.services.translation import translate_response
+from app.services.tts import generate_tts_payload as create_tts_payload
+
 logger = logging.getLogger(__name__)
 
 
@@ -349,13 +353,20 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
         fallback_response = _generate_symptom_aware_fallback(symptoms, body.get("age", 30))
         parsed = fallback_response
 
-    # Step 5: Translate response back to user's language if needed
+    # Step 5: Translate Phi-4 English response to user's native language
     if user_language != "english":
-        logger.info(f"Translating response back to {user_language}")
-        parsed = translate_json_response(parsed, user_language)
-        logger.info(f"✅ Response translated to {user_language}")
+        logger.info(f"🔄 Translating Phi-4 response from English → {user_language}")
+        try:
+            # Use new translation service (googletrans - no API key needed)
+            parsed = translate_response(parsed, user_language)
+            logger.info(f"✅ Response successfully translated to {user_language}")
+        except Exception as trans_err:
+            logger.error(f"❌ Translation failed: {trans_err}")
+            logger.warning(f"⚠️ Falling back to old translation service")
+            # Fallback to old translation
+            parsed = translate_json_response(parsed, user_language)
 
-    # Language verification and fallback translation if needed
+    # Language verification (legacy check)
     language = req.language.lower().strip() if req.language else "english"
     if language != "english" and language not in ["en"]:
         # Check if the response seems to be in English (simple heuristic)
@@ -384,9 +395,19 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
     # Apply safety filters
     parsed = safety_rules.sanitize_response(parsed, req.allergies, req.pregnancy_status, req.existing_conditions)
 
-    # Create TTS payload
-    tts = utils.generate_tts_payload(parsed)
-    parsed["tts_payload"] = tts
+    # Step 6: Generate TTS audio in native language
+    logger.info(f"🔊 Generating TTS audio in {user_language}")
+    try:
+        # Use new TTS service (gTTS)
+        tts = create_tts_payload(parsed, user_language)
+        parsed["tts_payload"] = tts
+        logger.info(f"✅ TTS audio generated successfully")
+    except Exception as tts_err:
+        logger.error(f"❌ TTS generation failed: {tts_err}")
+        logger.warning(f"⚠️ Falling back to old TTS method")
+        # Fallback to old TTS
+        tts = utils.generate_tts_payload(parsed)
+        parsed["tts_payload"] = tts
 
     # Ensure disclaimer exists in the correct language
     if "disclaimer" not in parsed or not parsed.get("disclaimer"):

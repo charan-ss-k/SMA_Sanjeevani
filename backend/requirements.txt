@@ -45,6 +45,7 @@ PyJWT>=2.8.0
 bcrypt>=4.0.0
 
 # Translation & Language Support
+googletrans==4.0.0rc1  # Free Google Translate API (no API key needed)
 #indic-trans2>=2.1.0  # For Indic language translation (9+ languages)
 google-cloud-translate>=3.14.0  # Fallback translation API
 langdetect>=1.0.9  # Language detection

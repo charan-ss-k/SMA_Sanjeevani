@@ -42,6 +42,76 @@ const translateValue = (value, language) => {
   return translationMap[langKey]?.[value] || value;
 };
 
+// Translation for UI messages
+const messageTranslations = {
+  english: {
+    doctorsFound: '{count} doctors found',
+    noDoctorsFound: 'No doctors found matching your criteria',
+    appointmentBooked: '✅ Appointment booked successfully! ID: {id}',
+    errorSearching: 'Error searching doctors',
+  },
+  telugu: {
+    doctorsFound: '{count} వైద్యులు దొరికారు',
+    noDoctorsFound: 'మీ ప్రమాణాలకు సరిపోయే వైద్యులు దొరకలేదు',
+    appointmentBooked: '✅ అపాయింట్‌మెంట్ విజయవంతంగా బుక్ చేయబడింది! ID: {id}',
+    errorSearching: 'వైద్యులను శోధించడంలో లోపం',
+  },
+  hindi: {
+    doctorsFound: '{count} डॉक्टर मिले',
+    noDoctorsFound: 'आपके मानदंडों से मेल खाने वाले डॉक्टर नहीं मिले',
+    appointmentBooked: '✅ अपॉइंटमेंट सफलतापूर्वक बुक हो गया! ID: {id}',
+    errorSearching: 'डॉक्टरों की खोज में त्रुटि',
+  },
+  marathi: {
+    doctorsFound: '{count} डॉक्टर सापडले',
+    noDoctorsFound: 'तुमच्या निकषांशी जुळणारे डॉक्टर सापडले नाहीत',
+    appointmentBooked: '✅ भेटीची वेळ यशस्वीरित्या बुक झाली! ID: {id}',
+    errorSearching: 'डॉक्टर शोधण्यात त्रुटी',
+  },
+  bengali: {
+    doctorsFound: '{count} ডাক্তার পাওয়া গেছে',
+    noDoctorsFound: 'আপনার মানদণ্ডের সাথে মিলে এমন ডাক্তার পাওয়া যায়নি',
+    appointmentBooked: '✅ অ্যাপয়েন্টমেন্ট সফলভাবে বুক হয়েছে! ID: {id}',
+    errorSearching: 'ডাক্তার খোঁজার সময় ত্রুটি',
+  },
+  tamil: {
+    doctorsFound: '{count} மருத்துவர்கள் கிடைத்தனர்',
+    noDoctorsFound: 'உங்கள் அளவுகோல்களுக்குப் பொருந்தும் மருத்துவர்கள் இல்லை',
+    appointmentBooked: '✅ சந்திப்பு வெற்றிகரமாக பதிவு செய்யப்பட்டது! ID: {id}',
+    errorSearching: 'மருத்துவர்களைத் தேடுவதில் பிழை',
+  },
+  kannada: {
+    doctorsFound: '{count} ವೈದ್ಯರು ಕಂಡುಬಂದಿದ್ದಾರೆ',
+    noDoctorsFound: 'ನಿಮ್ಮ ಮಾನದಂಡಗಳಿಗೆ ಹೊಂದಿಕೆಯಾಗುವ ವೈದ್ಯರು ಕಂಡುಬಂದಿಲ್ಲ',
+    appointmentBooked: '✅ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಯಶಸ್ವಿಯಾಗಿ ಬುಕ್ ಮಾಡಲಾಗಿದೆ! ID: {id}',
+    errorSearching: 'ವೈದ್ಯರನ್ನು ಹುಡುಕುವಲ್ಲಿ ದೋಷ',
+  },
+  malayalam: {
+    doctorsFound: '{count} ഡോക്ടർമാരെ കണ്ടെത്തി',
+    noDoctorsFound: 'നിങ്ങളുടെ മാനദണ്ഡങ്ങളുമായി പൊരുത്തപ്പെടുന്ന ഡോക്ടർമാരെ കണ്ടെത്തിയില്ല',
+    appointmentBooked: '✅ അപ്പോയിന്റ്മെന്റ് വിജയകരമായി ബുക്ക് ചെയ്തു! ID: {id}',
+    errorSearching: 'ഡോക്ടർമാരെ തിരയുന്നതിൽ പിശക്',
+  },
+  gujarati: {
+    doctorsFound: '{count} ડૉક્ટરો મળ્યા',
+    noDoctorsFound: 'તમારા માપદંડને મેળવતા ડૉક્ટર મળ્યા નથી',
+    appointmentBooked: '✅ મુલાકાત સફળતાપૂર્વક બુક કરાઈ! ID: {id}',
+    errorSearching: 'ડૉક્ટરોને શોધવામાં ભૂલ',
+  },
+};
+
+const translateMessage = (key, language, replacements = {}) => {
+  const langKey = language.toLowerCase();
+  let message = messageTranslations[langKey]?.[key] || messageTranslations.english[key] || key;
+  
+  // Replace placeholders
+  Object.keys(replacements).forEach(placeholder => {
+    message = message.replace(`{${placeholder}}`, replacements[placeholder]);
+  });
+  
+  return message;
+};
+
 const ConsultPage = () => {
   const { language } = useContext(LanguageContext);
   const [isMuted, setIsMuted] = useState(false);
@@ -228,17 +298,19 @@ const ConsultPage = () => {
       if (data.doctors && data.doctors.length > 0) {
         setDoctors(data.doctors);
         setStep('results');
-        const message = t('doctorsFound', language).replace('{count}', data.doctors.length);
+        const message = translateMessage('doctorsFound', language, { count: data.doctors.length });
         setMessage(message);
         if (!isMuted) playTTS(message, language);
       } else {
-        setError('No doctors found matching your criteria');
-        if (!isMuted) playTTS('No doctors found', language);
+        const errorMsg = translateMessage('noDoctorsFound', language);
+        setError(errorMsg);
+        if (!isMuted) playTTS(errorMsg, language);
       }
     } catch (err) {
       console.error('Search error:', err);
-      setError(err.message || 'Error searching doctors');
-      if (!isMuted) playTTS('Error searching doctors', language);
+      const errorMsg = err.message || translateMessage('errorSearching', language);
+      setError(errorMsg);
+      if (!isMuted) playTTS(errorMsg, language);
     } finally {
       setLoading(false);
     }
@@ -330,8 +402,9 @@ const ConsultPage = () => {
       }
       
       if (data.success) {
-        setMessage(`✅ Appointment booked successfully! ID: ${data.appointment_id}`);
-        if (!isMuted) playTTS('Appointment booked successfully', language);
+        const successMsg = translateMessage('appointmentBooked', language, { id: data.appointment_id });
+        setMessage(successMsg);
+        if (!isMuted) playTTS(successMsg, language);
         
         // Reload appointments
         loadAppointments();
