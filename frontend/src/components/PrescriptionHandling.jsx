@@ -6,8 +6,10 @@ import FeatureLoginPrompt from './FeatureLoginPrompt';
 import PrescriptionAnalyzer from './PrescriptionAnalyzer';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
+import { getPrescriptionText } from '../data/prescriptionTranslations';
+import { translateData } from '../data/dataTranslations';
 
-const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language }) => (
+const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language, translateDefaultValue, getFrequencyLabel }) => (
   <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500 hover:shadow-lg transition">
     <div className="flex gap-3 items-start">
       <div className="h-14 w-14 bg-gradient-to-br from-green-100 to-blue-100 rounded-md flex items-center justify-center font-bold text-green-700">
@@ -15,7 +17,11 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language }) => (
       </div>
       <div className="flex-1">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-bold text-gray-800 text-lg">{med.name}</h4>
+          <h4 className="font-bold text-gray-800 text-lg">
+            {med.name === 'Unknown Medicine'
+              ? getPrescriptionText('unknownMedicine', language)
+              : translateData(med.name, 'medicine', language)}
+          </h4>
           <div className="flex items-center gap-1">
             <button onClick={onSpeak} className="p-2 bg-amber-50 rounded hover:bg-amber-100 text-sm">🔊</button>
             <button onClick={onEdit} className="p-2 bg-blue-50 rounded hover:bg-blue-100 text-sm">✏️</button>
@@ -23,14 +29,14 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language }) => (
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
-          <div>💉 <span className="font-semibold">{med.dosage}</span></div>
-          <div>📅 <span className="font-semibold">{med.frequency}</span></div>
-          <div>⏳ <span className="font-semibold">{med.duration}</span></div>
-          <div>📦 <span className="font-semibold">{med.quantity} {t('units', language)}</span></div>
+          <div>💉 <span className="font-semibold text-sm">{getPrescriptionText('dosage', language)}:</span> {translateDefaultValue(med.dosage)}</div>
+          <div>📅 <span className="font-semibold text-sm">{getPrescriptionText('frequency', language)}:</span> {getFrequencyLabel(med.frequency)}</div>
+          <div>⏳ <span className="font-semibold text-sm">{getPrescriptionText('duration', language)}:</span> {translateDefaultValue(med.duration)}</div>
+          <div>📦 <span className="font-semibold text-sm">{med.quantity}</span> {getPrescriptionText('units', language)}</div>
         </div>
         {med.reminders && med.reminders.length > 0 && (
           <div className="mt-2 p-2 bg-green-50 rounded">
-            <div className="text-xs font-semibold text-green-800">{t('reminders', language)}</div>
+            <div className="text-xs font-semibold text-green-800">{getPrescriptionText('reminders', language)}</div>
             <div className="flex flex-wrap gap-1 mt-1">
               {med.reminders.map((r, i) => (
                 <span key={i} className="bg-green-200 text-green-900 px-2 py-1 rounded text-xs font-medium">
@@ -40,7 +46,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language }) => (
             </div>
           </div>
         )}
-        <div className="mt-2 text-xs text-gray-500">📝 {med.notes || 'No notes'}</div>
+        <div className="mt-2 text-xs text-gray-500">📝 {med.notes || getPrescriptionText('noNotes', language)}</div>
       </div>
     </div>
   </div>
@@ -92,6 +98,32 @@ const PrescriptionHandling = () => {
   useEffect(() => {
     localStorage.setItem('prescriptions', JSON.stringify(medicines));
   }, [medicines]);
+
+  const translateDefaultValue = (value) => {
+    if (!value) return value;
+    if (value === 'Unknown Medicine') return getPrescriptionText('unknownMedicine', language);
+    if (value === 'As prescribed') return getPrescriptionText('asPrescribed', language);
+    if (value === 'As per prescription') return getPrescriptionText('asPerPrescription', language);
+    return value;
+  };
+
+  const getFrequencyLabel = (value) => {
+    if (!value) return value;
+    const frequencyKeyMap = {
+      'Once Daily': 'onceDaily',
+      'Twice Daily': 'twiceDaily',
+      'Thrice Daily': 'thriceDaily',
+      'Every 4 hours': 'every4Hours',
+      'Every 6 hours': 'every6Hours',
+      'Every 8 hours': 'every8Hours',
+      'As needed': 'asNeeded',
+      'As per prescription': 'asPerPrescription',
+      'As prescribed': 'asPrescribed',
+    };
+
+    const key = frequencyKeyMap[value];
+    return key ? t(key, language) : translateDefaultValue(value);
+  };
 
   const fetchPrescriptionHistory = async () => {
     try {
@@ -204,7 +236,7 @@ const PrescriptionHandling = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       setAnalyzing(false);
-      setAnalysisError('Analysis cancelled by user');
+      setAnalysisError(t('analysisCancelled', language));
       if (!isMuted) {
         playTTS(t('analysisCancelled', language), language);
       }
@@ -213,7 +245,7 @@ const PrescriptionHandling = () => {
 
   const handleAnalyze = async () => {
     if (!file) {
-      setAnalysisError('Please select an image first');
+      setAnalysisError(getPrescriptionText('selectFileFirst', language));
       return;
     }
 
@@ -243,7 +275,7 @@ const PrescriptionHandling = () => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'Failed to analyze medicine image');
+        throw new Error(errorText || getPrescriptionText('analysisError', language));
       }
 
       const data = await response.json();
@@ -254,14 +286,14 @@ const PrescriptionHandling = () => {
           playTTS(t('analysisComplete', language), language);
         }
       } else {
-        setAnalysisError('No analysis data received');
+        setAnalysisError(getPrescriptionText('noAnalysisData', language));
       }
     } catch (err) {
       if (err.name === 'AbortError') {
-        setAnalysisError('Analysis cancelled');
+        setAnalysisError(t('analysisCancelled', language));
       } else {
         console.error('Analysis error:', err);
-        setAnalysisError(`Failed to analyze medicine: ${err.message}`);
+        setAnalysisError(`${t('analysisFailed', language)}: ${err.message}`);
         if (!isMuted) {
           playTTS(t('analysisFailed', language), language);
         }
@@ -274,7 +306,7 @@ const PrescriptionHandling = () => {
   const handleSpeakAnalysisResult = () => {
     if (!analysisResult) return;
     
-    const text = `${analysisResult.medicine_name || 'Unknown medicine'}. ${
+    const text = `${analysisResult.medicine_name || getPrescriptionText('unknownMedicine', language)}. ${
       analysisResult.dosage ? `${t('dosage', language)}: ${analysisResult.dosage}.` : ''
     } ${analysisResult.full_information || ''}`;
     
@@ -286,12 +318,12 @@ const PrescriptionHandling = () => {
 
     try {
       const prescriptionData = {
-        medicine_name: analysisResult.medicine_name || 'Unknown Medicine',
-        dosage: analysisResult.dosage || 'As prescribed',
-        frequency: 'As per prescription',
-        duration: 'As prescribed',
-        notes: analysisResult.full_information || 'Medicine identified from image',
-        doctor_name: 'AI Medicine Identification',
+        medicine_name: analysisResult.medicine_name || getPrescriptionText('unknownMedicine', language),
+        dosage: analysisResult.dosage || getPrescriptionText('asPrescribed', language),
+        frequency: getPrescriptionText('asPerPrescription', language),
+        duration: getPrescriptionText('asPrescribed', language),
+        notes: analysisResult.full_information || getPrescriptionText('medicineIdentifiedFromImage', language),
+        doctor_name: t('aiMedicineIdentification', language),
         category: analysisResult.category,
         manufacturer: analysisResult.manufacturer,
         price: analysisResult.price,
@@ -314,13 +346,13 @@ const PrescriptionHandling = () => {
       // Also add to local medicines list
       setMedicines(prev => [...prev, {
         id: Date.now(),
-        name: analysisResult.medicine_name || 'Unknown Medicine',
-        dosage: analysisResult.dosage || 'As prescribed',
-        frequency: 'As per prescription',
-        duration: 'As prescribed',
+        name: analysisResult.medicine_name || getPrescriptionText('unknownMedicine', language),
+        dosage: analysisResult.dosage || getPrescriptionText('asPrescribed', language),
+        frequency: getPrescriptionText('asPerPrescription', language),
+        duration: getPrescriptionText('asPrescribed', language),
         quantity: 0,
         reminders: [],
-        notes: analysisResult.full_information || 'Medicine identified from image',
+        notes: analysisResult.full_information || getPrescriptionText('medicineIdentifiedFromImage', language),
       }]);
 
       // Refresh prescription history
@@ -355,7 +387,7 @@ const PrescriptionHandling = () => {
       });
 
       if (response.ok) {
-        setPrescriptionHistory(prev => prev.filter(p => p.id !== id));
+        throw new Error(t('saveFailed', language));
         if (!isMuted) {
           playTTS(t('prescriptionDeleted', language), language);
         }
@@ -379,8 +411,8 @@ const PrescriptionHandling = () => {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-5xl font-bold text-green-800 mb-2">{t('prescriptionMedicineManagement', language)}</h1>
-            <p className="text-xl text-gray-700">{t('uploadTrackReminders', language)}</p>
+            <h1 className="text-5xl font-bold text-green-800 mb-2">{getPrescriptionText('prescriptionManagement', language)}</h1>
+            <p className="text-xl text-gray-700">{getPrescriptionText('managePrescriptions', language)}</p>
           </div>
           <button
             onClick={handleMuteToggle}
@@ -398,11 +430,11 @@ const PrescriptionHandling = () => {
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{t('totalMedicines', language)}</h3>
+            <h3 className="text-sm font-semibold opacity-90">{getPrescriptionText('myMedicines', language)}</h3>
             <p className="text-4xl font-bold mt-2">{stats.totalMedicines}</p>
           </div>
           <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{t('savedPrescriptions', language)}</h3>
+            <h3 className="text-sm font-semibold opacity-90">{getPrescriptionText('prescriptionHistory', language)}</h3>
             <p className="text-4xl font-bold mt-2">{stats.totalPrescriptions}</p>
           </div>
         </div>
@@ -417,7 +449,7 @@ const PrescriptionHandling = () => {
                 : 'border-b-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
-            📋 Manage Prescriptions
+            📋 {getPrescriptionText('managePrescriptions', language)}
           </button>
           <button
             onClick={() => setActiveTab('analyze')}
@@ -427,7 +459,7 @@ const PrescriptionHandling = () => {
                 : 'border-b-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
-            📸 Analyze Handwritten
+            🔍 {getPrescriptionText('analyzePrescription', language)}
           </button>
         </div>
 
@@ -639,12 +671,16 @@ const PrescriptionHandling = () => {
                   <tbody>
                     {prescriptionHistory.map(prescription => (
                       <tr key={prescription.id} className="border-t hover:bg-gray-50">
-                        <td className="px-4 py-3 font-semibold">{prescription.medicine_name}</td>
-                        <td className="px-4 py-3">{prescription.dosage}</td>
-                        <td className="px-4 py-3">{prescription.frequency}</td>
-                        <td className="px-4 py-3">{prescription.duration}</td>
+                        <td className="px-4 py-3 font-semibold">
+                          {prescription.medicine_name === 'Unknown Medicine'
+                            ? getPrescriptionText('unknownMedicine', language)
+                            : translateData(prescription.medicine_name, 'medicine', language)}
+                        </td>
+                        <td className="px-4 py-3">{translateDefaultValue(prescription.dosage)}</td>
+                        <td className="px-4 py-3">{getFrequencyLabel(prescription.frequency)}</td>
+                        <td className="px-4 py-3">{translateDefaultValue(prescription.duration)}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {new Date(prescription.created_at).toLocaleDateString()}
+                          {new Date(prescription.created_at).toLocaleDateString(language === 'english' ? 'en-US' : 'en-IN')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
@@ -704,6 +740,8 @@ const PrescriptionHandling = () => {
                       key={med.id}
                       med={med}
                       language={language}
+                      translateDefaultValue={translateDefaultValue}
+                      getFrequencyLabel={getFrequencyLabel}
                       onDelete={() => handleDeleteMedicine(med.id)}
                       onEdit={() => handleEditMedicine(med)}
                       onSpeak={() => handleSpeakMedicine(med)}
@@ -728,7 +766,7 @@ const PrescriptionHandling = () => {
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      placeholder="e.g., Paracetamol"
+                      placeholder={getPrescriptionText('enterMedicineName', language)}
                       className="w-full p-2 border-2 border-gray-300 rounded focus:border-green-500 focus:outline-none"
                     />
                   </div>
@@ -738,7 +776,7 @@ const PrescriptionHandling = () => {
                       type="text"
                       value={formData.dosage}
                       onChange={(e) => setFormData({...formData, dosage: e.target.value})}
-                      placeholder="e.g., 500mg"
+                      placeholder={getPrescriptionText('enterDosage', language)}
                       className="w-full p-2 border-2 border-gray-300 rounded focus:border-green-500 focus:outline-none"
                     />
                   </div>
@@ -765,7 +803,7 @@ const PrescriptionHandling = () => {
                       type="text"
                       value={formData.duration}
                       onChange={(e) => setFormData({...formData, duration: e.target.value})}
-                      placeholder="e.g., 5 days, 1 week"
+                      placeholder={getPrescriptionText('enterDuration', language)}
                       className="w-full p-2 border-2 border-gray-300 rounded focus:border-green-500 focus:outline-none"
                     />
                   </div>
@@ -775,7 +813,7 @@ const PrescriptionHandling = () => {
                       type="number"
                       value={formData.quantity}
                       onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                      placeholder="e.g., 10"
+                      placeholder={getPrescriptionText('enterQuantity', language)}
                       className="w-full p-2 border-2 border-gray-300 rounded focus:border-green-500 focus:outline-none"
                     />
                   </div>
@@ -785,12 +823,12 @@ const PrescriptionHandling = () => {
                       type="text"
                       value={formData.notes}
                       onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                      placeholder="e.g., Take after food"
+                      placeholder={getPrescriptionText('enterNotes', language)}
                       className="w-full p-2 border-2 border-gray-300 rounded focus:border-green-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Set Reminder Times</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t('setReminderTimes', language)}</label>
                     <div className="flex gap-2 mb-2">
                       <input
                         type="time"

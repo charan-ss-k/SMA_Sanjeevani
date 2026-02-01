@@ -52,10 +52,10 @@ const Contact = () => {
   ];
 
   const socialLinks = [
-    { icon: '📘', name: 'Facebook', color: 'hover:bg-blue-600' },
-    { icon: '🐦', name: 'Twitter', color: 'hover:bg-blue-400' },
-    { icon: '📷', name: 'Instagram', color: 'hover:bg-pink-600' },
-    { icon: '💼', name: 'LinkedIn', color: 'hover:bg-blue-700' },
+    { icon: '📘', titleKey: 'facebook', color: 'hover:bg-blue-600' },
+    { icon: '🐦', titleKey: 'twitter', color: 'hover:bg-blue-400' },
+    { icon: '📷', titleKey: 'instagram', color: 'hover:bg-pink-600' },
+    { icon: '💼', titleKey: 'linkedin', color: 'hover:bg-blue-700' },
   ];
 
   return (
@@ -222,7 +222,7 @@ const Contact = () => {
               <button
                 key={index}
                 className={`bg-gray-200 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${social.color} transform hover:scale-110`}
-                title={social.name}
+                title={t(social.titleKey, language)}
               >
                 {social.icon}
               </button>

@@ -49,12 +49,12 @@ const Navbar = ({ language, onLanguageChange }) => {
             </li>
             <li>
               <Link to="/consult" className={getLinkClass('/consult')}>
-                🏥 Consult
+                🏥 {t('consult', language)}
               </Link>
             </li>
             <li>
               <Link to="/dashboard" className={getLinkClass('/dashboard')}>
-                📊 {t('analysis', language) || 'Analysis'}
+                📊 {t('analysis', language)}
               </Link>
             </li>
             <li>
@@ -64,7 +64,7 @@ const Navbar = ({ language, onLanguageChange }) => {
             </li>
             <li>
               <Link to="/hospital-report" className={getLinkClass('/hospital-report')}>
-                🏥 Report
+                🏥 {t('report', language)}
               </Link>
             </li>
             
@@ -78,7 +78,7 @@ const Navbar = ({ language, onLanguageChange }) => {
                     : 'text-green-800 hover:text-green-900'
                 } hover:bg-amber-50 rounded-md px-4 py-2 flex items-center gap-1 transition-all duration-200`}
               >
-                ⋯ More
+                ⋯ {t('more', language)}
                 <span className="text-xs">▾</span>
               </button>
               

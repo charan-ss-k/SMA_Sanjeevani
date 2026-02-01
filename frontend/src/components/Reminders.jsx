@@ -73,14 +73,14 @@ const Reminders = () => {
               
               // Show notification
               if (Notification.permission === 'granted') {
-                new Notification(`Time to take ${med.name}!`, {
-                  body: `${med.dosage} - ${med.notes}`,
+                new Notification(`${t('timeToTake', language)} ${med.name}!`, {
+                  body: `${t('dosage', language)}: ${med.dosage}${med.notes ? ` • ${med.notes}` : ''}`,
                   icon: '💊',
                 });
               }
               
               if (!isMuted) {
-                speak(`Time to take ${med.name}, ${med.dosage}`, language);
+                speak(`${t('timeToTake', language)} ${med.name}, ${med.dosage}`, language);
               }
             }
           });
@@ -182,7 +182,7 @@ const Reminders = () => {
 
   return (
     <>
-      {!isAuthenticated && <FeatureLoginPrompt featureName="reminders management" />}
+      {!isAuthenticated && <FeatureLoginPrompt featureName={t('remindersManagementFeature', language)} />}
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 pt-24 pb-10">
         <div className="container mx-auto px-4 max-w-7xl">
           
@@ -324,7 +324,7 @@ const Reminders = () => {
                           <div className="font-semibold text-gray-800">{entry.medicine}</div>
                           <div className="text-sm text-gray-600">{entry.dosage}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {entry.date} at {entry.time}
+                            {entry.date} {t('at', language)} {entry.time}
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -334,7 +334,13 @@ const Reminders = () => {
                             entry.status === 'snoozed' ? 'bg-amber-200 text-amber-800' :
                             'bg-blue-200 text-blue-800'
                           }`}>
-                            {entry.status.toUpperCase()}
+                            {entry.status === 'taken'
+                              ? t('statusTaken', language)
+                              : entry.status === 'skipped'
+                              ? t('statusSkipped', language)
+                              : entry.status === 'snoozed'
+                              ? t('statusSnoozed', language)
+                              : t('statusPending', language)}
                           </span>
                           {entry.takenAt && (
                             <span className="text-xs text-gray-500">{entry.takenAt}</span>

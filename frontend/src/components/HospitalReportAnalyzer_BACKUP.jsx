@@ -86,7 +86,7 @@ const HospitalReportAnalyzer = () => {
 
   const analyzeReport = async () => {
     if (!file) {
-      setAnalysisError(getPrescriptionText('selectFileFirst', language));
+      setAnalysisError('Please select an image file first');
       return;
     }
 
@@ -101,28 +101,34 @@ const HospitalReportAnalyzer = () => {
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${apiBase}/api/hospital-report-analyze`, {
+      const response = await fetch(`${apiBase}/api/hospital-reports/analyze`, {
         method: 'POST',
         body: formData,
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         signal: abortControllerRef.current.signal,
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.detail || data.message || 'Analysis failed');
       }
 
-      const result = await response.json();
-      setAnalysisResult(result);
-      playTTS(getPrescriptionText('analysisComplete', language), language);
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        console.log('Analysis was cancelled');
-        setAnalysisError(getPrescriptionText('analysisCancelled', language));
+      setAnalysisResult(data);
+      
+      // Play success sound (if not muted)
+      if (!isMuted) {
+        playTTS('Hospital report analysis complete', language);
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Analysis cancelled');
       } else {
-        console.error('Analysis error:', err);
-        setAnalysisError(err.message || getPrescriptionText('failedToAnalyze', language));
+        console.error('Analysis error:', error);
+        setAnalysisError(error.message);
+        if (!isMuted) {
+          playTTS('Analysis failed. Please try again.', language);
+        }
       }
     } finally {
       setAnalyzing(false);
@@ -133,6 +139,7 @@ const HospitalReportAnalyzer = () => {
   const cancelAnalysis = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      setAnalyzing(false);
     }
   };
 
@@ -141,6 +148,15 @@ const HospitalReportAnalyzer = () => {
     setImagePreview(null);
     setAnalysisResult(null);
     setAnalysisError('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const speakSection = (text, title) => {
+    if (isMuted) return;
+    const content = `${title}: ${text}`;
+    playTTS(content, language);
   };
 
   const refreshHistory = async () => {
@@ -154,15 +170,10 @@ const HospitalReportAnalyzer = () => {
         setHistoryItems(data);
       }
     } catch (e) {
-      console.error('Failed to refresh history:', e);
+      console.error('Failed to load history:', e);
     } finally {
       setHistoryLoading(false);
     }
-  };
-
-  const speakSection = (text, title) => {
-    const announcement = `${title}. ${text}`;
-    playTTS(announcement, language);
   };
 
   const saveReport = async () => {
@@ -170,16 +181,21 @@ const HospitalReportAnalyzer = () => {
 
     setSavingReport(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('structured_data', JSON.stringify(analysisResult.structured_data || {}));
-      formData.append('extracted_text', analysisResult.extracted_text || '');
-      formData.append('report_title', file.name || 'Hospital Report');
+      const payload = {
+        report_title: analysisResult?.structured_data?.hospital_details?.name || file?.name || 'Hospital Report',
+        uploaded_file: file?.name || analysisResult?.uploaded_file || null,
+        ocr_method: analysisResult?.ocr_method || null,
+        extracted_text: analysisResult?.extracted_text || null,
+        structured_data: analysisResult?.structured_data || null,
+      };
 
       const response = await fetch(`${apiBase}/api/hospital-report-history`, {
         method: 'POST',
-        body: formData,
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -191,7 +207,7 @@ const HospitalReportAnalyzer = () => {
       setHistoryItems(prev => [saved, ...prev]);
     } catch (e) {
       console.error('Save report failed:', e);
-      setAnalysisError(e.message || getPrescriptionText('failedToSavePrescription', language));
+      setAnalysisError(e.message || 'Failed to save report');
     } finally {
       setSavingReport(false);
     }
@@ -219,7 +235,7 @@ const HospitalReportAnalyzer = () => {
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h1 className="text-3xl font-bold text-gray-800">
-              🏥 {getPrescriptionText('hospitalReportAnalyzer', language)}
+            🏥 Hospital Report Analyzer
             </h1>
             <button
               onClick={() => setIsMuted(prev => !prev)}
@@ -227,18 +243,18 @@ const HospitalReportAnalyzer = () => {
                 isMuted ? 'bg-gray-200 text-gray-700' : 'bg-green-100 text-green-800'
               }`}
             >
-              {isMuted ? `🔇 ${getPrescriptionText('muted', language)}` : `🔊 ${getPrescriptionText('soundOn', language)}`}
+              {isMuted ? '🔇 Muted' : '🔊 Sound On'}
             </button>
           </div>
           <p className="text-gray-600 mt-2">
-            {getPrescriptionText('uploadTypedPrintedReport', language)}
+            Upload a typed/printed hospital report to extract structured information
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Upload Section */}
           <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">📤 {getPrescriptionText('uploadReport', language)}</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">📤 Upload Report</h2>
 
             {/* Drag & Drop Area */}
             <div
@@ -260,10 +276,10 @@ const HospitalReportAnalyzer = () => {
                 <div className="space-y-3">
                   <div className="text-6xl">📄</div>
                   <p className="text-lg font-semibold text-gray-700">
-                    {getPrescriptionText('dropReportHereOrClick', language)}
+                    Drop hospital report here or click to browse
                   </p>
                   <p className="text-sm text-gray-500">
-                    {getPrescriptionText('supportsJpgPngPdf', language)}
+                    Supports: JPG, PNG, PDF (printed/typed reports)
                   </p>
                 </div>
               )}
@@ -285,83 +301,104 @@ const HospitalReportAnalyzer = () => {
                 className={`flex-1 py-3 rounded-lg font-semibold transition ${
                   !file || analyzing
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
-                {analyzing ? `🔄 ${getPrescriptionText('analyzingReport', language)}` : `🔍 ${getPrescriptionText('analyzeReport', language)}`}
+                {analyzing ? '⏳ Analyzing...' : '🔍 Analyze Report'}
               </button>
+
               {analyzing && (
                 <button
                   onClick={cancelAnalysis}
-                  className="px-4 py-3 rounded-lg font-semibold bg-orange-500 text-white hover:bg-orange-600"
+                  className="px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                 >
-                  ⏸️ {getPrescriptionText('stopAnalysis', language)}
+                  ❌ Cancel
                 </button>
               )}
+
               {file && !analyzing && (
                 <button
                   onClick={clearReport}
-                  className="px-4 py-3 rounded-lg font-semibold bg-red-500 text-white hover:bg-red-600"
+                  className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
                 >
-                  ❌ {getPrescriptionText('clearReport', language)}
+                  🗑️ Clear
                 </button>
               )}
             </div>
 
+            {/* Error Display */}
             {analysisError && (
-              <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg">
-                {analysisError}
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 font-semibold">❌ Analysis Failed</p>
+                <p className="text-red-600 text-sm mt-1">{analysisError}</p>
               </div>
             )}
           </div>
 
           {/* Results Section */}
           <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">📊 {getPrescriptionText('analysisResults', language)}</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">📊 Analysis Results</h2>
+
+            {!analysisResult && !analyzing && (
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-6xl mb-4">📋</div>
+                <p>Upload a hospital report to see results</p>
+              </div>
+            )}
 
             {analyzing && (
-              <div className="bg-gray-100 rounded-lg p-4">
-                <p className="text-gray-600">🔄 {getPrescriptionText('analyzingReport', language)}...</p>
+              <div className="text-center py-12">
+                <div className="animate-spin text-6xl mb-4">⚙️</div>
+                <p className="text-gray-600 font-semibold">Analyzing report...</p>
+                <p className="text-sm text-gray-500 mt-2">This may take 20-30 seconds</p>
               </div>
             )}
 
-            {!analyzing && !analysisResult && !analysisError && (
-              <div className="bg-gray-100 rounded-lg p-4">
-                <p className="text-gray-500">{getPrescriptionText('analysisResultsWillAppearHere', language)}</p>
-              </div>
-            )}
-
-            {analysisResult && (
-              <div className="space-y-4">
-                {/* Extracted Text */}
-                {analysisResult.extracted_text && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-bold text-gray-800 mb-2">📝 {getPrescriptionText('extractedText', language)}</h3>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{analysisResult.extracted_text}</p>
-                  </div>
+            {analysisResult && analysisResult.structured_data && (
+              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                {/* Hospital Details */}
+                {analysisResult.structured_data.hospital_details && Object.keys(analysisResult.structured_data.hospital_details).length > 0 && (
+                  <InfoCard
+                    title="🏥 Hospital Details"
+                    data={analysisResult.structured_data.hospital_details}
+                    onSpeak={speakSection}
+                  />
                 )}
 
-                {/* Structured Data */}
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <h3 className="font-bold text-gray-800 mb-3">📊 {getPrescriptionText('structuredData', language)}</h3>
-
-                {/* Patient Information */}
-                {analysisResult.structured_data.patient && Object.keys(analysisResult.structured_data.patient).length > 0 && (
-                  <InfoCard title={`👤 ${getPrescriptionText('patientInfo', language)}`} data={analysisResult.structured_data.patient} onSpeak={speakSection} language={language} />
+                {/* Patient Details */}
+                {analysisResult.structured_data.patient_details && Object.keys(analysisResult.structured_data.patient_details).length > 0 && (
+                  <InfoCard
+                    title="👤 Patient Information"
+                    data={analysisResult.structured_data.patient_details}
+                    onSpeak={speakSection}
+                  />
                 )}
 
-                {/* Test Results */}
-                {analysisResult.structured_data.test_results && Object.keys(analysisResult.structured_data.test_results).length > 0 && (
-                  <InfoCard title={`🧪 ${getPrescriptionText('testResults', language)}`} data={analysisResult.structured_data.test_results} onSpeak={speakSection} language={language} />
+                {/* Doctor Details */}
+                {analysisResult.structured_data.doctor_details && Object.keys(analysisResult.structured_data.doctor_details).length > 0 && (
+                  <InfoCard
+                    title="👨‍⚕️ Doctor Details"
+                    data={analysisResult.structured_data.doctor_details}
+                    onSpeak={speakSection}
+                  />
+                )}
+
+                {/* Visit Details */}
+                {analysisResult.structured_data.visit_details && Object.keys(analysisResult.structured_data.visit_details).length > 0 && (
+                  <InfoCard
+                    title="📅 Visit Details"
+                    data={analysisResult.structured_data.visit_details}
+                    onSpeak={speakSection}
+                  />
                 )}
 
                 {/* Medicines */}
                 {analysisResult.structured_data.medicines && analysisResult.structured_data.medicines.length > 0 && (
                   <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-gray-800">💊 {getPrescriptionText('medicines', language)}</h3>
+                      <h3 className="font-bold text-gray-800">💊 Prescribed Medicines ({analysisResult.structured_data.medicines.length})</h3>
                       <button
-                        onClick={() => speakSection(JSON.stringify(analysisResult.structured_data.medicines), getPrescriptionText('medicines', language))}
+                        onClick={() => speakSection(JSON.stringify(analysisResult.structured_data.medicines), 'Medicines')}
                         className="p-2 bg-green-100 rounded hover:bg-green-200"
                       >
                         🔊
@@ -379,7 +416,7 @@ const HospitalReportAnalyzer = () => {
                         return (
                         <div key={idx} className="bg-white p-3 rounded border w-full">
                           <div className="font-semibold text-gray-800 wrap-break-word whitespace-normal">
-                            {medName || getPrescriptionText('unnamedMedicine', language)}
+                            {medName || 'Unnamed medicine'}
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600 mt-2 wrap-break-word">
                             {dosage && <div>💉 {dosage}</div>}
@@ -402,10 +439,9 @@ const HospitalReportAnalyzer = () => {
                 {/* Medical Advice */}
                 {analysisResult.structured_data.medical_advice && Object.keys(analysisResult.structured_data.medical_advice).length > 0 && (
                   <InfoCard
-                    title={`💡 ${getPrescriptionText('medicalAdvice', language)}`}
+                    title="💡 Medical Advice"
                     data={analysisResult.structured_data.medical_advice}
                     onSpeak={speakSection}
-                    language={language}
                   />
                 )}
 
@@ -419,12 +455,11 @@ const HospitalReportAnalyzer = () => {
                         savingReport ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
                     >
-                      {savingReport ? `💾 ${getPrescriptionText('saving', language)}` : `💾 ${getPrescriptionText('saveReportToHistory', language)}`}
+                      {savingReport ? '💾 Saving...' : '💾 Save Report to History'}
                     </button>
                   </div>
                 )}
               </div>
-            </div>
             )}
           </div>
         </div>
@@ -433,21 +468,21 @@ const HospitalReportAnalyzer = () => {
         <div className="mt-8">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">📚 {getPrescriptionText('reportHistory', language)}</h2>
+              <h2 className="text-xl font-bold text-gray-800">📚 Report History</h2>
               <button
                 onClick={refreshHistory}
                 className="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
               >
-                🔄 {getPrescriptionText('refresh', language)}
+                🔄 Refresh
               </button>
             </div>
 
             {historyLoading && (
-              <div className="text-gray-500">{getPrescriptionText('loadingHistory', language)}</div>
+              <div className="text-gray-500">Loading history...</div>
             )}
 
             {!historyLoading && historyItems.length === 0 && (
-              <div className="text-gray-500">{getPrescriptionText('noSavedReportsYet', language)}</div>
+              <div className="text-gray-500">No saved reports yet. Save one to see it here.</div>
             )}
 
             <div className="space-y-3">
@@ -456,54 +491,70 @@ const HospitalReportAnalyzer = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="font-semibold text-gray-800">
-                        {item.report_title || item.uploaded_file || getPrescriptionText('hospitalReport', language)}
+                        {item.report_title || item.uploaded_file || 'Hospital Report'}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        {getPrescriptionText('saved', language)}: {new Date(item.created_at).toLocaleString()}
+                        Saved: {new Date(item.created_at).toLocaleString()}
                       </div>
                       <div className="text-sm text-gray-600 mt-2">
-                        {getPrescriptionText('medicines', language)}: {(item.structured_data?.medicines || []).length}
+                        Medicines: {(item.structured_data?.medicines || []).length}
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setExpandedHistoryId(expandedHistoryId === item.id ? null : item.id)}
-                        className="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
+                        className="px-3 py-2 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 transition whitespace-nowrap"
                       >
-                        {expandedHistoryId === item.id ? `▲ ${getPrescriptionText('hideDetails', language)}` : `▼ ${getPrescriptionText('viewDetails', language)}`}
+                        {expandedHistoryId === item.id ? '📖 Collapse' : '📖 Expand'}
                       </button>
                       <button
                         onClick={() => deleteHistoryItem(item.id)}
-                        className="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
+                        className="px-3 py-2 rounded-md bg-red-100 text-red-700 hover:bg-red-200 transition"
                       >
-                        🗑️ {getPrescriptionText('deleteReport', language)}
+                        🗑️ Delete
                       </button>
                     </div>
                   </div>
 
-                  {/* Expanded Details */}
-                  {expandedHistoryId === item.id && (
-                    <div className="mt-4 space-y-3">
-                      {/* Patient Information */}
-                      {item.structured_data.patient && Object.keys(item.structured_data.patient).length > 0 && (
+                  {/* Expanded Report View */}
+                  {expandedHistoryId === item.id && item.structured_data && (
+                    <div className="mt-4 pt-4 border-t border-gray-300 space-y-3">
+                      {/* Hospital Details */}
+                      {item.structured_data.hospital_details && Object.keys(item.structured_data.hospital_details).length > 0 && (
                         <ExpandedInfoSection
-                          title={`👤 ${getPrescriptionText('patientInfo', language)}`}
-                          data={item.structured_data.patient}
+                          title="🏥 Hospital Details"
+                          data={item.structured_data.hospital_details}
                         />
                       )}
 
-                      {/* Test Results */}
-                      {item.structured_data.test_results && Object.keys(item.structured_data.test_results).length > 0 && (
+                      {/* Patient Details */}
+                      {item.structured_data.patient_details && Object.keys(item.structured_data.patient_details).length > 0 && (
                         <ExpandedInfoSection
-                          title={`🧪 ${getPrescriptionText('testResults', language)}`}
-                          data={item.structured_data.test_results}
+                          title="👤 Patient Information"
+                          data={item.structured_data.patient_details}
+                        />
+                      )}
+
+                      {/* Doctor Details */}
+                      {item.structured_data.doctor_details && Object.keys(item.structured_data.doctor_details).length > 0 && (
+                        <ExpandedInfoSection
+                          title="👨‍⚕️ Doctor Details"
+                          data={item.structured_data.doctor_details}
+                        />
+                      )}
+
+                      {/* Visit Details */}
+                      {item.structured_data.visit_details && Object.keys(item.structured_data.visit_details).length > 0 && (
+                        <ExpandedInfoSection
+                          title="📅 Visit Details"
+                          data={item.structured_data.visit_details}
                         />
                       )}
 
                       {/* Medicines */}
                       {item.structured_data.medicines && item.structured_data.medicines.length > 0 && (
                         <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                          <h4 className="font-bold text-gray-800 mb-2">💊 {getPrescriptionText('medicines', language)}</h4>
+                          <h4 className="font-bold text-gray-800 mb-2">💊 Prescribed Medicines</h4>
                           <div className="space-y-2">
                             {item.structured_data.medicines.map((med, idx) => {
                               const medName = med.medicine_name || med.name || med.medicine || med.drug_name || med.item_name || '';
@@ -514,9 +565,9 @@ const HospitalReportAnalyzer = () => {
                               const instructions = med.special_instructions || med.instructions || med.note || '';
 
                               return (
-                                <div key={idx} className="bg-white p-2 rounded border text-xs">
-                                  <div className="font-semibold text-gray-700 text-sm">
-                                    {medName || getPrescriptionText('unnamedMedicine', language)}
+                                <div key={idx} className="bg-white p-3 rounded border text-sm">
+                                  <div className="font-semibold text-gray-800 wrap-break-word">
+                                    {medName || 'Unnamed medicine'}
                                   </div>
                                   <div className="grid grid-cols-2 gap-2 text-gray-600 mt-2 text-xs">
                                     {dosage && <div>💉 {dosage}</div>}
@@ -539,7 +590,7 @@ const HospitalReportAnalyzer = () => {
                       {/* Medical Advice */}
                       {item.structured_data.medical_advice && Object.keys(item.structured_data.medical_advice).length > 0 && (
                         <ExpandedInfoSection
-                          title={`💡 ${getPrescriptionText('medicalAdvice', language)}`}
+                          title="💡 Medical Advice"
                           data={item.structured_data.medical_advice}
                         />
                       )}
@@ -556,7 +607,7 @@ const HospitalReportAnalyzer = () => {
 };
 
 // Reusable Info Card Component
-const InfoCard = ({ title, data, onSpeak, language }) => {
+const InfoCard = ({ title, data, onSpeak }) => {
   const dataString = Object.entries(data)
     .map(([key, value]) => `${key}: ${value}`)
     .join(', ');
