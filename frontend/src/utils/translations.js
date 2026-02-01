@@ -413,6 +413,19 @@ export const translations = {
     timeToTakeMedicine: 'Time to take your medicine',
     stopAlarm: 'Stop Alarm',
     
+    // Appointment Notifications
+    appointmentReminder: 'Appointment Reminder',
+    urgentReminder: 'Urgent Reminder',
+    appointmentNow: 'Appointment Now',
+    appointmentIn30Minutes: 'Appointment in 30 Minutes',
+    appointmentIn5Minutes: 'Appointment in 5 Minutes',
+    doctorAppointment: 'Doctor Appointment',
+    yourAppointmentWith: 'Your appointment with',
+    isIn: 'is in',
+    minutes: 'minutes',
+    isNow: 'is now',
+    specialization: 'Specialization',
+    
     // AuthModal & LoginSignup
     sanjeevani: 'Sanjeevani',
     yourPersonalHealthAssistant: 'Your Personal Health Assistant',
@@ -785,6 +798,19 @@ export const translations = {
     delete: 'తొలగించు',
     edit: 'సవరించు',
     close: 'మూసివేయి',
+    
+    // Appointment Notifications
+    appointmentReminder: 'అపాయింట్‌మెంట్ రిమైండర్',
+    urgentReminder: 'అత్యవసర రిమైండర్',
+    appointmentNow: 'అపాయింట్‌మెంట్ ఇప్పుడు',
+    appointmentIn30Minutes: '30 నిమిషాల్లో అపాయింట్‌మెంట్',
+    appointmentIn5Minutes: '5 నిమిషాల్లో అపాయింట్‌మెంట్',
+    doctorAppointment: 'డాక్టర్ అపాయింట్‌మెంట్',
+    yourAppointmentWith: 'మీ అపాయింట్‌మెంట్',
+    isIn: 'లో ఉంది',
+    minutes: 'నిమిషాలు',
+    isNow: 'ఇప్పుడు ఉంది',
+    specialization: 'స్పెషలైజేషన్',
     
     // Medicine Recommendation
     selectSymptoms: 'లక్షణాలను ఎంచుకోండి',
@@ -1360,6 +1386,19 @@ export const translations = {
     delete: 'हटाएं',
     edit: 'संपादित करें',
     close: 'बंद करें',
+    
+    // Appointment Notifications
+    appointmentReminder: 'अपॉइंटमेंट रिमाइंडर',
+    urgentReminder: 'तत्काल रिमाइंडर',
+    appointmentNow: 'अपॉइंटमेंट अभी',
+    appointmentIn30Minutes: '30 मिनट में अपॉइंटमेंट',
+    appointmentIn5Minutes: '5 मिनट में अपॉइंटमेंट',
+    doctorAppointment: 'डॉक्टर अपॉइंटमेंट',
+    yourAppointmentWith: 'आपकी अपॉइंटमेंट',
+    isIn: 'में है',
+    minutes: 'मिनट',
+    isNow: 'अभी है',
+    specialization: 'विशेषज्ञता',
     
     // Medicine Recommendation
     selectSymptoms: 'लक्षण चुनें',

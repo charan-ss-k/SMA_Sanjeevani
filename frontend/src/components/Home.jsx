@@ -6,6 +6,7 @@ import { t } from '../utils/translations';
 import DashboardAppointments from './DashboardAppointments';
 import DashboardAnalytics from './DashboardAnalytics';
 import ReminderNotification from './ReminderNotification';
+import AppointmentNotification from './AppointmentNotification';
 
 const Home = () => {
   const { language } = useContext(LanguageContext);
@@ -242,6 +243,9 @@ const Home = () => {
             
             {/* Reminder Notification (Global) */}
             <ReminderNotification />
+            
+            {/* Appointment Notification (Global) */}
+            <AppointmentNotification />
           </>
         ) : (
           <>
