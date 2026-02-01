@@ -8,6 +8,10 @@ const DashboardAppointments = ({ language = 'en' }) => {
   const activeLanguage = contextLanguage || language;
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingAppointment, setEditingAppointment] = useState(null);
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   useEffect(() => {
     loadAppointments();
@@ -101,25 +105,75 @@ const DashboardAppointments = ({ language = 'en' }) => {
   };
 
   const rescheduleAppointment = (appointment) => {
-    const newDate = prompt('Enter new appointment date (YYYY-MM-DD):');
-    if (newDate) {
-      const updated = appointments.map(apt => 
-        apt.doctor_id === appointment.doctor_id 
-          ? { ...apt, appointment_date: newDate }
-          : apt
-      );
-      setAppointments(updated);
+    // Open edit modal
+    setEditingAppointment(appointment);
+    
+    // Parse current date and time
+    const aptDate = new Date(appointment.appointment_date);
+    const dateStr = aptDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    setEditDate(dateStr);
+    setEditTime(appointment.appointment_time || '');
+    setEditNotes(appointment.notes || '');
+  };
 
-      const allAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
-      const updatedAll = allAppointments.map(apt =>
-        apt.doctor_id === appointment.doctor_id
-          ? { ...apt, appointment_date: newDate }
-          : apt
-      );
-      localStorage.setItem('userAppointments', JSON.stringify(updatedAll));
-
-      playTTS('Appointment rescheduled successfully', language);
+  const handleSaveEdit = async () => {
+    if (!editingAppointment) return;
+    
+    if (!editDate || !editTime) {
+      alert('Please provide both date and time');
+      return;
     }
+
+    try {
+      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+      const token = localStorage.getItem('access_token');
+      
+      console.log('✏️ Updating appointment:', editingAppointment.id);
+      
+      const response = await fetch(`${apiBase}/api/appointments/appointment/${editingAppointment.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          appointment_date: editDate,
+          appointment_time: editTime,
+          notes: editNotes
+        })
+      });
+      
+      const data = await response.json();
+      console.log('📤 Update response:', response.status, data);
+      
+      if (response.ok) {
+        // Reload appointments to get fresh data
+        await loadAppointments();
+        
+        // Close modal
+        setEditingAppointment(null);
+        setEditDate('');
+        setEditTime('');
+        setEditNotes('');
+        
+        playTTS('Appointment updated successfully', activeLanguage);
+        console.log('✅ Appointment updated successfully');
+      } else {
+        const errorMsg = data.detail || 'Failed to update appointment';
+        throw new Error(errorMsg);
+      }
+    } catch (error) {
+      console.error('❌ Error updating appointment:', error);
+      playTTS(`Error: ${error.message}`, activeLanguage);
+      alert(`Failed to update appointment: ${error.message}`);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAppointment(null);
+    setEditDate('');
+    setEditTime('');
+    setEditNotes('');
   };
 
   if (loading) {
@@ -164,21 +218,86 @@ const DashboardAppointments = ({ language = 'en' }) => {
 
                 <div className="apt-actions">
                   <button
-                    className="apt-btn reschedule"
+                    className="apt-btn edit"
                     onClick={() => rescheduleAppointment(apt)}
+                    title="Edit appointment"
                   >
-                    {t('reschedule', activeLanguage)}
+                    ✏️ {t('edit', activeLanguage)}
                   </button>
                   <button
-                    className="apt-btn cancel"
+                    className="apt-btn delete"
                     onClick={() => cancelAppointment(apt)}
+                    title="Delete appointment"
                   >
-                    {t('cancel', activeLanguage)}
+                    🗑️ {t('delete', activeLanguage)}
                   </button>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Edit Appointment Modal */}
+      {editingAppointment && (
+        <div className="modal-overlay" onClick={handleCancelEdit}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>✏️ Edit Appointment</h3>
+              <button className="modal-close" onClick={handleCancelEdit}>✕</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="modal-info">
+                <p><strong>👨‍⚕️ Doctor:</strong> {editingAppointment.doctor_name}</p>
+                <p><strong>🏥 Hospital:</strong> {editingAppointment.hospital_name}</p>
+                <p><strong>📍 Location:</strong> {editingAppointment.locality}, {editingAppointment.city}</p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-date">📅 Appointment Date</label>
+                <input
+                  id="edit-date"
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-time">⏰ Appointment Time</label>
+                <input
+                  id="edit-time"
+                  type="time"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-notes">📝 Notes (Optional)</label>
+                <textarea
+                  id="edit-notes"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  rows="3"
+                  placeholder="Add any special notes or requirements..."
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="modal-btn cancel-btn" onClick={handleCancelEdit}>
+                Cancel
+              </button>
+              <button className="modal-btn save-btn" onClick={handleSaveEdit}>
+                💾 Save Changes
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -280,6 +399,15 @@ const DashboardAppointments = ({ language = 'en' }) => {
           background: #1565c0;
         }
 
+        .apt-btn.edit {
+          background: #1976d2;
+          color: white;
+        }
+
+        .apt-btn.edit:hover {
+          background: #1565c0;
+        }
+
         .apt-btn.cancel {
           background: #ffebee;
           color: #dc3545;
@@ -287,6 +415,173 @@ const DashboardAppointments = ({ language = 'en' }) => {
 
         .apt-btn.cancel:hover {
           background: #ffcdd2;
+        }
+
+        .apt-btn.delete {
+          background: #ffebee;
+          color: #dc3545;
+        }
+
+        .apt-btn.delete:hover {
+          background: #ffcdd2;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .modal-content {
+          background: white;
+          border-radius: 12px;
+          max-width: 600px;
+          width: 90%;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+          animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px 24px;
+          border-bottom: 2px solid #e0e0e0;
+        }
+
+        .modal-header h3 {
+          margin: 0;
+          color: #333;
+          font-size: 1.3rem;
+        }
+
+        .modal-close {
+          background: none;
+          border: none;
+          font-size: 1.5rem;
+          color: #666;
+          cursor: pointer;
+          padding: 5px 10px;
+          line-height: 1;
+          transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+          color: #dc3545;
+        }
+
+        .modal-body {
+          padding: 24px;
+        }
+
+        .modal-info {
+          background: #f5f5f5;
+          padding: 15px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+        }
+
+        .modal-info p {
+          margin: 8px 0;
+          color: #555;
+          font-size: 0.95rem;
+        }
+
+        .form-group {
+          margin-bottom: 20px;
+        }
+
+        .form-group label {
+          display: block;
+          margin-bottom: 8px;
+          color: #333;
+          font-weight: 600;
+          font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+          width: 100%;
+          padding: 12px;
+          border: 2px solid #e0e0e0;
+          border-radius: 8px;
+          font-size: 1rem;
+          transition: border-color 0.2s;
+          box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+          outline: none;
+          border-color: #1976d2;
+        }
+
+        .form-group textarea {
+          resize: vertical;
+          font-family: inherit;
+        }
+
+        .modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+          padding: 20px 24px;
+          border-top: 2px solid #e0e0e0;
+        }
+
+        .modal-btn {
+          padding: 12px 24px;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-size: 0.95rem;
+        }
+
+        .cancel-btn {
+          background: #f5f5f5;
+          color: #666;
+        }
+
+        .cancel-btn:hover {
+          background: #e0e0e0;
+        }
+
+        .save-btn {
+          background: #1976d2;
+          color: white;
+        }
+
+        .save-btn:hover {
+          background: #1565c0;
         }
 
         @media (max-width: 768px) {

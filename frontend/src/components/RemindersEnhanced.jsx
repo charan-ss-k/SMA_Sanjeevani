@@ -22,12 +22,13 @@ const RemindersEnhanced = () => {
   const { language } = useContext(LanguageContext);
   
   // Medicine Management State
+  const [reminders, setReminders] = useState([]);
   const [medicines, setMedicines] = useState([]);
   const [showAddMedicine, setShowAddMedicine] = useState(false);
   const [medicineForm, setMedicineForm] = useState({
     name: '',
     dosage: '',
-    frequency: '',
+    frequency: 'Once Daily',
     duration: '',
     quantity: '',
     reminderTimes: [''],
@@ -43,13 +44,37 @@ const RemindersEnhanced = () => {
   // Fetch medicines from database
   useEffect(() => {
     if (isAuthenticated) {
-      fetchMedicines();
+      fetchReminders();
     }
   }, [isAuthenticated]);
 
-  const fetchMedicines = async () => {
+  const buildMedicineGroups = (items) => {
+    const grouped = new Map();
+    items.forEach((item) => {
+      const quantity = item.quantity || item.days?.quantity || '';
+      const key = `${item.medicine_name}||${item.dosage}||${item.frequency}||${quantity}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          id: key,
+          medicine_name: item.medicine_name,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          duration: item.duration,
+          quantity,
+          reminder_times: [],
+          reminder_ids: [],
+        });
+      }
+      const entry = grouped.get(key);
+      entry.reminder_times.push(item.reminder_time);
+      entry.reminder_ids.push(item.id);
+    });
+    return Array.from(grouped.values());
+  };
+
+  const fetchReminders = async () => {
     try {
-      const response = await fetch('/api/prescriptions/', {
+      const response = await fetch('/api/reminders/', {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -57,7 +82,8 @@ const RemindersEnhanced = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setMedicines(data);
+        setReminders(data);
+        setMedicines(buildMedicineGroups(data));
       }
     } catch (error) {
       console.error('Failed to fetch medicines:', error);
@@ -99,36 +125,50 @@ const RemindersEnhanced = () => {
   // Save medicine with reminders
   const handleSaveMedicine = async () => {
     try {
-      const medicineData = {
-        medicine_name: medicineForm.name,
-        dosage: medicineForm.dosage,
-        frequency: medicineForm.frequency,
-        duration: medicineForm.duration,
-        quantity: medicineForm.quantity,
-        notes: medicineForm.notes,
-        reminder_times: medicineForm.reminderTimes.filter(t => t), // Remove empty times
-        doctor_name: 'Self-added',
-        hospital: 'Self-added'
-      };
+      const name = medicineForm.name?.trim();
+      const dosage = medicineForm.dosage?.trim();
+      const frequency = medicineForm.frequency?.trim();
+      const reminderTimes = medicineForm.reminderTimes.filter(t => t);
 
-      const response = await fetch('/api/prescriptions/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify(medicineData)
+      if (!name || !dosage || !frequency || reminderTimes.length === 0) {
+        alert('Please fill all required fields and at least one reminder time.');
+        return;
+      }
+
+      const reminderPayloads = reminderTimes.map((time) => {
+        const payload = {
+          medicine_name: name,
+          dosage,
+          reminder_time: time,
+          frequency,
+          days: null,
+          quantity: medicineForm.quantity || null,
+        };
+        return payload;
       });
 
-      if (response.ok) {
-        const newMedicine = await response.json();
-        setMedicines(prev => [...prev, newMedicine]);
+      const responses = await Promise.all(
+        reminderPayloads.map((payload) =>
+          fetch('/api/reminders/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(payload)
+          })
+        )
+      );
+
+      const failed = responses.find((res) => !res.ok);
+
+      if (!failed) {
         
         // Reset form
         setMedicineForm({
           name: '',
           dosage: '',
-          frequency: '',
+          frequency: 'Once Daily',
           duration: '',
           quantity: '',
           reminderTimes: [''],
@@ -141,7 +181,20 @@ const RemindersEnhanced = () => {
         }
         
         // Refresh medicines
-        fetchMedicines();
+        fetchReminders();
+      } else {
+        let errorMessage = 'Unable to save reminder. Please check your inputs.';
+        try {
+          const errorBody = await failed.json();
+          if (errorBody?.detail) {
+            errorMessage = Array.isArray(errorBody.detail)
+              ? errorBody.detail.map((d) => d.msg).join(' | ')
+              : errorBody.detail;
+          }
+        } catch (err) {
+          console.error('Failed to parse error response:', err);
+        }
+        alert(errorMessage);
       }
     } catch (error) {
       console.error('Failed to save medicine:', error);
@@ -153,18 +206,30 @@ const RemindersEnhanced = () => {
     if (!confirm(t('confirmDeleteMedicine', language))) return;
     
     try {
-      const response = await fetch(`/api/prescriptions/${medicineId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      });
+      const target = medicines.find((m) => m.id === medicineId);
+      if (!target || !target.reminder_ids) {
+        return;
+      }
 
-      if (response.ok) {
+      const responses = await Promise.all(
+        target.reminder_ids.map((id) =>
+          fetch(`/api/reminders/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+        )
+      );
+
+      const allOk = responses.every((res) => res.ok || res.status === 204);
+
+      if (allOk) {
         setMedicines(prev => prev.filter(m => m.id !== medicineId));
         if (!isMuted) {
           playTTS(t('medicineDeleted', language), language);
         }
+        fetchReminders();
       }
     } catch (error) {
       console.error('Failed to delete medicine:', error);
@@ -180,17 +245,16 @@ const RemindersEnhanced = () => {
       const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       
       const upcoming = [];
-      medicines.forEach(med => {
-        if (med.reminder_times && Array.isArray(med.reminder_times)) {
-          med.reminder_times.forEach(reminder => {
-            if (reminder === currentTime) {
-              upcoming.push(med);
+      reminders.forEach(reminder => {
+        if (reminder.reminder_time === currentTime) {
+          upcoming.push(reminder);
               
               // Add to reminder history
               const historyEntry = {
                 id: Date.now(),
-                medicine: med.medicine_name,
-                dosage: med.dosage,
+                medicine: reminder.medicine_name,
+                dosage: reminder.dosage,
+                quantity: reminder.quantity || reminder.days?.quantity,
                 time: currentTime,
                 date: now.toLocaleDateString(),
                 status: 'pending',
@@ -199,17 +263,17 @@ const RemindersEnhanced = () => {
               
               // Show notification
               if (Notification.permission === 'granted') {
-                new Notification(`${t('timeToTake', language)} ${med.medicine_name}!`, {
-                  body: `${t('dosage', language)}: ${med.dosage}`,
+                const qtyText = historyEntry.quantity ? ` • ${t('quantity', language)}: ${historyEntry.quantity}` : '';
+                new Notification(`${t('timeToTake', language)} ${reminder.medicine_name}!`, {
+                  body: `${t('dosage', language)}: ${reminder.dosage}${qtyText}`,
                   icon: '💊',
                 });
               }
               
               if (!isMuted) {
-                speak(`${t('timeToTake', language)} ${med.medicine_name}, ${med.dosage}`, language);
+                const qtyText = historyEntry.quantity ? `, ${t('quantity', language)} ${historyEntry.quantity}` : '';
+                speak(`${t('timeToTake', language)} ${reminder.medicine_name}, ${t('dosage', language)} ${reminder.dosage}${qtyText}`, language);
               }
-            }
-          });
         }
       });
       
@@ -226,7 +290,7 @@ const RemindersEnhanced = () => {
     checkReminders();
     const interval = setInterval(checkReminders, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, [medicines, isMuted, language, isAuthenticated]);
+  }, [reminders, isMuted, language, isAuthenticated]);
 
   const handleMuteToggle = () => {
     setIsMuted(!isMuted);
@@ -251,7 +315,7 @@ const RemindersEnhanced = () => {
     
     // Update reminder history
     setReminderHistory(prev => prev.map(entry => {
-      if (entry.medicine === med.medicine_name && entry.status === 'pending') {
+      if (entry.medicine === med.medicine_name && entry.time === med.reminder_time && entry.status === 'pending') {
         return { ...entry, status: 'taken', takenAt: now };
       }
       return entry;
@@ -333,7 +397,12 @@ const RemindersEnhanced = () => {
                           </button>
                         </div>
                         <p className="text-sm text-gray-600">{med.dosage}</p>
-                        <p className="text-xs text-gray-500">{med.frequency} • {med.duration}</p>
+                        {med.quantity && (
+                          <p className="text-sm text-gray-600">{t('quantity', language)}: {med.quantity}</p>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          {med.frequency}{med.duration ? ` • ${med.duration}` : ''}
+                        </p>
                         {med.reminder_times && med.reminder_times.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {med.reminder_times.map((time, i) => (
@@ -523,6 +592,11 @@ const RemindersEnhanced = () => {
                     <div className="flex-1">
                       <div className="font-bold text-lg text-gray-800">{med.medicine_name}</div>
                       <div className="text-sm text-gray-600">{med.dosage}</div>
+                      {(med.quantity || med.days?.quantity) && (
+                        <div className="text-sm text-gray-600">
+                          {t('quantity', language)}: {med.quantity || med.days?.quantity}
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => handleMarkTaken(med)}
@@ -557,6 +631,11 @@ const RemindersEnhanced = () => {
                           <div>
                             <div className="font-semibold text-gray-800">{m.medicine_name}</div>
                             <div className="text-sm text-gray-600">{m.dosage}</div>
+                            {(m.quantity || m.days?.quantity) && (
+                              <div className="text-sm text-gray-600">
+                                {t('quantity', language)}: {m.quantity || m.days?.quantity}
+                              </div>
+                            )}
                           </div>
                           <div className="text-xs text-gray-500">{m.takenAt}</div>
                         </div>
@@ -593,6 +672,11 @@ const RemindersEnhanced = () => {
                         <div>
                           <div className="font-semibold text-gray-800">{entry.medicine}</div>
                           <div className="text-sm text-gray-600">{entry.dosage}</div>
+                          {entry.quantity && (
+                            <div className="text-sm text-gray-600">
+                              {t('quantity', language)}: {entry.quantity}
+                            </div>
+                          )}
                           <div className="text-xs text-gray-500 mt-1">
                             {entry.date} {t('at', language)} {entry.time}
                           </div>
@@ -630,6 +714,9 @@ const RemindersEnhanced = () => {
                         <div className="flex-1">
                           <h4 className="font-bold text-gray-800">{med.medicine_name}</h4>
                           <p className="text-sm text-gray-600">{med.dosage}</p>
+                          {med.quantity && (
+                            <p className="text-sm text-gray-600">{t('quantity', language)}: {med.quantity}</p>
+                          )}
                           <div className="mt-2 flex flex-wrap gap-1">
                             {med.reminder_times.map((time, i) => (
                               <span key={i} className="bg-blue-200 text-blue-900 px-2 py-1 rounded text-xs font-medium">

@@ -390,6 +390,29 @@ export const translations = {
     todaysReminders: 'Today\'s Reminders',
     clearHistory: 'Clear History',
     
+    // Dashboard Analytics
+    healthDashboard: 'Health Dashboard',
+    medicines: 'Medicines',
+    remindersToday: 'Reminders Today',
+    upcomingAppointments: 'Upcoming',
+    chatHistory: 'Chat History',
+    totalReminders: 'Total Reminders',
+    totalAppointments: 'Total Appointments',
+    quickSummary: 'Quick Summary',
+    youHave: 'You have',
+    activeMedicines: 'active medicines',
+    remindersSet: 'reminders set',
+    upcomingAppointmentsText: 'upcoming appointments',
+    youHaveAsked: 'You have asked',
+    healthQuestions: 'health questions',
+    healthTip: 'Health Tip',
+    stayConsistentWithMedication: 'Remember to take your medicines on time every day for best results!',
+    
+    // Reminder Notifications
+    medicineReminder: 'Medicine Reminder!',
+    timeToTakeMedicine: 'Time to take your medicine',
+    stopAlarm: 'Stop Alarm',
+    
     // AuthModal & LoginSignup
     sanjeevani: 'Sanjeevani',
     yourPersonalHealthAssistant: 'Your Personal Health Assistant',
@@ -541,7 +564,7 @@ export const translations = {
     yourAppointments: '📅 Your Appointments',
     noUpcomingAppointments: 'No upcoming appointments. Book one to get started!',
     yourReminders: '🔔 Your Reminders',
-    noRemindersYet: 'No reminders yet. Book an appointment to receive reminders!',
+    noRemindersYet: 'No medicine reminders yet. Add medicines in the Reminders page!',
     loadingAppointments: 'Loading appointments...',
     loadingReminders: 'Loading reminders...',
     reschedule: 'Reschedule',

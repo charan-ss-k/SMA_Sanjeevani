@@ -12,9 +12,9 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# CSV path - now in backend folder
-# From backend/app/services/consultation/router.py, go up 3 levels to backend folder
-DOCTORS_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../indian_doctors_dataset (1).csv'))
+# CSV path - now in backend/resources folder
+# From backend/app/services/consultation/router.py, go up to app, then to backend, then to resources
+DOCTORS_CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../resources/indian_doctors_dataset (1).csv'))
 
 print(f"🔍 CSV Path: {DOCTORS_CSV_PATH}")
 print(f"🔍 CSV Exists: {os.path.exists(DOCTORS_CSV_PATH)}")

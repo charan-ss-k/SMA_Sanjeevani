@@ -21,8 +21,8 @@ from app.core.rls_context import get_db_with_rls
 # ============================================
 router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 
-# CSV file path - relative to backend folder
-CSV_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "indian_doctors_dataset (1).csv")
+# CSV file path - relative to backend/resources folder
+CSV_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "resources", "indian_doctors_dataset (1).csv")
 
 print(f"📍 CSV Path configured: {CSV_FILE_PATH}")
 print(f"✓ CSV file exists: {os.path.exists(CSV_FILE_PATH)}")

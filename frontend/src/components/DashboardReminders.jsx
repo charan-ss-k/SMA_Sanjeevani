@@ -1,42 +1,81 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
+import { AuthContext } from '../main';
 import { t } from '../utils/translations';
 
 const DashboardReminders = ({ language = 'en' }) => {
   const { language: contextLanguage } = useContext(LanguageContext);
+  const { isAuthenticated, authToken } = useContext(AuthContext);
   const activeLanguage = contextLanguage || language;
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadReminders();
-  }, []);
+    if (isAuthenticated) {
+      loadReminders();
+    } else {
+      setReminders([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated, authToken]);
 
-  const loadReminders = () => {
-    try {
-      const savedAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
-      const upcomingAppointments = savedAppointments.filter(apt => {
-        const aptDate = new Date(apt.appointment_date);
-        return aptDate >= new Date();
+  const buildMedicineReminders = (items) => {
+    const now = new Date();
+    return items.map((item) => {
+      const [hour, minute] = (item.reminder_time || '00:00').split(':').map(Number);
+      const next = new Date(now);
+      next.setHours(hour || 0, minute || 0, 0, 0);
+      if (next < now) {
+        next.setDate(next.getDate() + 1);
+      }
+      const minutesUntil = Math.ceil((next - now) / (1000 * 60));
+      const status = minutesUntil <= 60 ? 'urgent' : minutesUntil <= 360 ? 'upcoming' : 'normal';
+      const quantity = item.quantity || item.days?.quantity;
+      const qtyText = quantity ? ` • ${t('quantity', activeLanguage)}: ${quantity}` : '';
+
+      return {
+        id: `med-${item.id}`,
+        type: 'medicine',
+        title: `💊 ${item.medicine_name}`,
+        description: `${t('dosage', activeLanguage)}: ${item.dosage}${qtyText}`,
+        date: next.toISOString(),
+        status,
+      };
+    });
+  };
+
+  const loadReminders = async () => {
+    try {      
+      let medicineReminders = [];
+      if (authToken) {
+        console.log('🔍 Fetching reminders with token:', authToken ? 'present' : 'missing');
+        const response = await fetch('/api/reminders/', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        console.log('📡 Response status:', response.status, response.ok);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📦 Received data:', data);
+          console.log('📊 Number of items:', data.length);
+          medicineReminders = buildMedicineReminders(data);
+          console.log('🏗️ Built reminders:', medicineReminders);
+        }
+      } else {
+        console.log('⚠️ No auth token available');
+      }
+
+      // Sort by date
+      const sorted = medicineReminders.sort((a, b) => {
+        return new Date(a.date) - new Date(b.date);
       });
 
-      const appointmentReminders = upcomingAppointments.map(apt => {
-        const aptDate = new Date(apt.appointment_date);
-        const daysUntil = Math.ceil((aptDate - new Date()) / (1000 * 60 * 60 * 24));
-        return {
-          id: apt.doctor_id,
-          type: 'appointment',
-          title: `Appointment with ${apt.doctor_name}`,
-          description: `Your appointment is in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}`,
-          date: apt.appointment_date,
-          status: daysUntil <= 1 ? 'urgent' : daysUntil <= 3 ? 'upcoming' : 'normal'
-        };
-      });
-
-      setReminders(appointmentReminders);
+      console.log('✅ Setting reminders:', sorted);
+      setReminders(sorted);
     } catch (error) {
-      console.error('Error loading reminders:', error);
+      console.error('❌ Error loading reminders:', error);
     } finally {
       setLoading(false);
     }
@@ -48,7 +87,7 @@ const DashboardReminders = ({ language = 'en' }) => {
 
   return (
     <div className="reminders-section">
-      <h2>{t('yourReminders', activeLanguage)}</h2>
+      <h2>{t('medicineReminders', activeLanguage)}</h2>
       {reminders.length === 0 ? (
         <div className="empty-state">
           <p>{t('noRemindersYet', activeLanguage)}</p>

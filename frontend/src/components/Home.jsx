@@ -4,7 +4,8 @@ import { playTTS } from '../utils/tts';
 import { LanguageContext, AuthContext } from '../main';
 import { t } from '../utils/translations';
 import DashboardAppointments from './DashboardAppointments';
-import DashboardReminders from './DashboardReminders';
+import DashboardAnalytics from './DashboardAnalytics';
+import ReminderNotification from './ReminderNotification';
 
 const Home = () => {
   const { language } = useContext(LanguageContext);
@@ -234,10 +235,13 @@ const Home = () => {
               </div>
             </section>
 
-            {/* Reminders Section */}
+            {/* Analytics Section */}
             <section className="bg-white rounded-lg shadow p-6 mb-6">
-              <DashboardReminders language={language} />
+              <DashboardAnalytics />
             </section>
+            
+            {/* Reminder Notification (Global) */}
+            <ReminderNotification />
           </>
         ) : (
           <>

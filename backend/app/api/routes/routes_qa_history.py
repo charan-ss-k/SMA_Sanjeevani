@@ -35,10 +35,13 @@ class QAHistoryResponse(BaseModel):
 @router.post("/", response_model=QAHistoryResponse)
 async def create_qa_history(
     qa_data: QAHistoryCreate,
-    user_id: int = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new Q&A history entry for authenticated user."""
+    # Extract user_id from User object
+    user_id = current_user.id if hasattr(current_user, 'id') else current_user
+    
     db = get_db_with_rls(db, user_id)
     new_qa = QAHistory(
         user_id=user_id,
@@ -59,13 +62,16 @@ async def create_qa_history(
 
 @router.get("/", response_model=List[QAHistoryResponse])
 async def get_user_qa_history(
-    user_id: int = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 10,
     category: Optional[str] = None
 ):
     """Get Q&A history for authenticated user, optionally filtered by category."""
+    # Extract user_id from User object
+    user_id = current_user.id if hasattr(current_user, 'id') else current_user
+    
     db = get_db_with_rls(db, user_id)
     query = db.query(QAHistory).filter(QAHistory.user_id == user_id)
     
@@ -85,10 +91,13 @@ async def get_user_qa_history(
 @router.get("/{qa_id}", response_model=QAHistoryResponse)
 async def get_qa_history(
     qa_id: int,
-    user_id: int = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get specific Q&A history entry (user can only access their own)."""
+    # Extract user_id from User object
+    user_id = current_user.id if hasattr(current_user, 'id') else current_user
+    
     db = get_db_with_rls(db, user_id)
     qa = db.query(QAHistory).filter(
         QAHistory.id == qa_id,
@@ -110,10 +119,13 @@ async def get_qa_history(
 async def mark_qa_helpful(
     qa_id: int,
     helpful: bool,
-    user_id: int = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Mark Q&A as helpful or not helpful."""
+    # Extract user_id from User object
+    user_id = current_user.id if hasattr(current_user, 'id') else current_user
+    
     db = get_db_with_rls(db, user_id)
     qa = db.query(QAHistory).filter(
         QAHistory.id == qa_id,
@@ -137,10 +149,13 @@ async def mark_qa_helpful(
 @router.delete("/{qa_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_qa_history(
     qa_id: int,
-    user_id: int = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete Q&A history entry (user can only delete their own)."""
+    # Extract user_id from User object
+    user_id = current_user.id if hasattr(current_user, 'id') else current_user
+    
     db = get_db_with_rls(db, user_id)
     qa = db.query(QAHistory).filter(
         QAHistory.id == qa_id,

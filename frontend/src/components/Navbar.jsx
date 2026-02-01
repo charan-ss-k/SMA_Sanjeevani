@@ -63,8 +63,8 @@ const Navbar = ({ language, onLanguageChange }) => {
               </Link>
             </li>
             <li>
-              <Link to="/hospital-report" className={getLinkClass('/hospital-report')}>
-                🏥 {t('report', language)}
+              <Link to="/reminders" className={getLinkClass('/reminders')}>
+                ⏰ {t('reminders', language)}
               </Link>
             </li>
             
@@ -73,7 +73,7 @@ const Navbar = ({ language, onLanguageChange }) => {
               <button 
                 onClick={() => setShowMoreMenu(!showMoreMenu)}
                 className={`${
-                  ['/reminders', '/services', '/about', '/contact'].includes(location.pathname)
+                  ['/hospital-report', '/services', '/about', '/contact'].includes(location.pathname)
                     ? 'text-green-800 font-semibold'
                     : 'text-green-800 hover:text-green-900'
                 } hover:bg-amber-50 rounded-md px-4 py-2 flex items-center gap-1 transition-all duration-200`}
@@ -85,11 +85,11 @@ const Navbar = ({ language, onLanguageChange }) => {
               {showMoreMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                   <Link 
-                    to="/reminders" 
+                    to="/hospital-report" 
                     className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100"
                     onClick={() => setShowMoreMenu(false)}
                   >
-                    ⏰ {t('reminders', language)}
+                    🏥 {t('report', language)}
                   </Link>
                   <Link 
                     to="/services" 

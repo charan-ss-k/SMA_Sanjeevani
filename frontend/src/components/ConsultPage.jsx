@@ -160,6 +160,12 @@ const ConsultPage = () => {
   const [appointmentHistory, setAppointmentHistory] = useState([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   
+  // Edit Appointment Modal
+  const [editingAppointment, setEditingAppointment] = useState(null);
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  
   // Load search options and appointments on mount
   useEffect(() => {
     loadSearchOptions();
@@ -215,6 +221,80 @@ const ConsultPage = () => {
     } catch (err) {
       console.error('❌ Error loading appointments:', err);
     }
+  };
+
+  const handleEditAppointment = (appointment) => {
+    setEditingAppointment(appointment);
+    const aptDate = new Date(appointment.appointment_date);
+    const dateStr = aptDate.toISOString().split('T')[0];
+    setEditDate(dateStr);
+    setEditTime(appointment.appointment_time || '');
+    setEditNotes(appointment.notes || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingAppointment) return;
+    
+    if (!editDate || !editTime) {
+      alert('Please provide both date and time');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
+      const token = localStorage.getItem('access_token');
+      
+      console.log('✏️ Updating appointment:', editingAppointment.id);
+      
+      const response = await fetch(`${apiBase}/api/appointments/appointment/${editingAppointment.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          appointment_date: editDate,
+          appointment_time: editTime,
+          notes: editNotes
+        })
+      });
+      
+      const data = await response.json();
+      console.log('📤 Update response:', response.status, data);
+      
+      if (response.ok) {
+        setMessage('✅ Appointment updated successfully');
+        if (!isMuted) playTTS('Appointment updated successfully', language);
+        
+        // Reload appointments
+        await loadAppointments();
+        
+        // Close modal
+        setEditingAppointment(null);
+        setEditDate('');
+        setEditTime('');
+        setEditNotes('');
+        
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const errorMsg = data.detail || 'Failed to update appointment';
+        throw new Error(errorMsg);
+      }
+    } catch (error) {
+      console.error('❌ Error updating appointment:', error);
+      setMessage(`❌ ${error.message}`);
+      if (!isMuted) playTTS(`Error: ${error.message}`, language);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAppointment(null);
+    setEditDate('');
+    setEditTime('');
+    setEditNotes('');
   };
 
   const cancelAppointment = async (appointment) => {
@@ -867,6 +947,22 @@ const ConsultPage = () => {
                           <span className="value">{apt.notes}</span>
                         </div>
                       )}
+                      <div className="appointment-actions">
+                        <button
+                          className="action-btn edit-btn"
+                          onClick={() => handleEditAppointment(apt)}
+                          title="Edit appointment"
+                        >
+                          ✏️ {t('edit', language)}
+                        </button>
+                        <button
+                          className="action-btn delete-btn"
+                          onClick={() => cancelAppointment(apt)}
+                          title="Delete appointment"
+                        >
+                          🗑️ {t('delete', language)}
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -928,13 +1024,16 @@ const ConsultPage = () => {
                         </div>
                       )}
                       <div className="appointment-actions">
-                        <button className="btn btn-primary" onClick={() => {
+                        <button className="btn btn-edit" onClick={() => handleEditAppointment(apt)} title="Edit appointment">
+                          ✏️ {t('edit', language)}
+                        </button>
+                        <button className="btn btn-reminder" onClick={() => {
                           if (!isMuted) playTTS(`${t('yourAppointmentWithDr', language)} ${apt.doctor_name} ${t('isComingUpIn', language)} ${daysUntil} ${t('daysFormat', language)} ${t('at', language)} ${apt.appointment_time}`, language);
                         }}>
                           🔔 {t('setReminder', language)}
                         </button>
-                        <button className="btn btn-secondary" onClick={() => cancelAppointment(apt)}>
-                          ❌ {t('cancelAppointment', language)}
+                        <button className="btn btn-delete" onClick={() => cancelAppointment(apt)} title="Delete appointment">
+                          🗑️ {t('delete', language)}
                         </button>
                       </div>
                     </div>
@@ -948,6 +1047,72 @@ const ConsultPage = () => {
                 <p>{t('noUpcomingAppointmentsMessage', language)}</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      
+      {/* Edit Appointment Modal */}
+      {editingAppointment && (
+        <div className="edit-modal-overlay" onClick={handleCancelEdit}>
+          <div className="edit-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <h3>✏️ {t('edit', language)}</h3>
+              <button className="modal-close-btn" onClick={handleCancelEdit}>✕</button>
+            </div>
+            
+            <div className="edit-modal-body">
+              <div className="modal-appointment-info">
+                <p><strong>👨‍⚕️ {t('doctor', language)}:</strong> {editingAppointment.doctor_name}</p>
+                <p><strong>🏥 {t('hospital', language)}:</strong> {editingAppointment.hospital}</p>
+                <p><strong>📍 {t('location', language)}:</strong> {editingAppointment.city}, {editingAppointment.state}</p>
+              </div>
+
+              <div className="modal-form-group">
+                <label htmlFor="edit-modal-date">📅 {t('appointmentDate', language)}</label>
+                <input
+                  id="edit-modal-date"
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="modal-input"
+                  required
+                />
+              </div>
+
+              <div className="modal-form-group">
+                <label htmlFor="edit-modal-time">⏰ {t('appointmentTime', language)}</label>
+                <input
+                  id="edit-modal-time"
+                  type="time"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                  className="modal-input"
+                  required
+                />
+              </div>
+
+              <div className="modal-form-group">
+                <label htmlFor="edit-modal-notes">📝 {t('notes', language)}</label>
+                <textarea
+                  id="edit-modal-notes"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  rows="3"
+                  className="modal-textarea"
+                  placeholder={t('anyAdditionalNotesOrConcerns', language)}
+                />
+              </div>
+            </div>
+
+            <div className="edit-modal-footer">
+              <button className="modal-btn modal-cancel" onClick={handleCancelEdit}>
+                {t('cancel', language)}
+              </button>
+              <button className="modal-btn modal-save" onClick={handleSaveEdit} disabled={loading}>
+                {loading ? '⏳ Saving...' : `💾 ${t('save', language)}`}
+              </button>
+            </div>
           </div>
         </div>
       )}

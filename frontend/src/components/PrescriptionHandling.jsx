@@ -716,17 +716,8 @@ const PrescriptionHandling = () => {
           {/* Left Column - Medicines List */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center justify-between mb-6">
+              <div className="mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">{t('yourMedicines', language)}</h2>
-                <button
-                  onClick={() => {
-                    setShowForm(true);
-                    setEditingId(null);
-                  }}
-                  className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg font-semibold"
-                >
-                  {t('addMedicine', language)}
-                </button>
               </div>
 
               {medicines.length === 0 ? (

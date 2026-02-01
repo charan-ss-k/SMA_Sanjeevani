@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/doctors", tags=["Doctors"])
 # Load doctor data from CSV
 def load_doctors_data():
     """Load and cache doctor data from CSV"""
-    csv_path = os.path.join(os.path.dirname(__file__), "../../../indian_doctors_dataset (1).csv")
+    csv_path = os.path.join(os.path.dirname(__file__), "../../../resources/indian_doctors_dataset (1).csv")
     
     try:
         df = pd.read_csv(csv_path)
