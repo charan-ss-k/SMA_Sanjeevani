@@ -66,6 +66,14 @@ class AppointmentBookRequest(BaseModel):
     notes: Optional[str] = Field(None, max_length=500, description="Optional appointment notes")
 
 
+class AppointmentUpdateRequest(BaseModel):
+    """Request to update an appointment"""
+    appointment_date: Optional[str] = Field(None, description="Date in format YYYY-MM-DD")
+    appointment_time: Optional[str] = Field(None, description="Time in format HH:MM")
+    notes: Optional[str] = Field(None, max_length=500, description="Optional appointment notes")
+    status: Optional[str] = Field(None, description="Appointment status")
+
+
 class AppointmentResponse(BaseModel):
     """Response after booking an appointment"""
     success: bool
@@ -314,6 +322,14 @@ async def book_appointment(
             
             appointment_datetime = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
             print(f"✅ Date/Time validation passed: {appointment_datetime}")
+            print(f"   Type: {type(appointment_datetime)}")
+            print(f"   Timezone: {appointment_datetime.tzinfo}")
+            print(f"   ISO format: {appointment_datetime.isoformat()}")
+            
+            # Check if this is in the future
+            current_time = datetime.now()
+            print(f"   Current time: {current_time}")
+            print(f"   Is future: {appointment_datetime > current_time}")
         except ValueError as ve:
             print(f"❌ Date/Time format error: {ve}")
             print(f"  - Expected format: YYYY-MM-DD HH:MM")
@@ -428,14 +444,50 @@ async def get_upcoming_appointments(
 ):
     """
     Get upcoming appointments (not yet passed) for the current user.
+    Filters by both date and time.
     """
     try:
-        now = datetime.utcnow()
-        upcoming = db.query(Appointment).filter(
+        # Use local time for comparison since appointments are stored in local timezone
+        now = datetime.now()
+        print(f"🕒 Current time (local): {now}")
+        print(f"🕒 Current time type: {type(now)}")
+        print(f"🕒 Timezone info: {now.tzinfo}")
+        
+        # Get all scheduled appointments for user
+        appointments = db.query(Appointment).filter(
             Appointment.user_id == current_user.id,
-            Appointment.appointment_date >= now,
             Appointment.status == "scheduled"
-        ).order_by(Appointment.appointment_date).all()
+        ).all()
+        
+        print(f"📋 Found {len(appointments)} scheduled appointments")
+        
+        # Filter appointments that haven't passed yet (considering time)
+        upcoming = []
+        for apt in appointments:
+            # appointment_date is stored as datetime in DB (contains both date and time)
+            print(f"\n🔍 Checking appointment {apt.id}:")
+            print(f"   Stored datetime: {apt.appointment_date}")
+            print(f"   Stored type: {type(apt.appointment_date)}")
+            print(f"   Stored timezone: {apt.appointment_date.tzinfo}")
+            print(f"   Display time: {apt.appointment_time}")
+            print(f"   Current time: {now}")
+            print(f"   Current type: {type(now)}")
+            print(f"   Current timezone: {now.tzinfo}")
+            
+            # Detailed comparison
+            time_diff = apt.appointment_date - now
+            print(f"   Time difference: {time_diff}")
+            print(f"   Seconds difference: {time_diff.total_seconds()}")
+            print(f"   Compare: {apt.appointment_date} > {now} = {apt.appointment_date > now}")
+            
+            if apt.appointment_date > now:
+                upcoming.append(apt)
+                print(f"   ✅ Including as upcoming")
+            else:
+                print(f"   ❌ Excluding as past")
+        
+        # Sort by appointment date
+        upcoming.sort(key=lambda x: x.appointment_date)
         
         return {
             "success": True,
@@ -466,36 +518,76 @@ async def get_upcoming_appointments(
 @router.put("/appointment/{appointment_id}")
 async def update_appointment(
     appointment_id: int,
-    status: str,
+    update_data: AppointmentUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Update appointment status (completed, cancelled, etc).
+    Update appointment details (date, time, notes, status).
     """
     try:
+        print(f"🔄 Updating appointment {appointment_id} for user {current_user.id}")
+        
         appointment = db.query(Appointment).filter(
             Appointment.id == appointment_id,
             Appointment.user_id == current_user.id
         ).first()
         
         if not appointment:
+            print(f"❌ Appointment {appointment_id} not found for user {current_user.id}")
             raise HTTPException(status_code=404, detail="Appointment not found")
         
-        appointment.status = status
+        # Update fields if provided
+        if update_data.appointment_date:
+            try:
+                date_str = update_data.appointment_date.strip()
+                time_str = update_data.appointment_time.strip() if update_data.appointment_time else appointment.appointment_time
+                datetime_str = f"{date_str} {time_str}"
+                appointment_datetime = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
+                appointment.appointment_date = appointment_datetime
+                print(f"  - Updated date: {appointment_datetime}")
+            except ValueError as ve:
+                print(f"❌ Date format error: {ve}")
+                raise HTTPException(status_code=422, detail=f"Invalid date format: {str(ve)}")
+        
+        if update_data.appointment_time and not update_data.appointment_date:
+            # Update only time, keep existing date
+            try:
+                date_str = appointment.appointment_date.strftime("%Y-%m-%d")
+                time_str = update_data.appointment_time.strip()
+                datetime_str = f"{date_str} {time_str}"
+                appointment_datetime = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
+                appointment.appointment_date = appointment_datetime
+                appointment.appointment_time = update_data.appointment_time
+                print(f"  - Updated time: {update_data.appointment_time}")
+            except ValueError as ve:
+                print(f"❌ Time format error: {ve}")
+                raise HTTPException(status_code=422, detail=f"Invalid time format: {str(ve)}")
+        
+        if update_data.notes is not None:
+            appointment.notes = update_data.notes.strip() if update_data.notes else None
+            print(f"  - Updated notes: {appointment.notes}")
+        
+        if update_data.status:
+            appointment.status = update_data.status
+            print(f"  - Updated status: {update_data.status}")
+        
         appointment.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(appointment)
         
+        print(f"✅ Appointment {appointment_id} updated successfully")
+        
         return {
             "success": True,
-            "message": f"Appointment status updated to {status}",
+            "message": "Appointment updated successfully",
             "appointment_id": appointment.id
         }
     except HTTPException:
         raise
     except Exception as e:
         print(f"❌ Error updating appointment: {e}")
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
