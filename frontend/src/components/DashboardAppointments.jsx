@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { playTTS } from '../utils/tts';
+import { LanguageContext } from '../main';
+import { t } from '../utils/translations';
 
 const DashboardAppointments = ({ language = 'en' }) => {
+  const { language: contextLanguage } = useContext(LanguageContext);
+  const activeLanguage = contextLanguage || language;
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -119,15 +123,15 @@ const DashboardAppointments = ({ language = 'en' }) => {
   };
 
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center' }}>Loading appointments...</div>;
+    return <div style={{ padding: '20px', textAlign: 'center' }}>{t('loadingAppointments', activeLanguage)}</div>;
   }
 
   return (
     <div className="appointments-section">
-      <h2>📅 Your Appointments</h2>
+      <h2>{t('yourAppointments', activeLanguage)}</h2>
       {appointments.length === 0 ? (
         <div className="empty-state">
-          <p>No upcoming appointments. Book one to get started!</p>
+          <p>{t('noUpcomingAppointments', activeLanguage)}</p>
         </div>
       ) : (
         <div className="appointments-grid">
@@ -163,13 +167,13 @@ const DashboardAppointments = ({ language = 'en' }) => {
                     className="apt-btn reschedule"
                     onClick={() => rescheduleAppointment(apt)}
                   >
-                    Reschedule
+                    {t('reschedule', activeLanguage)}
                   </button>
                   <button
                     className="apt-btn cancel"
                     onClick={() => cancelAppointment(apt)}
                   >
-                    Cancel
+                    {t('cancel', activeLanguage)}
                   </button>
                 </div>
               </div>

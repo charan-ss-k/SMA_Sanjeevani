@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { playTTS } from '../utils/tts';
+import { LanguageContext } from '../main';
+import { t } from '../utils/translations';
 
 const DashboardReminders = ({ language = 'en' }) => {
+  const { language: contextLanguage } = useContext(LanguageContext);
+  const activeLanguage = contextLanguage || language;
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,15 +43,15 @@ const DashboardReminders = ({ language = 'en' }) => {
   };
 
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center' }}>Loading reminders...</div>;
+    return <div style={{ padding: '20px', textAlign: 'center' }}>{t('loadingReminders', activeLanguage)}</div>;
   }
 
   return (
     <div className="reminders-section">
-      <h2>🔔 Your Reminders</h2>
+      <h2>{t('yourReminders', activeLanguage)}</h2>
       {reminders.length === 0 ? (
         <div className="empty-state">
-          <p>No reminders yet. Book an appointment to receive reminders!</p>
+          <p>{t('noRemindersYet', activeLanguage)}</p>
         </div>
       ) : (
         <div className="reminders-list">
@@ -62,7 +66,7 @@ const DashboardReminders = ({ language = 'en' }) => {
                 <small>📅 {new Date(reminder.date).toLocaleDateString()}</small>
               </div>
               <div className="reminder-badge">
-                {reminder.status === 'urgent' ? 'URGENT' : reminder.status === 'upcoming' ? 'SOON' : 'NORMAL'}
+                {reminder.status === 'urgent' ? t('urgent', activeLanguage) : reminder.status === 'upcoming' ? t('soon', activeLanguage) : t('normal', activeLanguage)}
               </div>
             </div>
           ))}

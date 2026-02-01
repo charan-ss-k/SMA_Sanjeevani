@@ -213,9 +213,9 @@ const Home = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-3xl font-bold text-blue-900 mb-2">
-                    👋 Welcome back, {user?.username || 'User'}!
+                    👋 {t('welcomeBackUser', language).replace('{username}', user?.username || 'User')}
                   </h2>
-                  <p className="text-gray-700">Your health companion dashboard is ready</p>
+                  <p className="text-gray-700">{t('yourHealthCompanionDashboard', language)}</p>
                 </div>
                 <div className="text-6xl hidden md:block">🏥</div>
               </div>
@@ -229,7 +229,7 @@ const Home = () => {
                   to="/consult"
                   className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-lg transition"
                 >
-                  📅 Book New Appointment
+                  {t('bookNewAppointment', language)}
                 </Link>
               </div>
             </section>
@@ -245,7 +245,7 @@ const Home = () => {
             <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h3 className="font-bold text-3xl mb-2">Get Started with Your Health Journey</h3>
+                  <h3 className="font-bold text-3xl mb-2">{t('getStartedWithYourHealthJourney', language)}</h3>
                   <p className="text-lg mb-4">
 {t('getStartedDesc', language)}
                   </p>
