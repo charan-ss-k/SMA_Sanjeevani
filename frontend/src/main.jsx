@@ -10,7 +10,7 @@ import Services from './components/Services.jsx';
 import Contact from './components/Contact.jsx';
 import PrescriptionHandling from './components/PrescriptionHandling.jsx';
 import HospitalReportAnalyzer from './components/HospitalReportAnalyzer.jsx';
-import Reminders from './components/Reminders.jsx';
+import RemindersEnhanced from './components/RemindersEnhanced.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import Tutorial from './components/Tutorial.jsx';
 import MedicineRecommendation from './components/MedicineRecommendation.jsx';
@@ -47,7 +47,7 @@ function AppWrapper() {
             <Route path="/services" element={<Services />} />
             <Route path="/prescription" element={<ProtectedRoute><PrescriptionHandling /></ProtectedRoute>} />
             <Route path="/hospital-report" element={<ProtectedRoute><HospitalReportAnalyzer /></ProtectedRoute>} />
-            <Route path="/reminders" element={<ProtectedRoute><Reminders /></ProtectedRoute>} />
+            <Route path="/reminders" element={<ProtectedRoute><RemindersEnhanced /></ProtectedRoute>} />
             <Route path="/consult" element={<ProtectedRoute><ConsultPage /></ProtectedRoute>} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/tutorial" element={<Tutorial />} />
