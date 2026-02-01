@@ -169,7 +169,13 @@ const SymptomChecker = ({ onResult }) => {
             <label className="block text-lg font-semibold text-gray-800 mb-2">{t('gender', language)}</label>
             <select
               value={gender}
-              onChange={(e) => setGender(e.target.value)}
+              onChange={(e) => {
+                setGender(e.target.value);
+                // Clear pregnancy checkbox when changing from female to another gender
+                if (e.target.value !== 'female' && pregnant) {
+                  setPregnant(false);
+                }
+              }}
               className="w-full border-2 border-gray-300 px-4 py-3 rounded-lg text-lg focus:outline-none focus:border-green-500"
             >
               <option value="male">{t('male', language)}</option>
@@ -253,18 +259,20 @@ const SymptomChecker = ({ onResult }) => {
         <p className="text-sm text-gray-600 mt-2">{t('typeFirstLetter', language)}</p>
       </div>
 
-      {/* Pregnancy Status */}
-      <div className="border-2 border-purple-300 rounded-lg p-6 bg-purple-50">
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={pregnant}
-            onChange={(e) => setPregnant(e.target.checked)}
-            className="w-6 h-6 mr-4 cursor-pointer"
-          />
-          <span className="text-xl font-semibold text-purple-800">{t('currentlyPregnant', language)}</span>
-        </label>
-      </div>
+      {/* Pregnancy Status - Only show for females */}
+      {gender === 'female' && (
+        <div className="border-2 border-purple-300 rounded-lg p-6 bg-purple-50">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={pregnant}
+              onChange={(e) => setPregnant(e.target.checked)}
+              className="w-6 h-6 mr-4 cursor-pointer"
+            />
+            <span className="text-xl font-semibold text-purple-800">{t('currentlyPregnant', language)}</span>
+          </label>
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (

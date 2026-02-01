@@ -36,10 +36,15 @@ class UnifiedMedicineDatabase:
         logger.info("🔄 Loading and merging medicine datasets...")
         
         try:
-            # Find datasets
+            # Find datasets in resources/datasets folder
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            resources_path = os.path.join(base_dir, 'resources', 'datasets')
+            
             possible_paths = [
-                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'medicine_dataset.csv'),
-                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'A_Z_medicines_dataset_of_India.csv'),
+                os.path.join(resources_path, 'medicine_dataset.csv'),
+                os.path.join(resources_path, 'A_Z_medicines_dataset_of_India.csv'),
+                os.path.join(base_dir, 'medicine_dataset.csv'),  # Fallback to old location
+                os.path.join(base_dir, 'A_Z_medicines_dataset_of_India.csv'),  # Fallback
                 'medicine_dataset.csv',
                 'A_Z_medicines_dataset_of_India.csv'
             ]

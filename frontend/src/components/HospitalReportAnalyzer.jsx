@@ -101,7 +101,7 @@ const HospitalReportAnalyzer = () => {
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${apiBase}/api/hospital-report-analyze`, {
+      const response = await fetch(`${apiBase}/api/hospital-reports/analyze`, {
         method: 'POST',
         body: formData,
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
