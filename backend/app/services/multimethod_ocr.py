@@ -1,6 +1,7 @@
 """
 Multi-Method OCR Engine for Handwritten Prescriptions
 Combines EasyOCR, Tesseract v5, TrOCR, and PaddleOCR for maximum accuracy
+Automatically uses GPU if available, falls back to CPU
 """
 
 import easyocr
@@ -11,6 +12,9 @@ import logging
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from PIL import Image
+
+# Device management - GPU/CPU auto-detection
+from app.core.device_manager import DeviceManager, get_ocr_device_config, get_torch_device
 
 try:
     from paddleocr import PaddleOCR
@@ -80,39 +84,70 @@ class MultiMethodHandwrittenOCR:
         self._initialize_paddle_ocr()
         
     def _initialize_easyocr(self):
-        """Initialize EasyOCR reader"""
+        """Initialize EasyOCR reader with GPU/CPU auto-detection"""
         try:
-            self._easyocr_reader = easyocr.Reader(self.languages, gpu=False)
-            self.logger.info("✅ EasyOCR initialized successfully")
+            device_config = get_ocr_device_config()
+            use_gpu = device_config['use_gpu']
+            device_type = device_config['device']
+            
+            self.logger.info(f"🔤 Initializing EasyOCR on {device_type.upper()}...")
+            self._easyocr_reader = easyocr.Reader(self.languages, gpu=use_gpu)
+            
+            if use_gpu:
+                self.logger.info(f"✅ EasyOCR initialized on GPU - {device_config['device_info']['gpu_name']}")
+            else:
+                self.logger.info("✅ EasyOCR initialized on CPU")
         except Exception as e:
             self.logger.warning(f"⚠️ EasyOCR initialization failed: {e}")
             self._easyocr_reader = None
     
     def _initialize_trocr(self):
-        """Initialize TrOCR (Transformer-based OCR for handwriting)"""
+        """Initialize TrOCR (Transformer-based OCR for handwriting) with GPU support"""
         if not TROCR_AVAILABLE:
             self.logger.info("ℹ️ TrOCR not available - skipping initialization")
             return
         
         try:
-            self.logger.info("🔄 Loading TrOCR model (handwritten)...")
+            device = get_torch_device()
+            device_type = device.type if device else 'cpu'
+            
+            self.logger.info(f"🔄 Loading TrOCR model on {device_type.upper()}...")
             self._trocr_processor = TrOCRProcessor.from_pretrained('microsoft/trocr-base-handwritten')
             self._trocr_model = VisionEncoderDecoderModel.from_pretrained('microsoft/trocr-base-handwritten')
-            self.logger.info("✅ TrOCR initialized successfully")
+            
+            # Move model to device if available
+            if device:
+                self._trocr_model = self._trocr_model.to(device)
+                if device_type == 'cuda':
+                    self.logger.info("✅ TrOCR initialized and moved to GPU")
+                else:
+                    self.logger.info("✅ TrOCR initialized on CPU")
+            else:
+                self.logger.info("✅ TrOCR initialized")
+                
         except Exception as e:
             self.logger.warning(f"⚠️ TrOCR initialization failed: {e}")
             self._trocr_processor = None
             self._trocr_model = None
     
     def _initialize_paddle_ocr(self):
-        """Initialize PaddleOCR reader"""
+        """Initialize PaddleOCR reader with GPU support if available"""
         if not PADDLE_AVAILABLE:
             self.logger.info("ℹ️ PaddleOCR not available - skipping initialization")
             return
         
         try:
-            self._paddle_ocr = PaddleOCR(use_angle_cls=True, lang='en')
-            self.logger.info("✅ PaddleOCR initialized successfully")
+            device_config = get_ocr_device_config()
+            use_gpu = device_config['use_gpu']
+            device_type = device_config['device']
+            
+            self.logger.info(f"🔤 Initializing PaddleOCR on {device_type.upper()}...")
+            self._paddle_ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=use_gpu)
+            
+            if use_gpu:
+                self.logger.info(f"✅ PaddleOCR initialized on GPU")
+            else:
+                self.logger.info("✅ PaddleOCR initialized on CPU")
         except Exception as e:
             self.logger.warning(f"⚠️ PaddleOCR initialization failed: {e}")
             self._paddle_ocr = None
@@ -376,12 +411,15 @@ class MultiMethodHandwrittenOCR:
             return None
     
     def _extract_with_trocr(self, image: np.ndarray) -> Optional[OCRResult]:
-        """Extract text using TrOCR (Transformer-based OCR for handwriting)"""
+        """Extract text using TrOCR (Transformer-based OCR for handwriting) with GPU support"""
         if not self._trocr_processor or not self._trocr_model:
             return None
         
         try:
             self.logger.debug("🔍 Running TrOCR extraction...")
+            
+            # Get device for inference
+            device = get_torch_device()
             
             # Convert to PIL Image
             if len(image.shape) == 3:
@@ -393,6 +431,10 @@ class MultiMethodHandwrittenOCR:
             
             # Process with TrOCR
             pixel_values = self._trocr_processor(pil_image, return_tensors="pt").pixel_values
+            
+            # Move to device if GPU available
+            if device:
+                pixel_values = pixel_values.to(device)
             
             with torch.no_grad():
                 generated_ids = self._trocr_model.generate(pixel_values)
