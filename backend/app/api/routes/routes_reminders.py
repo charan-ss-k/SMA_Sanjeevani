@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.middleware import get_current_user
+from app.core.rls_context import get_db_with_rls
 from app.models.models import Reminder
 from pydantic import BaseModel
 from typing import List, Optional
@@ -40,6 +41,10 @@ async def create_reminder(
     db: Session = Depends(get_db)
 ):
     """Create a new medicine reminder for authenticated user."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user_id)
+    
     new_reminder = Reminder(
         user_id=user_id,
         prescription_id=reminder.prescription_id,
@@ -66,6 +71,10 @@ async def get_user_reminders(
     limit: int = 10
 ):
     """Get all reminders for authenticated user."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user_id)
+    
     reminders = db.query(Reminder).filter(
         Reminder.user_id == user_id
     ).offset(skip).limit(limit).all()

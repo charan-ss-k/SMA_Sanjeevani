@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.middleware import get_current_user
+from app.core.rls_context import get_db_with_rls
 from app.models.models import QAHistory
 from pydantic import BaseModel
 from typing import List, Optional
@@ -38,6 +39,7 @@ async def create_qa_history(
     db: Session = Depends(get_db)
 ):
     """Create a new Q&A history entry for authenticated user."""
+    db = get_db_with_rls(db, user_id)
     new_qa = QAHistory(
         user_id=user_id,
         question=qa_data.question,
@@ -64,6 +66,7 @@ async def get_user_qa_history(
     category: Optional[str] = None
 ):
     """Get Q&A history for authenticated user, optionally filtered by category."""
+    db = get_db_with_rls(db, user_id)
     query = db.query(QAHistory).filter(QAHistory.user_id == user_id)
     
     if category:
@@ -86,6 +89,7 @@ async def get_qa_history(
     db: Session = Depends(get_db)
 ):
     """Get specific Q&A history entry (user can only access their own)."""
+    db = get_db_with_rls(db, user_id)
     qa = db.query(QAHistory).filter(
         QAHistory.id == qa_id,
         QAHistory.user_id == user_id
@@ -110,6 +114,7 @@ async def mark_qa_helpful(
     db: Session = Depends(get_db)
 ):
     """Mark Q&A as helpful or not helpful."""
+    db = get_db_with_rls(db, user_id)
     qa = db.query(QAHistory).filter(
         QAHistory.id == qa_id,
         QAHistory.user_id == user_id
@@ -136,6 +141,7 @@ async def delete_qa_history(
     db: Session = Depends(get_db)
 ):
     """Delete Q&A history entry (user can only delete their own)."""
+    db = get_db_with_rls(db, user_id)
     qa = db.query(QAHistory).filter(
         QAHistory.id == qa_id,
         QAHistory.user_id == user_id

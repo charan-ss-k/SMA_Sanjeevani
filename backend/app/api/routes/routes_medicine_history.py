@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.middleware import get_current_user
+from app.core.rls_context import get_db_with_rls
 from app.models.models import MedicineHistory
 from pydantic import BaseModel
 from typing import List, Optional
@@ -40,6 +41,7 @@ async def create_medicine_history(
     db: Session = Depends(get_db)
 ):
     """Create a new medicine recommendation history entry for authenticated user."""
+    db = get_db_with_rls(db, user_id)
     new_history = MedicineHistory(
         user_id=user_id,
         symptoms=history.symptoms,
@@ -66,6 +68,7 @@ async def get_user_medicine_history(
     limit: int = 10
 ):
     """Get all medicine recommendation history for authenticated user."""
+    db = get_db_with_rls(db, user_id)
     histories = db.query(MedicineHistory).filter(
         MedicineHistory.user_id == user_id
     ).offset(skip).limit(limit).all()
@@ -84,6 +87,7 @@ async def get_medicine_history(
     db: Session = Depends(get_db)
 ):
     """Get specific medicine history entry (user can only access their own)."""
+    db = get_db_with_rls(db, user_id)
     history = db.query(MedicineHistory).filter(
         MedicineHistory.id == history_id,
         MedicineHistory.user_id == user_id
@@ -108,6 +112,7 @@ async def update_medicine_history(
     db: Session = Depends(get_db)
 ):
     """Update medicine history entry (user can only update their own)."""
+    db = get_db_with_rls(db, user_id)
     history = db.query(MedicineHistory).filter(
         MedicineHistory.id == history_id,
         MedicineHistory.user_id == user_id
@@ -141,6 +146,7 @@ async def delete_medicine_history(
     db: Session = Depends(get_db)
 ):
     """Delete medicine history entry (user can only delete their own)."""
+    db = get_db_with_rls(db, user_id)
     history = db.query(MedicineHistory).filter(
         MedicineHistory.id == history_id,
         MedicineHistory.user_id == user_id

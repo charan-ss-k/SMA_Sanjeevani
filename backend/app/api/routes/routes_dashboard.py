@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.core.database import get_db
 from app.core.middleware import get_current_user
+from app.core.rls_context import get_db_with_rls
 from app.models.models import DashboardData, MedicineHistory, Prescription, Reminder, QAHistory
 from pydantic import BaseModel
 from typing import Optional
@@ -27,6 +28,9 @@ async def get_dashboard_stats(
     db: Session = Depends(get_db)
 ):
     """Get user's dashboard statistics and health metrics."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user_id)
     
     # Count consultations (Q&A history)
     consultations = db.query(func.count(QAHistory.id)).filter(
@@ -108,6 +112,9 @@ async def get_user_progress(
 ):
     """Get user's progress over specified number of days."""
     
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user_id)
+    
     start_date = datetime.utcnow() - timedelta(days=days)
     
     # Get daily counts
@@ -148,6 +155,9 @@ async def get_health_insights(
     db: Session = Depends(get_db)
 ):
     """Get personalized health insights based on user data."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user_id)
     
     # Get most common conditions
     conditions = db.query(

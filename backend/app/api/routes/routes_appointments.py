@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, get_db
 from app.models.models import User, Appointment
 from app.core.middleware import get_current_user
+from app.core.rls_context import get_db_with_rls
 
 # ============================================
 # Router and Configuration
@@ -279,6 +280,7 @@ async def book_appointment(
     Book an appointment with a doctor.
     Validates doctor exists and saves to database.
     """
+    db = get_db_with_rls(db, current_user.id)
     try:
         print(f"\n🔔 Appointment booking request received:")
         print(f"  - Current User Type: {type(current_user)} | Value: {current_user}")
@@ -406,6 +408,7 @@ async def get_my_appointments(
     """
     Get all appointments for the current user.
     """
+    db = get_db_with_rls(db, current_user.id)
     try:
         appointments = db.query(Appointment).filter(Appointment.user_id == current_user.id).order_by(Appointment.appointment_date.desc()).all()
         
@@ -446,6 +449,7 @@ async def get_upcoming_appointments(
     Get upcoming appointments (not yet passed) for the current user.
     Filters by both date and time.
     """
+    db = get_db_with_rls(db, current_user.id)
     try:
         # Use local time for comparison since appointments are stored in local timezone
         now = datetime.now()
@@ -525,6 +529,7 @@ async def update_appointment(
     """
     Update appointment details (date, time, notes, status).
     """
+    db = get_db_with_rls(db, current_user.id)
     try:
         print(f"🔄 Updating appointment {appointment_id} for user {current_user.id}")
         
@@ -597,6 +602,7 @@ async def delete_appointment(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    db = get_db_with_rls(db, current_user.id)
     """
     Delete/cancel an appointment - removes it from the database.
     """

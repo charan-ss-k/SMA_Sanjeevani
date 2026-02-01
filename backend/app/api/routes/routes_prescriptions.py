@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.middleware import get_current_user, get_current_user_optional
+from app.core.rls_context import get_db_with_rls
 from app.models.models import Prescription, User
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -47,6 +48,10 @@ async def create_prescription(
     db: Session = Depends(get_db)
 ):
     """Create a new prescription for authenticated user."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user)
+    
     try:
         user_id = user.id
         logger.info(f"Creating prescription for user_id={user_id}: {prescription.medicine_name}")
@@ -96,6 +101,10 @@ async def get_user_prescriptions(
     limit: int = 10
 ):
     """Get all prescriptions for authenticated user."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user)
+    
     user_id = user.id
     prescriptions = db.query(Prescription).filter(
         Prescription.user_id == user_id
@@ -116,6 +125,10 @@ async def get_prescription(
     db: Session = Depends(get_db)
 ):
     """Get specific prescription (user can only access their own)."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user)
+    
     user_id = user.id
     prescription = db.query(Prescription).filter(
         Prescription.id == prescription_id,
@@ -142,6 +155,10 @@ async def update_prescription(
     db: Session = Depends(get_db)
 ):
     """Update prescription (user can only update their own)."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user)
+    
     user_id = user.id
     prescription = db.query(Prescription).filter(
         Prescription.id == prescription_id,
@@ -181,6 +198,10 @@ async def delete_prescription(
     db: Session = Depends(get_db)
 ):
     """Delete prescription (user can only delete their own)."""
+    
+    # ✅ Set RLS context for per-user isolation
+    db = get_db_with_rls(db, user)
+    
     user_id = user.id
     prescription = db.query(Prescription).filter(
         Prescription.id == prescription_id,

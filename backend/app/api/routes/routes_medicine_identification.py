@@ -14,6 +14,7 @@ import numpy as np
 
 from app.core.database import get_db
 from app.core.middleware import get_current_user, get_current_user_optional
+from app.core.rls_context import get_db_with_rls
 from app.services.medicine_ocr_service import process_medicine_image
 from app.models.models import Prescription, MedicineHistory
 

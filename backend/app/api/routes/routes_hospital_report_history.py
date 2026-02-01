@@ -6,6 +6,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.core.middleware import get_current_user
+from app.core.rls_context import get_db_with_rls
 from app.models.models import HospitalReportHistory, User
 
 router = APIRouter(prefix="/api/hospital-report-history", tags=["Hospital Report History"])
@@ -40,6 +41,7 @@ async def create_hospital_report_history(
     db: Session = Depends(get_db)
 ):
     """Save a hospital report analysis to history."""
+    db = get_db_with_rls(db, user.id)
     new_history = HospitalReportHistory(
         user_id=user.id,
         report_title=payload.report_title,
@@ -67,6 +69,7 @@ async def get_hospital_report_history(
     limit: int = 50
 ):
     """Get hospital report history for current user."""
+    db = get_db_with_rls(db, user.id)
     histories = db.query(HospitalReportHistory).filter(
         HospitalReportHistory.user_id == user.id
     ).order_by(HospitalReportHistory.created_at.desc()).offset(skip).limit(limit).all()
@@ -87,6 +90,7 @@ async def delete_hospital_report_history(
     db: Session = Depends(get_db)
 ):
     """Delete a hospital report history entry (user can only delete their own)."""
+    db = get_db_with_rls(db, user.id)
     history = db.query(HospitalReportHistory).filter(
         HospitalReportHistory.id == history_id,
         HospitalReportHistory.user_id == user.id

@@ -1,50 +1,50 @@
 """
-Database Configuration and Connection Setup
+PostgreSQL Database Configuration - Azure PostgreSQL
+Clean implementation without SQLite fallbacks
 """
 import os
-from sqlalchemy import create_engine, text
+from pathlib import Path
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
 import logging
 
-load_dotenv()
-
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Database URL configuration
-# Using Azure PostgreSQL with sanjeevani_finaldb
-# Azure PostgreSQL requires SSL connection
+# Load .env from project root
+root_env = Path(__file__).parent.parent.parent.parent / ".env"
+load_dotenv(root_env, override=True)
+
+# PostgreSQL connection string (Azure)
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://sma_admin:Sanjeevani%4026@sma-sanjeevani.postgres.database.azure.com:5432/sanjeevani_finaldb?sslmode=require"
 )
 
-# SQLAlchemy setup
-if "sqlite" in DATABASE_URL:
-    # SQLite specific configuration
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        echo=False  # Set to True for SQL debugging
-    )
-else:
-    # PostgreSQL/MySQL configuration
-    # Azure PostgreSQL requires SSL connection
-    connect_args = {}
-    if "azure.com" in DATABASE_URL or "postgres.database.azure.com" in DATABASE_URL:
-        connect_args = {
-            "sslmode": "require"
-        }
-    
-    engine = create_engine(
-        DATABASE_URL,
-        echo=False,  # Set to True for SQL debugging
-        pool_pre_ping=True,  # Enable connection health checks
-        pool_recycle=3600,  # Recycle connections after 1 hour
-        connect_args=connect_args
-    )
+# Validate PostgreSQL URL
+if not DATABASE_URL.startswith("postgresql://"):
+    raise ValueError(f"❌ DATABASE_URL must be PostgreSQL! Got: {DATABASE_URL[:50]}...")
 
+logger.info(f"✅ PostgreSQL connection configured: {DATABASE_URL[:70]}...")
+
+# Create PostgreSQL engine
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,  # Set to True for SQL query debugging
+    pool_pre_ping=True,  # Verify connections before using
+    pool_recycle=3600,  # Recycle connections every hour
+    pool_size=10,  # Connection pool size
+    max_overflow=20,  # Max connections beyond pool_size
+    connect_args={
+        "connect_timeout": 10,
+        "options": "-c timezone=utc"
+    }
+)
+
+# Session factory
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
@@ -55,9 +55,11 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-# Dependency for FastAPI routes
-def get_db():
-    """Get database session for dependency injection"""
+def get_db() -> Session:
+    """
+    FastAPI dependency for database sessions.
+    Usage: db: Session = Depends(get_db)
+    """
     db = SessionLocal()
     try:
         yield db
@@ -65,62 +67,54 @@ def get_db():
         db.close()
 
 
-# Database initialization
-def create_database_if_not_exists():
-    """Create the database if it doesn't exist (for PostgreSQL)"""
+def verify_connection() -> bool:
+    """Test PostgreSQL connection"""
     try:
-        import psycopg2
-        from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-        from urllib.parse import urlparse
-        
-        # Parse database URL to get components
-        parsed = urlparse(DATABASE_URL)
-        database_name = parsed.path.lstrip('/').split('?')[0]
-        
-        # Only for PostgreSQL (not SQLite)
-        if "postgresql" in DATABASE_URL and "sqlite" not in DATABASE_URL:
-            # Connect to default 'postgres' database
-            admin_conn_string = (
-                f"postgresql://{parsed.username}:{parsed.password}@"
-                f"{parsed.hostname}:{parsed.port or 5432}/postgres?sslmode=require"
-            )
-            
-            conn = psycopg2.connect(admin_conn_string)
-            conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-            cursor = conn.cursor()
-            
-            # Check if database exists
-            cursor.execute(
-                "SELECT 1 FROM pg_database WHERE datname = %s",
-                (database_name,)
-            )
-            exists = cursor.fetchone()
-            
-            if not exists:
-                logger.info(f"Creating database '{database_name}'...")
-                cursor.execute(f'CREATE DATABASE "{database_name}"')
-                logger.info(f"✅ Database '{database_name}' created successfully!")
-            else:
-                logger.info(f"✅ Database '{database_name}' already exists")
-            
-            cursor.close()
-            conn.close()
-    except ImportError:
-        logger.warning("psycopg2 not available, skipping database creation")
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT version()"))
+            version = result.scalar()
+            logger.info(f"✅ PostgreSQL connected: {version[:100]}")
+            return True
     except Exception as e:
-        logger.warning(f"Could not auto-create database (this is OK if it already exists): {e}")
+        logger.error(f"❌ PostgreSQL connection failed: {e}")
+        return False
 
 
 def init_db():
-    """Create all tables in the database"""
-    # Try to create database first (for PostgreSQL)
-    if "postgresql" in DATABASE_URL and "sqlite" not in DATABASE_URL:
-        create_database_if_not_exists()
-    
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
+    """
+    Initialize database by creating all tables.
+    Creates tables based on SQLAlchemy models.
+    """
+    try:
+        logger.info("📊 Initializing PostgreSQL database...")
+        
+        # Verify connection first
+        if not verify_connection():
+            raise ConnectionError("Cannot connect to PostgreSQL database")
+        
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ All database tables created/verified")
+        
+        return True
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+        raise
+
+
+# Test connection on module import
+try:
+    verify_connection()
+except Exception as e:
+    logger.warning(f"⚠️  Database connection not available yet: {e}")
 
 
 if __name__ == "__main__":
+    print("=" * 70)
+    print("🔧 PostgreSQL Database Initialization")
+    print("=" * 70)
     init_db()
-    print("Database initialized successfully!")
+    print("=" * 70)
+    print("✅ Database initialization complete!")
+    print("=" * 70)
+

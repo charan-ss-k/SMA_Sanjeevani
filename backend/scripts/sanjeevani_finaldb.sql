@@ -495,6 +495,7 @@ SELECT
 FROM users u
 LEFT JOIN prescriptions p ON u.id = p.user_id AND p.is_active = TRUE
 LEFT JOIN reminders r ON p.id = r.prescription_id AND r.is_active = TRUE
+WHERE u.id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
 GROUP BY u.id, u.username, p.id, p.medicine_name, p.dosage, p.frequency, p.duration, p.start_date, p.end_date;
 
 -- View: User Health Summary
@@ -525,6 +526,7 @@ LEFT JOIN chatbot_conversations cc ON u.id = cc.user_id
 LEFT JOIN medical_checkups mc ON u.id = mc.user_id
 LEFT JOIN medicine_taken_log mtl ON u.id = mtl.user_id
 LEFT JOIN user_analytics ua ON u.id = ua.user_id
+WHERE u.id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
 GROUP BY 
     u.id, 
     u.username, 
@@ -546,6 +548,7 @@ SELECT
     EXTRACT(HOUR FROM (r.next_reminder_at - CURRENT_TIMESTAMP)) as hours_until_reminder
 FROM reminders r
 WHERE r.is_active = TRUE
+    AND r.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
     AND r.next_reminder_at BETWEEN CURRENT_TIMESTAMP AND CURRENT_TIMESTAMP + INTERVAL '24 hours'
 ORDER BY r.next_reminder_at;
 
@@ -566,7 +569,156 @@ LEFT JOIN prescriptions p ON u.id = p.user_id
 LEFT JOIN reminders r ON p.id = r.prescription_id
 LEFT JOIN medicine_taken_log mtl ON r.id = mtl.reminder_id
 WHERE p.is_active = TRUE
+  AND u.id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
 GROUP BY u.id, u.username, p.id, p.medicine_name, p.start_date, p.end_date;
+
+-- ============================================================================
+-- ROW-LEVEL SECURITY (RLS) - Per-user data isolation across all features
+-- Requires application to set: SET app.current_user_id = '<user_id>' per session/connection
+-- ============================================================================
+
+-- 2. HEALTH PROFILE
+ALTER TABLE health_profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_health_profiles ON health_profiles
+    USING (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER))
+    WITH CHECK (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER));
+
+-- 3. SYMPTOM CHECKER HISTORY
+ALTER TABLE symptom_check_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_symptom_check_history ON symptom_check_history
+    USING (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER))
+    WITH CHECK (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER));
+
+-- 4. MEDICINE RECOMMENDATIONS
+ALTER TABLE medicine_recommendations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_medicine_recommendations ON medicine_recommendations
+    USING (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND (symptom_check_id IS NULL OR EXISTS (
+            SELECT 1 FROM symptom_check_history sch
+            WHERE sch.id = symptom_check_id
+              AND sch.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        ))
+    )
+    WITH CHECK (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND (symptom_check_id IS NULL OR EXISTS (
+            SELECT 1 FROM symptom_check_history sch
+            WHERE sch.id = symptom_check_id
+              AND sch.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        ))
+    );
+
+-- 5. PRESCRIPTIONS
+ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_prescriptions ON prescriptions
+    USING (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER))
+    WITH CHECK (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER));
+
+-- 6. REMINDERS
+ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_reminders ON reminders
+    USING (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND (prescription_id IS NULL OR EXISTS (
+            SELECT 1 FROM prescriptions p
+            WHERE p.id = prescription_id
+              AND p.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        ))
+    )
+    WITH CHECK (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND (prescription_id IS NULL OR EXISTS (
+            SELECT 1 FROM prescriptions p
+            WHERE p.id = prescription_id
+              AND p.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        ))
+    );
+
+-- 7. MEDICINE TAKEN LOG
+ALTER TABLE medicine_taken_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_medicine_taken_log ON medicine_taken_log
+    USING (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND (reminder_id IS NULL OR EXISTS (
+            SELECT 1 FROM reminders r
+            WHERE r.id = reminder_id
+              AND r.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        ))
+    )
+    WITH CHECK (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND (reminder_id IS NULL OR EXISTS (
+            SELECT 1 FROM reminders r
+            WHERE r.id = reminder_id
+              AND r.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        ))
+    );
+
+-- 8. CHATBOT CONVERSATIONS
+ALTER TABLE chatbot_conversations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_chatbot_conversations ON chatbot_conversations
+    USING (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER))
+    WITH CHECK (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER));
+
+-- 9. CHATBOT MESSAGES
+ALTER TABLE chatbot_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_chatbot_messages ON chatbot_messages
+    USING (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND EXISTS (
+            SELECT 1 FROM chatbot_conversations c
+            WHERE c.id = conversation_id
+              AND c.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        )
+    )
+    WITH CHECK (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND EXISTS (
+            SELECT 1 FROM chatbot_conversations c
+            WHERE c.id = conversation_id
+              AND c.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        )
+    );
+
+-- 10. HEALTH SCHEDULES
+ALTER TABLE health_schedules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_health_schedules ON health_schedules
+    USING (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER))
+    WITH CHECK (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER));
+
+-- 11. HEALTH SCHEDULE LOG
+ALTER TABLE health_schedule_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_health_schedule_log ON health_schedule_log
+    USING (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND EXISTS (
+            SELECT 1 FROM health_schedules hs
+            WHERE hs.id = schedule_id
+              AND hs.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        )
+    )
+    WITH CHECK (
+        user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        AND EXISTS (
+            SELECT 1 FROM health_schedules hs
+            WHERE hs.id = schedule_id
+              AND hs.user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER)
+        )
+    );
+
+-- 12. MEDICAL CHECKUPS
+ALTER TABLE medical_checkups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_medical_checkups ON medical_checkups
+    USING (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER))
+    WITH CHECK (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER));
+
+-- 13. USER ANALYTICS
+ALTER TABLE user_analytics ENABLE ROW LEVEL SECURITY;
+CREATE POLICY rls_user_analytics ON user_analytics
+    USING (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER))
+    WITH CHECK (user_id = CAST(current_setting('app.current_user_id', true) AS INTEGER));
+
 
 -- ============================================================================
 -- SAMPLE DATA - For Testing

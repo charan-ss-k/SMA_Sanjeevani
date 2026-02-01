@@ -11,6 +11,7 @@ import logging
 from app.core.database import get_db
 from app.core.middleware import get_current_user
 from app.models.models import User
+from app.core.rls_context import get_db_with_rls
 from app.services.handwritten_prescription_analyzer import HybridHandwrittenPrescriptionAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ async def analyze_handwritten_prescription(
     - validation: Medical validation results
     - structured_data: Complete parsed prescription
     """
+    db = get_db_with_rls(db, user.id)
     try:
         # Read file content
         content = await file.read()
