@@ -48,75 +48,153 @@ async def status():
         "llm_provider": provider,
         "ollama_url": ollama_url if provider == "ollama" else "N/A",
         "ollama_model": ollama_model if provider == "ollama" else "N/A",
-        "note": "If llm_provider is 'mock', change LLM_PROVIDER=ollama in .env file"
+        "note": "If llm_provider is 'mock', change LLM_PROVIDER=ollama or azure_openai in .env file"
     }
 
 
 @router.get("/api/symptoms/test-ollama")
 async def test_ollama():
-    """Simple test to verify Phi-4 is working"""
-    logger.info("=== TESTING OLLAMA DIRECTLY ===")
-    
-    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-    ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
+    """Simple test to verify LLM (Ollama or Azure OpenAI) is working"""
+    provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
+    logger.info(f"=== TESTING LLM PROVIDER: {provider.upper()} ===")
     
     # Simple test prompt
     test_prompt = "Respond with only valid JSON. A 28-year-old male has headache. What could be the condition? Return: {\"condition\": \"...\", \"medicine\": \"...\"}"
     
-    payload = {
-        "model": ollama_model,
-        "prompt": test_prompt,
-        "stream": False,
-        "temperature": 0.3,
-    }
-    
-    try:
-        logger.info("Sending simple test to Ollama at %s", f"{ollama_url}/api/generate")
-        logger.info("Model: %s", ollama_model)
-        logger.info("Test prompt: %s", test_prompt)
+    if provider == "azure_openai":
+        # Test Azure OpenAI
+        azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
+        azure_api_key = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
+        azure_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
         
-        resp = requests.post(f"{ollama_url}/api/generate", json=payload, timeout=300)
-        
-        if resp.status_code == 200:
-            resp_json = resp.json()
-            llm_output = resp_json.get("response", "")
-            logger.info("✓ Ollama responded successfully")
-            logger.info("Raw output:\n%s", llm_output)
-            
-            return {
-                "status": "success",
-                "ollama_running": True,
-                "model": ollama_model,
-                "raw_response": llm_output,
-                "response_length": len(llm_output),
-                "note": "If you see output above, Mistral is working. Check if it contains valid JSON."
-            }
-        else:
+        if not azure_endpoint or not azure_api_key:
             return {
                 "status": "error",
-                "http_status": resp.status_code,
-                "error": resp.text,
-                "note": "Ollama returned an error"
+                "error": "Azure OpenAI credentials missing",
+                "note": "Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY in .env"
             }
-    except requests.exceptions.Timeout:
-        return {
-            "status": "timeout",
-            "error": "Ollama/Mistral took too long to respond",
-            "note": "Mistral is very slow on your system. This is normal. Increase timeout or use a faster system.",
-            "suggestion": "Wait longer or reduce LLM_TEMPERATURE to make it faster"
+        
+        base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+        api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+        
+        payload = {
+            "messages": [
+                {"role": "system", "content": "You are a medical AI assistant. Respond only with valid JSON."},
+                {"role": "user", "content": test_prompt}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 512,
         }
-    except requests.exceptions.ConnectionError:
-        return {
-            "status": "connection_error",
-            "error": f"Cannot connect to Ollama at {ollama_url}",
-            "note": "Make sure Ollama is running: ollama serve"
+        
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": azure_api_key
         }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "note": "Check backend logs for details"
+        
+        try:
+            logger.info("Sending test request to Azure OpenAI")
+            logger.info("Deployment: %s", azure_deployment)
+            
+            resp = requests.post(api_url, json=payload, headers=headers, timeout=300)
+            
+            if resp.status_code == 200:
+                resp_json = resp.json()
+                llm_output = resp_json.get("choices", [{}])[0].get("message", {}).get("content", "")
+                logger.info("✓ Azure OpenAI responded successfully")
+                logger.info("Raw output:\n%s", llm_output)
+                
+                return {
+                    "status": "success",
+                    "provider": "azure_openai",
+                    "deployment": azure_deployment,
+                    "raw_response": llm_output,
+                    "response_length": len(llm_output),
+                    "note": "Azure OpenAI is working correctly"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "http_status": resp.status_code,
+                    "error": resp.text,
+                    "note": "Azure OpenAI returned an error"
+                }
+        except requests.exceptions.Timeout:
+            return {
+                "status": "timeout",
+                "error": "Azure OpenAI took too long to respond",
+                "note": "Request timed out after 300 seconds"
+            }
+        except requests.exceptions.ConnectionError:
+            return {
+                "status": "connection_error",
+                "error": f"Cannot connect to Azure OpenAI at {azure_endpoint}",
+                "note": "Check network connectivity and credentials"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "note": "Check backend logs for details"
+            }
+    
+    else:  # ollama provider
+        ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
+        ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
+        
+        payload = {
+            "model": ollama_model,
+            "prompt": test_prompt,
+            "stream": False,
+            "temperature": 0.3,
         }
+        
+        try:
+            logger.info("Sending simple test to Ollama at %s", f"{ollama_url}/api/generate")
+            logger.info("Model: %s", ollama_model)
+            logger.info("Test prompt: %s", test_prompt)
+            
+            resp = requests.post(f"{ollama_url}/api/generate", json=payload, timeout=300)
+            
+            if resp.status_code == 200:
+                resp_json = resp.json()
+                llm_output = resp_json.get("response", "")
+                logger.info("✓ Ollama responded successfully")
+                logger.info("Raw output:\n%s", llm_output)
+                
+                return {
+                    "status": "success",
+                    "ollama_running": True,
+                    "model": ollama_model,
+                    "raw_response": llm_output,
+                    "response_length": len(llm_output),
+                    "note": "If you see output above, Ollama is working. Check if it contains valid JSON."
+                }
+            else:
+                return {
+                    "status": "error",
+                    "http_status": resp.status_code,
+                    "error": resp.text,
+                    "note": "Ollama returned an error"
+                }
+        except requests.exceptions.Timeout:
+            return {
+                "status": "timeout",
+                "error": "Ollama took too long to respond",
+                "note": "Ollama is very slow on your system. This is normal. Increase timeout or use a faster system.",
+                "suggestion": "Wait longer or reduce LLM_TEMPERATURE to make it faster"
+            }
+        except requests.exceptions.ConnectionError:
+            return {
+                "status": "connection_error",
+                "error": f"Cannot connect to Ollama at {ollama_url}",
+                "note": "Make sure Ollama is running: ollama serve"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "note": "Check backend logs for details"
+            }
 
 
 @router.post("/api/symptoms/recommend", response_model=SymptomResponse)

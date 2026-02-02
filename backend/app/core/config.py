@@ -43,10 +43,20 @@ class Settings(BaseSettings):
     
     # LLM Configuration
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
+    
+    # Ollama Configuration
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")  # Alternative naming
     LLM_MODEL: str = os.getenv("LLM_MODEL", "microsoft/phi-4")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "phi4")
+    
+    # Azure OpenAI Configuration
+    AZURE_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+    AZURE_OPENAI_API_KEY: str = os.getenv("AZURE_OPENAI_API_KEY", "")
+    AZURE_OPENAI_MODEL_NAME: str = os.getenv("AZURE_OPENAI_MODEL_NAME", "Phi-4")
+    AZURE_OPENAI_DEPLOYMENT_NAME: str = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4")
+    
+    # General LLM Parameters
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.2"))
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1024"))
     

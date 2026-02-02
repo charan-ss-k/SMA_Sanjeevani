@@ -1,12 +1,14 @@
 """
 Handwritten Prescription Analyzer - Complete Hybrid Implementation
 Combines CNN Preprocessing + Multi-Method OCR + LLM Parsing
+Supports both Ollama and Azure OpenAI providers
 """
 
 import cv2
 import numpy as np
 import json
 import logging
+import os
 import requests
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -23,7 +25,7 @@ class HybridHandwrittenPrescriptionAnalyzer:
     Complete analyzer for handwritten prescriptions using:
     - CNN-based image preprocessing
     - Multi-method OCR (EasyOCR + Tesseract + PaddleOCR)
-    - LLM parsing for structured extraction
+    - LLM parsing for structured extraction (Ollama or Azure OpenAI)
     - Medical validation
     """
 
@@ -206,24 +208,65 @@ class HybridHandwrittenPrescriptionAnalyzer:
         If any field is not found, use null. Be thorough in extracting medicine information.
         """
 
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
+        self.logger.info(f"Using LLM provider: {provider}")
+
         try:
-            response = requests.post(
-                f'{self.ollama_url}/api/generate',
-                json={
-                    'model': self.ollama_model,
-                    'prompt': prompt,
-                    'stream': False,
-                    'temperature': 0.3  # Low temperature for precise extraction
-                },
-                timeout=120
-            )
+            if provider == "azure_openai":
+                # Azure OpenAI implementation
+                azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+                azure_api_key = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
+                azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
+                
+                if not azure_endpoint or not azure_api_key:
+                    self.logger.error("Azure OpenAI credentials missing")
+                    return None
+                
+                base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+                api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+                
+                response = requests.post(
+                    api_url,
+                    json={
+                        "messages": [
+                            {"role": "system", "content": "You are a medical AI assistant that extracts prescription information. Respond only with valid JSON."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 2048,
+                    },
+                    headers={
+                        "Content-Type": "application/json",
+                        "api-key": azure_api_key
+                    },
+                    timeout=120
+                )
 
-            if response.status_code != 200:
-                self.logger.error(f"LLM API error: {response.status_code}")
-                return None
+                if response.status_code != 200:
+                    self.logger.error(f"Azure OpenAI API error: {response.status_code}")
+                    return None
 
-            result = response.json()
-            text_response = result.get('response', '')
+                result = response.json()
+                text_response = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            else:  # ollama provider
+                response = requests.post(
+                    f'{self.ollama_url}/api/generate',
+                    json={
+                        'model': self.ollama_model,
+                        'prompt': prompt,
+                        'stream': False,
+                        'temperature': 0.3  # Low temperature for precise extraction
+                    },
+                    timeout=120
+                )
+
+                if response.status_code != 200:
+                    self.logger.error(f"LLM API error: {response.status_code}")
+                    return None
+
+                result = response.json()
+                text_response = result.get('response', '')
 
             # Extract JSON from response
             try:
