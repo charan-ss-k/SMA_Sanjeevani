@@ -40,16 +40,24 @@ except ImportError:
 async def status():
     """Check LLM provider status and configuration"""
     provider = os.environ.get("LLM_PROVIDER", "mock").strip().lower()
-    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-    ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
     
-    return {
+    response = {
         "status": "ok",
         "llm_provider": provider,
-        "ollama_url": ollama_url if provider == "ollama" else "N/A",
-        "ollama_model": ollama_model if provider == "ollama" else "N/A",
-        "note": "If llm_provider is 'mock', change LLM_PROVIDER=ollama or azure_openai in .env file"
     }
+    
+    if provider == "azure_openai":
+        response["azure_endpoint"] = os.environ.get("AZURE_OPENAI_ENDPOINT", "not_set")
+        response["azure_deployment"] = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4")
+        response["note"] = "✅ Using Azure OpenAI - All LLM calls routed to cloud provider"
+    elif provider == "ollama":
+        response["ollama_url"] = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+        response["ollama_model"] = os.environ.get("OLLAMA_MODEL", "phi4")
+        response["note"] = "Using local Ollama - Set LLM_PROVIDER=azure_openai in .env to use cloud provider"
+    else:
+        response["note"] = "If llm_provider is 'mock', change LLM_PROVIDER=azure_openai in .env file"
+    
+    return response
 
 
 @router.get("/api/symptoms/test-ollama")
@@ -62,6 +70,7 @@ async def test_ollama():
     test_prompt = "Respond with only valid JSON. A 28-year-old male has headache. What could be the condition? Return: {\"condition\": \"...\", \"medicine\": \"...\"}"
     
     if provider == "azure_openai":
+        logger.info("✅ TESTING AZURE OPENAI (NOT LOCAL OLLAMA)")
         # Test Azure OpenAI
         azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
         azure_api_key = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()

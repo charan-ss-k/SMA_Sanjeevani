@@ -183,7 +183,9 @@ except Exception:
 def call_llm(prompt: str) -> str:
     provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
     logger.info("=" * 70)
-    logger.info("LLM PROVIDER: '%s'", provider)
+    logger.info("🔧 Symptoms Recommendation Service using LLM PROVIDER: '%s'", provider)
+    if provider == "azure_openai":
+        logger.info("✅ USING AZURE OPENAI (NOT LOCAL OLLAMA)")
     logger.info("=" * 70)
     
     if provider == "mock":
@@ -559,7 +561,9 @@ Response (in {lang_display}):"""
         # Get LLM config
         provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
         
-        logger.info("LLM Provider: %s", provider)
+        logger.info("🔧 Medical Q&A using LLM Provider: %s", provider)
+        if provider == "azure_openai":
+            logger.info("✅ CONFIRMED: Using Azure OpenAI Phi-4 (NOT local Ollama)")
         
         if provider == "azure_openai":
             # Azure OpenAI implementation

@@ -171,16 +171,21 @@ const HospitalReportAnalyzer = () => {
 
     setSavingReport(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('structured_data', JSON.stringify(analysisResult.structured_data || {}));
-      formData.append('extracted_text', analysisResult.extracted_text || '');
-      formData.append('report_title', file.name || 'Hospital Report');
+      const payload = {
+        report_title: file?.name || 'Hospital Report',
+        uploaded_file: file?.name || 'Unknown file',
+        ocr_method: analysisResult.ocr_method || 'OCR',
+        extracted_text: analysisResult.extracted_text || '',
+        structured_data: analysisResult.structured_data || {}
+      };
 
-      const response = await fetch(`${apiBase}/api/hospital-report-history`, {
+      const response = await fetch(`${apiBase}/api/hospital-report-history/`, {
         method: 'POST',
-        body: formData,
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -190,6 +195,7 @@ const HospitalReportAnalyzer = () => {
 
       const saved = await response.json();
       setHistoryItems(prev => [saved, ...prev]);
+      playTTS('Report saved successfully', language);
     } catch (e) {
       console.error('Save report failed:', e);
       setAnalysisError(e.message || getPrescriptionText('failedToSavePrescription', language));
@@ -372,19 +378,13 @@ const HospitalReportAnalyzer = () => {
                         {/* Action Buttons */}
                         <div className="flex justify-end gap-3 mb-6 no-print">
                           <button
-                            onClick={() => window.print()}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                          >
-                            🖨️ Print Report
-                          </button>
-                          <button
                             onClick={saveReport}
                             disabled={savingReport}
-                            className={`px-4 py-2 rounded-lg font-semibold transition ${
+                            className={`px-6 py-3 rounded-lg font-semibold transition ${
                               savingReport ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
                             }`}
                           >
-                            {savingReport ? '💾 Saving...' : '💾 Save Report'}
+                            {savingReport ? '💾 Saving...' : '💾 Save Report to History'}
                           </button>
                         </div>
                         
@@ -746,21 +746,110 @@ const HospitalReportAnalyzer = () => {
 
                   {/* Expanded Details */}
                   {expandedHistoryId === item.id && (
-                    <div className="mt-4 space-y-3">
-                      {/* Patient Information */}
-                      {item.structured_data.patient && Object.keys(item.structured_data.patient).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`👤 ${getPrescriptionText('patientInfo', language)}`}
-                          data={item.structured_data.patient}
-                        />
+                    <div className="mt-4 space-y-3 bg-white p-4 rounded-lg border border-gray-200">
+                      {/* Hospital Details */}
+                      {item.structured_data?.hospital_details && Object.values(item.structured_data.hospital_details).some(v => v) && (
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <h4 className="font-bold text-blue-900 mb-2">🏥 Hospital Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.hospital_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.hospital_details.name}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.address && (
+                              <div className="col-span-2"><span className="text-gray-600">Address:</span> <span className="font-semibold">{item.structured_data.hospital_details.address}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.phone && (
+                              <div><span className="text-gray-600">Phone:</span> <span className="font-semibold">{item.structured_data.hospital_details.phone}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.timings && (
+                              <div><span className="text-gray-600">Timings:</span> <span className="font-semibold">{item.structured_data.hospital_details.timings}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
 
-                      {/* Test Results */}
-                      {item.structured_data.test_results && Object.keys(item.structured_data.test_results).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`🧪 ${getPrescriptionText('testResults', language)}`}
-                          data={item.structured_data.test_results}
-                        />
+                      {/* Doctor Details */}
+                      {item.structured_data?.doctor_details && Object.values(item.structured_data.doctor_details).some(v => v) && (
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <h4 className="font-bold text-blue-900 mb-2">👨‍⚕️ Doctor Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.doctor_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.doctor_details.name}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.qualifications && (
+                              <div><span className="text-gray-600">Qualifications:</span> <span className="font-semibold">{item.structured_data.doctor_details.qualifications}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.specialization && (
+                              <div><span className="text-gray-600">Specialization:</span> <span className="font-semibold">{item.structured_data.doctor_details.specialization}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.registration_number && (
+                              <div><span className="text-gray-600">Registration:</span> <span className="font-semibold">{item.structured_data.doctor_details.registration_number}</span></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Patient Information */}
+                      {item.structured_data?.patient_details && Object.values(item.structured_data.patient_details).some(v => v) && (
+                        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                          <h4 className="font-bold text-green-900 mb-2">🧑 Patient Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.patient_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.patient_details.name}</span></div>
+                            )}
+                            {item.structured_data.patient_details.patient_id && (
+                              <div><span className="text-gray-600">Patient ID:</span> <span className="font-semibold">{item.structured_data.patient_details.patient_id}</span></div>
+                            )}
+                            {item.structured_data.patient_details.age && (
+                              <div><span className="text-gray-600">Age:</span> <span className="font-semibold">{item.structured_data.patient_details.age}</span></div>
+                            )}
+                            {item.structured_data.patient_details.gender && (
+                              <div><span className="text-gray-600">Gender:</span> <span className="font-semibold">{item.structured_data.patient_details.gender}</span></div>
+                            )}
+                            {item.structured_data.patient_details.mobile && (
+                              <div><span className="text-gray-600">Contact:</span> <span className="font-semibold">{item.structured_data.patient_details.mobile}</span></div>
+                            )}
+                            {item.structured_data.patient_details.visit_date && (
+                              <div><span className="text-gray-600">Visit Date:</span> <span className="font-semibold">{item.structured_data.patient_details.visit_date}</span></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Clinical Details */}
+                      {item.structured_data?.clinical_details && Object.values(item.structured_data.clinical_details).some(v => v && v.length > 0) && (
+                        <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                          <h4 className="font-bold text-orange-900 mb-2">🩺 Clinical Information</h4>
+                          <div className="text-xs space-y-2">
+                            {(item.structured_data.clinical_details.weight_kg || item.structured_data.clinical_details.height_cm || item.structured_data.clinical_details.bmi || item.structured_data.clinical_details.blood_pressure) && (
+                              <div className="grid grid-cols-4 gap-2">
+                                {item.structured_data.clinical_details.weight_kg && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">Weight:</span> <span className="font-bold">{item.structured_data.clinical_details.weight_kg} kg</span></div>
+                                )}
+                                {item.structured_data.clinical_details.height_cm && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">Height:</span> <span className="font-bold">{item.structured_data.clinical_details.height_cm} cm</span></div>
+                                )}
+                                {item.structured_data.clinical_details.bmi && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">BMI:</span> <span className="font-bold">{item.structured_data.clinical_details.bmi}</span></div>
+                                )}
+                                {item.structured_data.clinical_details.blood_pressure && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">BP:</span> <span className="font-bold">{item.structured_data.clinical_details.blood_pressure}</span></div>
+                                )}
+                              </div>
+                            )}
+                            {item.structured_data.clinical_details.chief_complaints && item.structured_data.clinical_details.chief_complaints.length > 0 && (
+                              <div>
+                                <span className="font-semibold text-gray-700">Complaints:</span>
+                                <ul className="list-disc list-inside text-gray-600 mt-1">
+                                  {item.structured_data.clinical_details.chief_complaints.map((c, i) => <li key={i}>{c}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {item.structured_data.clinical_details.diagnosis && (
+                              <div><span className="text-gray-600">Diagnosis:</span> <span className="font-bold text-orange-900">{item.structured_data.clinical_details.diagnosis}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
 
                       {/* Medicines */}
@@ -800,11 +889,25 @@ const HospitalReportAnalyzer = () => {
                       )}
 
                       {/* Medical Advice */}
-                      {item.structured_data.medical_advice && Object.keys(item.structured_data.medical_advice).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`💡 ${getPrescriptionText('medicalAdvice', language)}`}
-                          data={item.structured_data.medical_advice}
-                        />
+                      {item.structured_data?.medical_advice && (item.structured_data.medical_advice.advice?.length > 0 || item.structured_data.medical_advice.precautions || item.structured_data.medical_advice.follow_up_date) && (
+                        <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                          <h4 className="font-bold text-purple-900 mb-2">📝 Medical Advice</h4>
+                          <div className="text-xs space-y-2">
+                            {item.structured_data.medical_advice.advice && item.structured_data.medical_advice.advice.length > 0 && (
+                              <div>
+                                <ul className="list-disc list-inside text-gray-700">
+                                  {item.structured_data.medical_advice.advice.map((a, i) => <li key={i}>{a}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {item.structured_data.medical_advice.precautions && (
+                              <div><span className="text-gray-600">Precautions:</span> <span className="font-semibold">{item.structured_data.medical_advice.precautions}</span></div>
+                            )}
+                            {item.structured_data.medical_advice.follow_up_date && (
+                              <div><span className="text-gray-600">Follow Up:</span> <span className="font-bold text-purple-900">{item.structured_data.medical_advice.follow_up_date}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

@@ -31,7 +31,7 @@ class MedicineLLMGenerator:
         Call LLM (Ollama or Azure OpenAI) based on LLM_PROVIDER environment variable
         """
         provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
-        logger.info(f"Using LLM provider: {provider}")
+        logger.info(f"🔧 Medicine LLM using provider: {provider}")
         
         if provider == "azure_openai":
             # Azure OpenAI implementation
@@ -46,27 +46,41 @@ class MedicineLLMGenerator:
             base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
             api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
             
-            response = requests.post(
-                api_url,
-                json={
-                    "messages": [
-                        {"role": "system", "content": "You are a medical AI assistant providing accurate medicine information."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": float(os.getenv("LLM_TEMPERATURE", 0.2)),
-                    "max_tokens": int(os.getenv("LLM_MAX_TOKENS", 1024)),
-                },
-                headers={
-                    "Content-Type": "application/json",
-                    "api-key": azure_api_key
-                },
-                timeout=MedicineLLMGenerator.TIMEOUT
-            )
-            
-            if response.status_code == 200:
-                return response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-            else:
-                raise Exception(f"Azure OpenAI error: {response.status_code} - {response.text}")
+            try:
+                response = requests.post(
+                    api_url,
+                    json={
+                        "messages": [
+                            {"role": "system", "content": "You are a medical AI assistant providing accurate medicine information. Always respond with valid, well-formatted JSON when requested."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": float(os.getenv("LLM_TEMPERATURE", 0.2)),
+                        "max_tokens": int(os.getenv("LLM_MAX_TOKENS", 2048)),
+                        "top_p": 0.95,
+                        "frequency_penalty": 0.0,
+                        "presence_penalty": 0.0
+                    },
+                    headers={
+                        "Content-Type": "application/json",
+                        "api-key": azure_api_key
+                    },
+                    timeout=(15, MedicineLLMGenerator.TIMEOUT)
+                )
+                
+                if response.status_code == 200:
+                    content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+                    logger.info(f"✅ Azure OpenAI response received: {len(content)} chars")
+                    return content
+                else:
+                    error_text = response.text[:500]
+                    logger.error(f"❌ Azure OpenAI error: {response.status_code} - {error_text}")
+                    raise Exception(f"Azure OpenAI error: {response.status_code} - {error_text}")
+            except requests.Timeout:
+                logger.error("❌ Azure OpenAI request timed out")
+                raise Exception("Azure OpenAI request timed out")
+            except Exception as e:
+                logger.error(f"❌ Azure OpenAI request failed: {e}")
+                raise
         
         else:  # ollama provider (default)
             ollama_url = os.getenv("OLLAMA_URL", MedicineLLMGenerator.OLLAMA_URL).strip()

@@ -870,7 +870,7 @@ CRITICAL: Return ONLY the JSON array, nothing else. Start with [ and end with ]"
         import time
         
         provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
-        logger.info(f"Using LLM provider: {provider}")
+        logger.info(f"🔧 Enhanced Medicine LLM Generator using provider: {provider}")
         
         if provider == "azure_openai":
             # Azure OpenAI implementation

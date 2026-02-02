@@ -209,7 +209,7 @@ class HybridHandwrittenPrescriptionAnalyzer:
         """
 
         provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
-        self.logger.info(f"Using LLM provider: {provider}")
+        self.logger.info(f"🔧 Handwritten Prescription Analyzer using LLM provider: {provider}")
 
         try:
             if provider == "azure_openai":
