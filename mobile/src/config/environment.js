@@ -5,14 +5,16 @@
 
 const ENV = {
   development: {
-    API_BASE_URL: 'http://192.168.29.195:8000/api',
+    API_BASE_URL: 'http://98.70.223.78/api',
     ENABLE_DEBUG: true,
-    API_TIMEOUT: 70000, // 70 seconds to accommodate backend's 60-second Ollama timeout
+    API_TIMEOUT: 120000, // 2 minutes for general API calls
+    PRESCRIPTION_TIMEOUT: 180000, // 3 minutes for prescription OCR + AI analysis
   },
   production: {
     API_BASE_URL: 'https://api.sanjeevani.com/api',
     ENABLE_DEBUG: false,
-    API_TIMEOUT: 70000, // 70 seconds to accommodate backend's 60-second Ollama timeout
+    API_TIMEOUT: 120000, // 2 minutes for general API calls
+    PRESCRIPTION_TIMEOUT: 180000, // 3 minutes for prescription OCR + AI analysis
   },
 };
 

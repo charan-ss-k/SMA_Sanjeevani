@@ -7,13 +7,6 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss()
-  ],
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      }
-    }
-  }
+  ]
+  // Proxy removed - frontend now connects directly to Azure VM via window.__API_BASE__
 })

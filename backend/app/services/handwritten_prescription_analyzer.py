@@ -462,3 +462,74 @@ class HybridHandwrittenPrescriptionAnalyzer:
                 except:
                     pass
 
+
+# ============================================================================
+# Static Wrapper Class for API Compatibility
+# ============================================================================
+
+class HandwrittenPrescriptionAnalyzer:
+    """
+    Static wrapper class for API compatibility.
+    Provides static methods that internally create analyzer instances.
+    """
+    
+    @staticmethod
+    def analyze_handwritten_prescription_from_bytes(image_bytes: bytes, filename: str = 'prescription.jpg') -> Dict[str, Any]:
+        """
+        Static method to analyze prescription from bytes.
+        Creates analyzer instance and processes the image.
+        
+        Args:
+            image_bytes: Image file content
+            filename: Original filename
+            
+        Returns:
+            Analysis result dictionary
+        """
+        try:
+            # Get configuration from environment
+            ollama_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+            ollama_model = os.getenv('OLLAMA_MODEL', 'phi4')
+            
+            # Create analyzer instance
+            analyzer = HybridHandwrittenPrescriptionAnalyzer(
+                ollama_url=ollama_url,
+                ollama_model=ollama_model
+            )
+            
+            # Analyze from bytes
+            return analyzer.analyze_from_bytes(image_bytes, filename)
+            
+        except Exception as e:
+            logger.error(f"❌ Static analysis failed: {str(e)}", exc_info=True)
+            return {
+                'status': 'error',
+                'message': f'Prescription analysis failed: {str(e)}',
+                'error': str(e),
+                'uploaded_file': filename
+            }
+    
+    @staticmethod
+    def get_service_info() -> Dict[str, Any]:
+        """
+        Get service information and capabilities.
+        
+        Returns:
+            Service information dictionary
+        """
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
+        
+        return {
+            'service': 'Handwritten Prescription Analyzer',
+            'version': '2.0',
+            'capabilities': {
+                'preprocessing': 'CNN-based image enhancement',
+                'ocr': 'Multi-method (EasyOCR + Tesseract + PaddleOCR)',
+                'parsing': f'LLM-based ({provider})',
+                'validation': 'Medical safety checks'
+            },
+            'status': 'operational',
+            'llm_provider': provider,
+            'supported_formats': ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp']
+        }
+

@@ -7,7 +7,7 @@ import Constants from 'expo-constants';
 
 const ENV = {
   dev: {
-    API_BASE_URL: 'http://192.168.1.100:8000', // Change to your server IP
+    API_BASE_URL: 'http://98.70.223.78', // Azure VM IP
     API_TIMEOUT: 30000,
     ENABLE_AI_STREAMING: true,
     ENABLE_TTS: true,

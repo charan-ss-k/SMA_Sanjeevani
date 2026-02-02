@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, LanguageContext } from '../main';
 import { t } from '../utils/translations';
 
+const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+
 const DashboardAnalytics = () => {
   const { isAuthenticated, authToken } = useContext(AuthContext);
   const { language } = useContext(LanguageContext);
@@ -38,7 +40,7 @@ const DashboardAnalytics = () => {
       // Load reminders from database
       try {
         console.log('📋 Fetching reminders from /api/reminders/');
-        const remResponse = await fetch('/api/reminders/', {
+        const remResponse = await fetch(`${API_BASE}/api/reminders/`, {
           headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
         });
         console.log('📋 Reminders response status:', remResponse.status);
@@ -63,7 +65,7 @@ const DashboardAnalytics = () => {
       // Load appointments from database
       try {
         console.log('📅 Fetching appointments from /api/appointments/my-appointments');
-        const aptResponse = await fetch('/api/appointments/my-appointments', {
+        const aptResponse = await fetch(`${API_BASE}/api/appointments/my-appointments`, {
           headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
         });
         console.log('📅 Appointments response status:', aptResponse.status);
@@ -100,7 +102,7 @@ const DashboardAnalytics = () => {
       // Load QA history from database
       try {
         console.log('💬 Fetching QA history from /api/qa-history/');
-        const qaResponse = await fetch('/api/qa-history/?limit=50', {
+        const qaResponse = await fetch(`${API_BASE}/api/qa-history/?limit=50`, {
           headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
         });
         console.log('💬 QA history response status:', qaResponse.status);
