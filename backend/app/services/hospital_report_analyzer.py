@@ -121,7 +121,8 @@ class HospitalReportAnalyzer:
     def _extract_text_from_report(image_path: str) -> Dict[str, Any]:
         """
         Extract text from hospital report using best available OCR.
-        Uses BOTH Tesseract and EasyOCR, picks the best result.
+        Enhanced for structured documents with proper layout preservation.
+        Uses BOTH Tesseract and EasyOCR, merges results intelligently.
         """
         try:
             # Load original image
@@ -129,81 +130,117 @@ class HospitalReportAnalyzer:
             if image is None:
                 raise ValueError(f"Could not load image from {image_path}")
             
+            logger.info(f"📸 Image loaded: {image.shape[1]}x{image.shape[0]} pixels")
+            
             all_results = []
             
-            # METHOD 1: Try EasyOCR first (better for real-world images)
+            # METHOD 1: Try EasyOCR first (better for real-world images with varied layouts)
             if HAVE_EASYOCR:
                 try:
-                    logger.info("🔍 METHOD 1: EasyOCR (best for real-world images)...")
+                    logger.info("🔍 METHOD 1: EasyOCR (layout-aware extraction)...")
                     
                     if HospitalReportAnalyzer._easyocr_reader is None:
                         logger.info("  📍 Initializing EasyOCR reader...")
                         HospitalReportAnalyzer._easyocr_reader = easyocr.Reader(['en'], gpu=False)
                     
-                    # Try on original image
-                    result = HospitalReportAnalyzer._easyocr_reader.readtext(image)
+                    # Run EasyOCR with paragraph detection enabled
+                    result = HospitalReportAnalyzer._easyocr_reader.readtext(
+                        image,
+                        paragraph=False,  # Get individual text segments for better control
+                        detail=1
+                    )
                     
-                    # Sort by vertical position (top to bottom, left to right)
-                    sorted_result = sorted(result, key=lambda x: (x[0][0][1], x[0][0][0]))
+                    # Sort by vertical position first (top to bottom), then horizontal (left to right)
+                    # This preserves the reading order of structured documents
+                    sorted_result = sorted(result, key=lambda x: (int(x[0][0][1] / 30), x[0][0][0]))
                     
-                    # Extract text with confidence > 0.2 (lower threshold for more text)
+                    # Group text by lines (same vertical position = same line)
                     lines = []
+                    current_line = []
+                    current_y = -1
+                    line_threshold = 30  # pixels - texts within this range are on same line
+                    
                     for (bbox, text, conf) in sorted_result:
-                        if conf > 0.2 and text.strip():
-                            lines.append(text.strip())
+                        if conf > 0.15 and text.strip():  # Lower threshold to catch more text
+                            y_pos = int(bbox[0][1])
+                            
+                            # Check if this is on the same line as previous text
+                            if current_y == -1 or abs(y_pos - current_y) < line_threshold:
+                                current_line.append(text.strip())
+                                current_y = y_pos if current_y == -1 else current_y
+                            else:
+                                # New line detected
+                                if current_line:
+                                    lines.append(' '.join(current_line))
+                                current_line = [text.strip()]
+                                current_y = y_pos
+                    
+                    # Add last line
+                    if current_line:
+                        lines.append(' '.join(current_line))
                     
                     full_text = '\n'.join(lines)
                     
                     if full_text and len(full_text.strip()) > 20:
-                        logger.info(f"  ✅ EasyOCR: {len(full_text)} characters")
-                        all_results.append(("EasyOCR", full_text, len(full_text)))
+                        word_count = len([w for w in full_text.split() if len(w) > 2])
+                        logger.info(f"  ✅ EasyOCR: {len(full_text)} chars, {len(lines)} lines, {word_count} words")
+                        all_results.append(("EasyOCR-Structured", full_text, len(full_text), word_count))
                     else:
                         logger.warning(f"  ⚠️ EasyOCR: Only {len(full_text)} chars")
                         
                 except Exception as e:
                     logger.warning(f"  ❌ EasyOCR failed: {e}")
             
-            # METHOD 2: Try Tesseract with preprocessing
+            # METHOD 2: Try Tesseract with multiple PSM modes on preprocessed image
             preprocessed = HospitalReportAnalyzer._preprocess_for_ocr(image)
             
             if HAVE_TESSERACT:
                 try:
-                    logger.info("🔍 METHOD 2: Tesseract OCR (multiple modes)...")
+                    logger.info("🔍 METHOD 2: Tesseract OCR (multiple segmentation modes)...")
                     
                     best_text = ""
                     best_length = 0
+                    best_words = 0
+                    best_mode = ""
                     
+                    # Try different PSM modes - each works better for different layouts
                     psm_modes = [
-                        (6, "uniform block of text"),
                         (3, "fully automatic page segmentation"),
+                        (6, "uniform block of text"),
                         (4, "single column of text"),
-                        (11, "sparse text")
+                        (11, "sparse text - no OSD")
                     ]
                     
                     for psm, description in psm_modes:
                         try:
-                            custom_config = f'--oem 3 --psm {psm}'
+                            # Use higher OEM (LSTM engine) for better accuracy
+                            custom_config = f'--oem 1 --psm {psm}'
                             text = pytesseract.image_to_string(
                                 preprocessed, 
                                 lang='eng',
                                 config=custom_config
                             )
                             
+                            words = len([w for w in text.split() if len(w) > 2])
+                            
                             if len(text.strip()) > best_length:
                                 best_text = text
                                 best_length = len(text.strip())
-                                logger.info(f"  ✓ PSM {psm} ({description}): {len(text)} chars")
+                                best_words = words
+                                best_mode = f"PSM {psm}"
+                                logger.info(f"  ✓ PSM {psm} ({description}): {len(text)} chars, {words} words")
                         except Exception as e:
                             logger.debug(f"  ✗ PSM {psm} failed: {e}")
                             continue
                     
                     if best_text and len(best_text.strip()) > 20:
-                        all_results.append(("Tesseract-Preprocessed", best_text, len(best_text.strip())))
+                        logger.info(f"  ✅ Best Tesseract mode: {best_mode}")
+                        all_results.append((f"Tesseract-{best_mode}", best_text, len(best_text.strip()), best_words))
                         
                 except Exception as e:
                     logger.warning(f"  ❌ Tesseract preprocessed failed: {e}")
             
-            # METHOD 3: Try Tesseract on original grayscale
+            # METHOD 3: Try Tesseract on original grayscale (sometimes works better than preprocessed)
             if HAVE_TESSERACT:
                 try:
                     logger.info("🔍 METHOD 3: Tesseract on original grayscale...")
@@ -214,49 +251,67 @@ class HospitalReportAnalyzer:
                     else:
                         gray = image
                     
-                    text = pytesseract.image_to_string(gray, lang='eng', config='--oem 3 --psm 3')
+                    # Try with automatic page segmentation
+                    text = pytesseract.image_to_string(gray, lang='eng', config='--oem 1 --psm 3')
+                    words = len([w for w in text.split() if len(w) > 2])
                     
                     if text and len(text.strip()) > 20:
-                        logger.info(f"  ✅ Tesseract-Original: {len(text)} chars")
-                        all_results.append(("Tesseract-Original", text, len(text.strip())))
+                        logger.info(f"  ✅ Tesseract-Original: {len(text)} chars, {words} words")
+                        all_results.append(("Tesseract-Original-Gray", text, len(text.strip()), words))
                         
                 except Exception as e:
                     logger.warning(f"  ❌ Tesseract original failed: {e}")
             
-            # Pick the best result (longest text with actual words)
+            # INTELLIGENT MERGING: Pick the best result and enhance with unique content from others
             if all_results:
-                # Score each result by length and word count
+                # Score each result by: (length * 0.4) + (word_count * 15)
+                # This favors results with more meaningful words over just length
                 scored_results = []
-                for method, text, length in all_results:
-                    words = [w for w in text.split() if len(w) > 2]  # Words with 3+ chars
-                    word_count = len(words)
-                    # Score = length * 0.5 + word_count * 10 (favor actual words)
-                    score = (length * 0.5) + (word_count * 10)
+                for method, text, length, word_count in all_results:
+                    score = (length * 0.4) + (word_count * 15)
                     scored_results.append((score, method, text, length, word_count))
                     logger.info(f"  📊 {method}: {length} chars, {word_count} words, score={score:.1f}")
                 
-                # Pick best score
+                # Pick best score as base
                 scored_results.sort(reverse=True)
                 best_score, best_method, best_text, best_length, best_words = scored_results[0]
                 
-                logger.info(f"✅ BEST RESULT: {best_method} ({best_length} chars, {best_words} words)")
+                logger.info(f"✅ PRIMARY RESULT: {best_method} ({best_length} chars, {best_words} words)")
                 
-                # IMPORTANT: Merge all unique text to ensure we don't miss medicines
-                # Sometimes different OCR methods catch different parts
-                all_text_combined = best_text
+                # Enhance with unique lines from other methods
+                base_lines = set(line.strip().lower() for line in best_text.split('\n') if line.strip())
+                enhanced_text = best_text
+                added_lines = 0
+                
                 for score, method, text, length, word_count in scored_results[1:]:
-                    # Add any unique lines from other methods
-                    other_lines = set(text.split('\n'))
-                    best_lines = set(best_text.split('\n'))
-                    unique_lines = other_lines - best_lines
-                    if unique_lines:
-                        logger.info(f"  📍 Adding {len(unique_lines)} unique lines from {method}")
-                        all_text_combined += '\n' + '\n'.join(unique_lines)
+                    other_lines = [line for line in text.split('\n') if line.strip()]
+                    
+                    for line in other_lines:
+                        line_clean = line.strip()
+                        line_lower = line_clean.lower()
+                        
+                        # Add line if it's unique and substantial
+                        if (line_lower not in base_lines and 
+                            len(line_clean) > 5 and 
+                            len([w for w in line_clean.split() if len(w) > 2]) > 0):
+                            enhanced_text += '\n' + line_clean
+                            base_lines.add(line_lower)
+                            added_lines += 1
+                
+                if added_lines > 0:
+                    logger.info(f"  📍 Enhanced with {added_lines} unique lines from other OCR methods")
                 
                 return {
                     "status": "success",
-                    "ocr_text": all_text_combined.strip(),
-                    "method": f"{best_method} (enhanced with other methods)"
+                    "ocr_text": enhanced_text.strip(),
+                    "method": f"{best_method} (enhanced with {len(scored_results)-1} other method(s))",
+                    "extraction_stats": {
+                        "total_chars": len(enhanced_text),
+                        "total_words": len([w for w in enhanced_text.split() if len(w) > 2]),
+                        "total_lines": len([l for l in enhanced_text.split('\n') if l.strip()]),
+                        "methods_used": len(all_results),
+                        "lines_added": added_lines
+                    }
                 }
             
             # No OCR worked
@@ -303,7 +358,6 @@ class HospitalReportAnalyzer:
         
         return parsed_data
     
-    @staticmethod
     @staticmethod
     def _create_empty_structure() -> Dict[str, Any]:
         """Create empty structure when parsing fails."""

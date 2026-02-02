@@ -893,28 +893,42 @@ CRITICAL: Return ONLY the JSON array, nothing else. Start with [ and end with ]"
                         api_url,
                         json={
                             "messages": [
-                                {"role": "system", "content": "You are a medical AI assistant providing accurate medicine information. Respond with valid JSON."},
+                                {"role": "system", "content": "You are a medical AI assistant providing accurate medicine information. Always respond with valid, well-formatted JSON. Extract ALL information requested in the prompt."},
                                 {"role": "user", "content": prompt}
                             ],
-                            "temperature": float(os.getenv("LLM_TEMPERATURE", 0.2)),
-                            "max_tokens": int(os.getenv("LLM_MAX_TOKENS", 2048)),
+                            "temperature": float(os.getenv("LLM_TEMPERATURE", 0.1)),  # Lower temperature for accuracy
+                            "max_tokens": int(os.getenv("LLM_MAX_TOKENS", 4096)),  # Increased for detailed responses
+                            "top_p": 0.95,
+                            "frequency_penalty": 0.0,
+                            "presence_penalty": 0.0
                         },
                         headers={
                             "Content-Type": "application/json",
                             "api-key": azure_api_key
                         },
-                        timeout=timeout
+                        timeout=(15, timeout)  # (connection timeout, read timeout)
                     )
                     
                     if response.status_code == 200:
-                        response_text = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+                        response_data = response.json()
+                        response_text = response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
                         if not response_text:
+                            logger.error("❌ Azure OpenAI returned empty response")
+                            logger.debug(f"Full response: {response_data}")
                             raise RuntimeError("Azure OpenAI returned empty response")
+                        
+                        logger.info(f"✅ Azure OpenAI response received: {len(response_text)} chars")
+                        logger.debug(f"Response preview: {response_text[:500]}")
                         return response_text
                     else:
-                        logger.warning(
-                            f"Azure OpenAI returned status {response.status_code}: {response.text[:200]}"
+                        error_text = response.text[:500]
+                        logger.error(
+                            f"❌ Azure OpenAI returned status {response.status_code}: {error_text}"
                         )
+                        if attempt < max_retries - 1:
+                            logger.info(f"Retrying... (attempt {attempt + 2}/{max_retries})")
+                        else:
+                            raise RuntimeError(f"Azure OpenAI failed with status {response.status_code}: {error_text}")
                         
                 except requests.Timeout:
                     logger.warning(f"Timeout on attempt {attempt + 1}/{max_retries}")
