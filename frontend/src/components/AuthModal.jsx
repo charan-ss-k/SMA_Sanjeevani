@@ -23,7 +23,7 @@ const AuthModal = ({ isOpen, onClose }) => {
     gender: 'Male'
   });
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = window.__API_BASE__ || 'http://98.70.223.78';
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

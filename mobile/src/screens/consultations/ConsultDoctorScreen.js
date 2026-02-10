@@ -194,7 +194,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
 
   const loadSearchOptions = async () => {
     try {
-      const apiBase = 'http://192.168.29.195:8000';
+      const apiBase = 'http://98.70.223.78';
       console.log('📍 Fetching search options from:', `${apiBase}/api/appointments/search/options`);
       const response = await fetch(`${apiBase}/api/appointments/search/options`);
       
@@ -218,7 +218,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
   const loadAppointments = async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
-      const baseURL = 'http://192.168.29.195:8000/api';
+      const baseURL = 'http://98.70.223.78/api';
       
       // Fetch all appointments (history)
       const allResponse = await fetch(`${baseURL}/my-appointments`, {
@@ -295,7 +295,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
       
-      const response = await fetch('http://192.168.29.195:8000/api/appointments/upcoming-appointments', {
+      const response = await fetch('http://98.70.223.78/api/appointments/upcoming-appointments', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -345,7 +345,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
       
-      const response = await fetch('http://192.168.29.195:8000/api/appointments/my-appointments', {
+      const response = await fetch('http://98.70.223.78/api/appointments/my-appointments', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -422,7 +422,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
     setMessage('');
     
     try {
-      const apiBase = 'http://192.168.29.195:8000';
+      const apiBase = 'http://98.70.223.78';
       const response = await fetch(`${apiBase}/api/appointments/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -540,7 +540,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       console.log('📤 Sending appointment booking (Local IST):', payload);
 
       const token = await AsyncStorage.getItem('authToken');
-      const response = await fetch('http://192.168.29.195:8000/api/appointments/book', {
+      const response = await fetch('http://98.70.223.78/api/appointments/book', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -620,7 +620,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
             try {
               setLoading(true);
               const token = await AsyncStorage.getItem('authToken');
-              const response = await fetch(`http://192.168.29.195:8000/api/appointments/appointment/${appointment.id}`, {
+              const response = await fetch(`http://98.70.223.78/api/appointments/appointment/${appointment.id}`, {
                 method: 'DELETE',
                 headers: {
                   'Authorization': `Bearer ${token}`,
@@ -715,7 +715,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       console.log('📤 Updating appointment (Local IST):', payload);
 
       const token = await AsyncStorage.getItem('authToken');
-      await fetch(`http://192.168.29.195:8000/api/appointments/appointment/${editingAppointment.id}`, {
+      await fetch(`http://98.70.223.78/api/appointments/appointment/${editingAppointment.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

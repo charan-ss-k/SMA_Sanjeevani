@@ -24,7 +24,7 @@ import * as SecureStore from 'expo-secure-store';
 import { colors, spacing, typography, borderRadius } from '../../utils/theme';
 
 const { width } = Dimensions.get('window');
-const API_BASE = 'http://192.168.29.195:8000';
+const API_BASE = 'http://98.70.223.78';
 
 // Feature Slides Data (matching frontend)
 const slides = [

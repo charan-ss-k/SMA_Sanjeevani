@@ -183,15 +183,92 @@ except Exception:
 def call_llm(prompt: str) -> str:
     provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
     logger.info("=" * 70)
-    logger.info("LLM PROVIDER: '%s'", provider)
+    logger.info("🔧 Symptoms Recommendation Service using LLM PROVIDER: '%s'", provider)
+    if provider == "azure_openai":
+        logger.info("✅ USING AZURE OPENAI (NOT LOCAL OLLAMA)")
     logger.info("=" * 70)
     
     if provider == "mock":
         logger.warning("!!! WARNING: Using MOCK provider - NOT calling real LLM !!!")
-        logger.warning("To use real Phi-4, set LLM_PROVIDER=ollama in .env")
-        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Phi-4")
+        logger.warning("To use real Phi-4, set LLM_PROVIDER=ollama or azure_openai in .env")
+        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama or azure_openai in .env to use Phi-4")
     
-    if provider == "ollama":
+    if provider == "azure_openai":
+        logger.info("Calling Phi-4 via Azure OpenAI for independent medical reasoning...")
+        
+        # Get Azure OpenAI configuration from environment
+        azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
+        azure_api_key = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
+        azure_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
+        
+        if not azure_endpoint or not azure_api_key:
+            raise ValueError("Azure OpenAI credentials missing. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY in .env")
+        
+        # Azure OpenAI uses OpenAI-compatible API
+        # Remove '/openai/v1/' from endpoint if present and reconstruct proper URL
+        base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+        api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+        
+        logger.info("Azure Endpoint: %s", base_endpoint)
+        logger.info("Deployment: %s", azure_deployment)
+        
+        payload = {
+            "messages": [
+                {"role": "system", "content": "You are a medical AI assistant. Respond only with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.2)),
+            "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", 1024)),
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": azure_api_key
+        }
+        
+        try:
+            logger.info("Sending request to Azure OpenAI...")
+            resp = requests.post(api_url, json=payload, headers=headers, timeout=600)
+            
+            if resp.status_code != 200:
+                error_msg = resp.text
+                logger.error("Azure OpenAI error (status %d): %s", resp.status_code, error_msg)
+                raise Exception(f"Azure OpenAI error: {resp.status_code} - {error_msg}")
+            
+            resp.raise_for_status()
+            
+            # Azure OpenAI returns OpenAI-compatible format
+            resp_json = resp.json()
+            llm_output = resp_json.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            logger.info("✓ Azure OpenAI (Phi-4) response received")
+            
+            # Try to extract JSON from the response
+            try:
+                parsed = utils.try_parse_json(llm_output)
+                logger.info("✓ Successfully parsed Azure OpenAI response")
+                return json.dumps(parsed)
+            except Exception as parse_err:
+                logger.error("✗ Failed to parse JSON from Azure OpenAI response")
+                logger.error("Parse error: %s", parse_err)
+                raise ValueError(f"Azure OpenAI did not return valid JSON. Error: {parse_err}")
+                
+        except requests.exceptions.ConnectionError as ce:
+            logger.error("✗ FATAL: Cannot connect to Azure OpenAI")
+            logger.error("Azure Endpoint: %s", azure_endpoint)
+            logger.error("Error: %s", ce)
+            raise Exception(
+                f"Cannot connect to Azure OpenAI at {azure_endpoint}\n\n"
+                f"Solutions:\n"
+                f"1. Verify AZURE_OPENAI_ENDPOINT is correct in .env\n"
+                f"2. Check AZURE_OPENAI_API_KEY is valid\n"
+                f"3. Ensure network connectivity to Azure"
+            )
+        except Exception as e:
+            logger.exception("✗ ERROR calling Azure OpenAI: %s", e)
+            raise
+    
+    elif provider == "ollama":
         logger.info("Calling Phi-4 via Ollama for independent medical reasoning...")
         ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
         ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
@@ -251,7 +328,7 @@ def call_llm(prompt: str) -> str:
     
     else:
         logger.error("Invalid LLM_PROVIDER: %s", provider)
-        raise ValueError(f"Invalid LLM_PROVIDER: {provider}. Must be 'ollama'. Set in .env file.")
+        raise ValueError(f"Invalid LLM_PROVIDER: {provider}. Must be 'ollama' or 'azure_openai'. Set in .env file.")
 
 
 def _translate_text_if_needed(text: str, lang: str) -> str:
@@ -479,46 +556,93 @@ Question from user: {question}
 Response (in {lang_display}):"""
 
     try:
-        logger.info("Calling Phi-4 LLM for medical Q&A...")
+        logger.info("Calling LLM for medical Q&A...")
         
         # Get LLM config
         provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
-        ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-        ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
         
-        logger.info("LLM Provider: %s", provider)
-        logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s (Phi-4)", ollama_model)
+        logger.info("🔧 Medical Q&A using LLM Provider: %s", provider)
+        if provider == "azure_openai":
+            logger.info("✅ CONFIRMED: Using Azure OpenAI Phi-4 (NOT local Ollama)")
         
-        if provider != "ollama":
-            raise Exception(f"Only Ollama provider is supported. Got: {provider}")
+        if provider == "azure_openai":
+            # Azure OpenAI implementation
+            azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
+            azure_api_key = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
+            azure_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
+            
+            if not azure_endpoint or not azure_api_key:
+                raise ValueError("Azure OpenAI credentials missing. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY in .env")
+            
+            base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+            api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+            
+            payload = {
+                "messages": [
+                    {"role": "system", "content": f"You are a medical AI assistant. Respond ENTIRELY in {lang_display} language."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
+                "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", 1024)),
+            }
+            
+            headers = {
+                "Content-Type": "application/json",
+                "api-key": azure_api_key
+            }
+            
+            logger.info("Sending request to Azure OpenAI (Phi-4)...")
+            logger.info("Timeout: 60 seconds for medical Q&A response")
+            
+            resp = requests.post(api_url, json=payload, headers=headers, timeout=60)
+            
+            if resp.status_code != 200:
+                error_msg = resp.text
+                logger.error("Azure OpenAI error (status %d): %s", resp.status_code, error_msg)
+                raise Exception(f"Azure OpenAI API error: {resp.status_code} - {error_msg}")
+            
+            resp.raise_for_status()
+            
+            # Extract response from Azure OpenAI
+            resp_json = resp.json()
+            answer = resp_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            
+        elif provider == "ollama":
+            ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
+            ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
+            
+            logger.info("Ollama URL: %s", ollama_url)
+            logger.info("Ollama Model: %s (Phi-4)", ollama_model)
+            
+            # Call Ollama directly without JSON parsing
+            api_url = f"{ollama_url}/api/generate"
+            payload = {
+                "model": ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
+            }
+            
+            logger.info("Sending request to Phi-4 via Ollama...")
+            logger.info("Timeout: 60 seconds for Phi-4 medical Q&A response")
+            
+            resp = requests.post(api_url, json=payload, timeout=60)
+            
+            if resp.status_code != 200:
+                error_msg = resp.text
+                logger.error("Ollama error (status %d): %s", resp.status_code, error_msg)
+                raise Exception(f"Ollama API error: {resp.status_code} - {error_msg}")
+            
+            resp.raise_for_status()
+            
+            # Extract response from Ollama
+            resp_json = resp.json()
+            answer = resp_json.get("response", "").strip()
         
-        # Call Ollama directly without JSON parsing
-        api_url = f"{ollama_url}/api/generate"
-        payload = {
-            "model": ollama_model,
-            "prompt": prompt,
-            "stream": False,
-            "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
-        }
+        else:
+            raise Exception(f"Invalid LLM_PROVIDER: {provider}. Must be 'ollama' or 'azure_openai'")
         
-        logger.info("Sending request to Phi-4 via Ollama...")
-        logger.info("Timeout: 60 seconds for Phi-4 medical Q&A response")
-        
-        resp = requests.post(api_url, json=payload, timeout=60)
-        
-        if resp.status_code != 200:
-            error_msg = resp.text
-            logger.error("Ollama error (status %d): %s", resp.status_code, error_msg)
-            raise Exception(f"Ollama API error: {resp.status_code} - {error_msg}")
-        
-        resp.raise_for_status()
-        
-        # Extract response from Ollama
-        resp_json = resp.json()
-        answer = resp_json.get("response", "").strip()
-        
-        logger.info("✓ Phi-4 response received (%d chars)", len(answer))
+        logger.info("✓ LLM response received (%d chars)", len(answer))
         logger.info("Response (first 500 chars): %s", answer[:500])
         
         # Validate response

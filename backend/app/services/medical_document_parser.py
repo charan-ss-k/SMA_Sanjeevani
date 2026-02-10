@@ -34,7 +34,7 @@ class MedicalDocumentParser:
             
             # Call LLM with increased timeout for accuracy
             logger.info(f"📞 Calling LLM (timeout: {timeout}s, retries: {max_retries})...")
-            response_text = EnhancedMedicineLLMGenerator._call_ollama_with_retry(
+            response_text = EnhancedMedicineLLMGenerator._call_llm_with_retry(
                 prompt,
                 max_retries=max_retries,
                 timeout_base=timeout
@@ -44,8 +44,10 @@ class MedicalDocumentParser:
                 logger.warning("⚠️ LLM returned empty or very short response, using fallback")
                 return MedicalDocumentParser._parse_with_regex(extracted_text)
             
-            logger.debug(f"📄 Raw LLM Response length: {len(response_text)} chars")
-            logger.info(f"📄 LLM RESPONSE PREVIEW:\n{response_text[:800]}")
+            logger.info(f"✅ LLM Response received: {len(response_text)} chars")
+            logger.info(f"📄 LLM RESPONSE PREVIEW:\n{response_text[:1000]}...")
+            logger.info(f"📄 LLM RESPONSE END:\n...{response_text[-500:]}")
+            logger.info(f"📄 LLM RESPONSE END:\n...{response_text[-500:]}")
             
             # Try to extract and parse JSON
             parsed = MedicalDocumentParser._extract_json_safe(response_text)
@@ -75,7 +77,7 @@ class MedicalDocumentParser:
         try:
             from app.services.enhanced_medicine_llm_generator import EnhancedMedicineLLMGenerator
             
-            response_text = EnhancedMedicineLLMGenerator._call_ollama_with_retry(
+            response_text = EnhancedMedicineLLMGenerator._call_llm_with_retry(
                 prompt,
                 max_retries=max_retries,
                 timeout_base=timeout
@@ -101,115 +103,165 @@ class MedicalDocumentParser:
     def _create_hospital_report_prompt(extracted_text: str) -> str:
         """
         Create comprehensive prompt for hospital report parsing.
-        Includes examples and strict formatting requirements.
+        Enhanced to handle ALL sections of printed prescriptions perfectly.
         """
-        prompt = f"""You are a MEDICAL DOCUMENT EXPERT with 20+ years of healthcare experience.
-Your task is to extract EVERY piece of information from a hospital report and structure it carefully.
+        prompt = f"""You are an EXPERT MEDICAL DOCUMENT ANALYST with 25+ years experience in healthcare documentation.
+Your PRIMARY MISSION: Extract EVERY SINGLE piece of information from this hospital report with 100% accuracy.
 
-IMPORTANT: 
-- Extract EXACTLY what you see in the document
-- Do NOT make assumptions or add information not present
-- For missing information, use null or empty string
-- PRESERVE original names, numbers, and spellings
-- Return ONLY valid JSON
+⚠️ CRITICAL IMPORTANCE: This is a REAL medical document. Missing information could affect patient care.
 
-HOSPITAL REPORT TEXT:
-==================
-{extracted_text[:2000]}
-==================
+DOCUMENT TEXT TO ANALYZE:
+==========================================
+{extracted_text[:3500]}
+==========================================
 
-CRITICAL TASK: Parse this hospital report completely and extract EVERY medicine mentioned.
+🎯 YOUR TASK: Parse this document completely and structure it perfectly.
 
-MEDICINE EXTRACTION PRIORITY:
-⚠️ MOST IMPORTANT: Find ALL medicines in the text, even if:
-    - They appear after "Rx:", "R/", "Prescription:", "Medicines:", "Treatment:"
-    - Listed with numbers (1., 2., 3.) or bullet points
-    - Have dosage after name (e.g., "Paracetamol 500mg")
-    - Abbreviated (Tab., Cap., Syp., Inj.)
-    - Written in any section of the report
+📋 EXTRACTION PRIORITY (WHAT TO FIND):
 
-WHAT TO EXTRACT:
-1. Hospital name, address, phone, email
-2. Patient full name, ID, age, gender, contact  
-3. Doctor name, specialization, registration number
-4. Visit date, type, department, diagnosis
-5. ALL symptoms and complaints
-6. ⚠️ EVERY MEDICINE - look for:
-    - Medicine names (generic or brand)
-    - Dosage form (tablet, capsule, syrup, injection)
-    - Strength (mg, ml, gm)
-    - Frequency (OD/BD/TDS, once/twice/thrice daily, morning/evening)
-    - Duration (days, weeks, "till next visit")
-    - Instructions (after food, before sleep, etc)
-7. ALL investigations/tests
-8. Complete medical advice and follow-up
+1. **HOSPITAL/CLINIC DETAILS** (Top of document):
+   - Look for: Hospital/Clinic name, Business Center, address, city, PIN code
+   - Phone numbers (Ph:, Phone:, Contact:)
+   - Email addresses if present
+   - Registration numbers (Reg:, Registration:)
+   - Timings (09:00 AM - 01:00 PM format)
+   - Closed days (Closed: Sunday)
 
-RETURN THIS EXACT JSON FORMAT:
+2. **DOCTOR DETAILS** (Header section):
+   - Full name (Dr., Dr, Doctor)
+   - Qualifications (MS, MD, MBBS, etc.)
+   - Registration number (MMC, Reg No:, License:)
+   - Specialization if mentioned
+
+3. **PATIENT INFORMATION** (After header):
+   - Patient ID (OPD, ID:, Patient ID:, MR No:)
+   - Full name
+   - Age (Y for years, M for months)
+   - Gender (M/F/Male/Female)
+   - Mobile number (Mob No:, Contact:, Phone:)
+   - Complete address
+   - Visit date (Date:, dd-mm-yyyy format)
+
+4. **CLINICAL DATA** (Middle section):
+   - Weight (Kg, kg)
+   - Height (Cm, cm)
+   - BMI (B.MI:, BMI:)
+   - Blood Pressure (BP:, mm Hg, mmHg)
+   - Temperature if present
+   - Clinical Findings section
+   - Chief Complaints (symptoms with duration in days/weeks)
+   - Diagnosis
+
+5. **MEDICINES LIST** (MOST IMPORTANT - Medicine Name section):
+   ⚠️ CRITICAL: Look for EVERY medicine after these markers:
+   - "Medicine Name", "Medicines:", "Rx:", "R/", "Prescription:", "Treatment:"
+   - Usually numbered (1), 2), 3), etc.) or bulleted
+   
+   For EACH medicine extract:
+   - Serial number (1., 2., 3.)
+   - Complete medicine name (TAB., CAP., SYP., INJ. prefix)
+   - Generic/Brand name (ALL CAPITAL LETTERS usually)
+   - Strength/composition (10MG, 500MG, etc.)
+   - Dosage column (Morning, Night, Afternoon, Evening)
+   - When to take (After Food, Before Food, Empty Stomach)
+   - Duration (X Days, X Weeks, "Tot: X Tab" means total tablets)
+   - Frequency (Once/Twice/Thrice daily, OD/BD/TDS)
+
+6. **MEDICAL ADVICE** (Bottom section):
+   - Advice: section (dietary, lifestyle instructions)
+   - Follow Up: (date for next visit)
+   - Precautions and warnings
+   - Emergency instructions
+
+7. **ADDITIONAL NOTES**:
+   - Any substitute recommendations
+   - Test reports mentioned
+   - Other instructions
+
+🔍 MEDICINE EXTRACTION RULES:
+✓ Look for pattern: "NUMBER) TYPE. MEDICINE_NAME STRENGTH"
+   Example: "1) TAB. ABCIXIMAB 8 Days"
+✓ Dosage column shows: Morning/Night/Afternoon timing
+✓ "(Tot: X Tab)" means total number of tablets
+✓ Duration is usually after the medicine name (8 Days, 3 Days)
+✓ Some medicines show composition like "DOXYLAMINE 10MG + PYRIDOXINE 10MG"
+
+RETURN THIS EXACT JSON STRUCTURE:
 {{
   "hospital_details": {{
-    "name": "extracted hospital name or null",
-    "address": "full address or null",
-    "phone": "contact number or null",
-    "email": "email or null"
-  }},
-  "patient_details": {{
-    "name": "patient full name",
-    "id": "patient ID/MR number or null",
-    "age": "age in numbers or null",
-    "gender": "Male/Female/Other or null",
-    "contact": "phone number or null",
-    "address": "address or null"
+    "name": "Full hospital/clinic name",
+    "address": "Complete address with city and PIN",
+    "phone": "Phone number",
+    "email": "Email if present or null",
+    "registration": "Registration number or null",
+    "timings": "Operating hours or null",
+    "closed_days": "Closed days or null"
   }},
   "doctor_details": {{
-    "name": "doctor full name",
-    "specialization": "specialization or null",
-    "registration_number": "registration/license number or null",
-    "contact": "contact or null"
+    "name": "Dr. Full Name",
+    "qualifications": "MS, MD, MBBS etc or null",
+    "specialization": "Specialty or null",
+    "registration_number": "MMC/Registration number",
+    "contact": "Doctor contact or null"
   }},
-  "visit_details": {{
-    "date": "visit date or null",
-    "type": "OPD/IPD/Emergency/Follow-up or null",
-    "department": "department name or null",
-    "chief_complaint": "main complaint or null",
-    "diagnosis": "final diagnosis or null",
-    "symptoms": ["symptom 1", "symptom 2", "symptom 3"] (or empty if none)
+  "patient_details": {{
+    "name": "Patient full name",
+    "patient_id": "OPD ID / Patient ID",
+    "age": "Age with unit (e.g., 13 Y, 6 M)",
+    "gender": "Male/Female/M/F",
+    "mobile": "Mobile number",
+    "address": "Patient address",
+    "visit_date": "Visit date (dd-mm-yyyy)"
+  }},
+  "clinical_details": {{
+    "weight_kg": "Weight in kg or null",
+    "height_cm": "Height in cm or null",
+    "bmi": "BMI value or null",
+    "blood_pressure": "BP reading (e.g., 120/80 mmHg) or null",
+    "temperature": "Temperature or null",
+    "chief_complaints": ["Complaint 1 (duration)", "Complaint 2 (duration)"],
+    "clinical_findings": "Clinical findings text or null",
+    "diagnosis": "Diagnosis"
   }},
   "medicines": [
     {{
-      "name": "medicine name with strength (e.g., Amoxicillin 500mg)",
-      "dosage": "e.g., 1 tablet or 5ml",
-      "frequency": "e.g., twice daily / BD / TDS",
-      "duration": "e.g., 7 days or 2 weeks",
-      "timing": "e.g., after food, before sleep, morning",
-      "instructions": "any special instructions or null",
-      "route": "oral/injection/topical or null"
-    }}
-  ],
-  "investigations": [
-    {{
-      "name": "test/investigation name",
-      "result": "result if shown or null",
-      "normal_range": "normal values or null"
+      "serial_number": "1",
+      "medicine_type": "TAB/CAP/SYP/INJ",
+      "name": "MEDICINE NAME",
+      "strength": "500mg / 10mg / etc",
+      "composition": "Chemical composition or null",
+      "dosage": "1 tablet / 5ml / etc",
+      "timing": "Morning/Night/Afternoon/Evening",
+      "frequency": "Once daily / BD / TDS / OD",
+      "duration": "7 Days / 2 Weeks / etc",
+      "total_quantity": "Total tablets/capsules (Tot: 8 Tab) or null",
+      "when_to_take": "After Food / Before Food / Empty Stomach or null",
+      "instructions": "Special instructions or null"
     }}
   ],
   "medical_advice": {{
-    "diet": "dietary restrictions or recommendations or null",
-    "lifestyle": "activity level, rest needed, etc or null",
-    "precautions": "things to avoid or be careful about or null",
-    "follow_up": "when to return for follow-up or null",
-    "emergency": "when to seek emergency care or null"
+    "advice": ["Advice 1", "Advice 2", "Advice 3"],
+    "dietary_restrictions": "Diet instructions or null",
+    "precautions": "Precautions or null",
+    "follow_up_date": "Next visit date or null",
+    "emergency_instructions": "When to seek emergency care or null"
   }},
-  "additional_information": "any other important details from report or null"
+  "additional_notes": "Any other important information or substitute recommendations"
 }}
 
-VALIDATION CHECKLIST:
-✓ All medicine names are exact from document
-✓ Dosages and frequencies match document exactly
-✓ No invented or assumed information
-✓ Missing fields are null, not empty strings
-✓ Valid JSON syntax (can be parsed by json.loads)
+⚠️ VALIDATION REQUIREMENTS:
+✓ Extract medicine names EXACTLY as written (preserve capitalization)
+✓ Do NOT skip any medicine - get ALL of them
+✓ Duration format: "X Days" not "for X days"
+✓ Timing: Extract from dosage column (Morning/Night/Afternoon/Evening)
+✓ Total quantity: Look for "(Tot: X Tab)" or "(Tot: X Cap)"
+✓ Use null for missing data, NEVER empty strings
+✓ Return ONLY valid JSON - must parse with json.loads()
+✓ NO explanatory text before or after JSON
 
-NOW PARSE THE REPORT AND RETURN ONLY THE JSON."""
+🚨 FINAL CHECK: Did you find ALL medicines? Count them in the document and in your JSON. They MUST match!
+
+NOW EXTRACT ALL INFORMATION AND RETURN ONLY THE JSON:"""
         return prompt
     
     @staticmethod
@@ -336,29 +388,68 @@ NOW PARSE AND RETURN ONLY THE JSON."""
         """
         Extract medicines from text using regex patterns.
         Looks for common pharmaceutical formats.
+        IMPROVED: Filters out non-medicine field labels.
         """
         medicines = []
         
-        # Common medicine name patterns
+        # Field labels that are NOT medicines (case-insensitive)
+        excluded_labels = {
+            'no:', 'ph:', 'phone:', 'date:', 'weight', 'height', 'follow up:', 'address:', 
+            'mob no:', 'mobile:', 'reg:', 'timing:', 'b.mi:', 'bmi:', 'blood pressure:', 'bp:',
+            'patient', 'doctor', 'dr.', 'dr ', 'hospital', 'clinic', 'mmc', 'diagnosis:', 
+            'closed:', 'opd', 'id:', 'age:', 'gender:', 'contact:', 'email:', 'registration:',
+            'clinical findings', 'chief complaints', 'symptoms', 'advice:', 'precautions:',
+            'instructions:', 'notes:', 'remarks:', 'visit date:', 'consultant:', 'dept:'
+        }
+        
+        # Common medicine patterns
         medicine_patterns = [
-            r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(\d+\s*(?:mg|ml|gm|IU|mcg))',  # Name + strength
-            r'1\.\s*([A-Z][a-z]+.*?)\s*[-–]\s*(\d+.*?)(?:\n|$)',  # Numbered format
-            r'^([A-Z][a-z]+.*?)\s+(\d+.*?)$',  # Line-by-line format
+            # Pattern 1: "1) TAB. MEDICINE_NAME" or "1. TAB MEDICINE"
+            r'(?:^|\n)\s*\d+\)\s*(?:TAB\.?|CAP\.?|SYP\.?|INJ\.?|SUSP\.?)\s+([A-Z][A-Z\s]+?)(?:\s+\d+\s*(?:mg|ml|gm|mcg|IU))?',
+            # Pattern 2: "Medicine Name 500mg"
+            r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(\d+\s*(?:mg|ml|gm|mcg|IU))',
+            # Pattern 3: After "Rx:", "Medicines:", "Prescription:"
+            r'(?:Rx:|Medicines?:|Prescription:)\s*\n\s*(?:\d+[.)]\s*)?([A-Z][A-Z\s]+)',
         ]
         
         lines = text.split('\n')
         for line in lines:
-            line = line.strip()
-            if not line or len(line) < 5:
+            line_clean = line.strip()
+            
+            # Skip empty lines
+            if not line_clean or len(line_clean) < 3:
                 continue
             
+            # Skip if line is just a field label (excluded label)
+            line_lower = line_clean.lower()
+            is_excluded = any(label in line_lower for label in excluded_labels)
+            if is_excluded:
+                logger.debug(f"Skipping excluded label: {line_clean}")
+                continue
+            
+            # Skip lines that are just numbers or dates
+            if re.match(r'^\d+[-/]\d+[-/]\d+$', line_clean) or re.match(r'^\d{8,}$', line_clean):
+                continue
+            
+            # Try to match medicine patterns
             for pattern in medicine_patterns:
-                matches = re.findall(pattern, line)
+                matches = re.findall(pattern, line_clean, re.IGNORECASE)
                 if matches:
                     for match in matches:
+                        medicine_name = match if isinstance(match, str) else match[0]
+                        medicine_name = medicine_name.strip()
+                        
+                        # Additional validation: medicine name should be mostly letters
+                        if len(medicine_name) < 3:
+                            continue
+                        
+                        letter_count = sum(c.isalpha() for c in medicine_name)
+                        if letter_count < len(medicine_name) * 0.5:  # At least 50% letters
+                            continue
+                        
                         medicines.append({
-                            "name": match[0] if len(match) > 0 else "",
-                            "dosage": match[1] if len(match) > 1 else "",
+                            "name": medicine_name,
+                            "dosage": match[1] if isinstance(match, tuple) and len(match) > 1 else "",
                             "frequency": "",
                             "duration": "",
                             "timing": "",
@@ -366,4 +457,5 @@ NOW PARSE AND RETURN ONLY THE JSON."""
                         })
                     break
         
+        logger.info(f"Regex extraction found {len(medicines)} medicines (after filtering)")
         return medicines

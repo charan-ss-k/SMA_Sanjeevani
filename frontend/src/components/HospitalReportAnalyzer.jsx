@@ -115,6 +115,7 @@ const HospitalReportAnalyzer = () => {
 
       const result = await response.json();
       setAnalysisResult(result);
+      
       playTTS(getPrescriptionText('analysisComplete', language), language);
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -170,16 +171,21 @@ const HospitalReportAnalyzer = () => {
 
     setSavingReport(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('structured_data', JSON.stringify(analysisResult.structured_data || {}));
-      formData.append('extracted_text', analysisResult.extracted_text || '');
-      formData.append('report_title', file.name || 'Hospital Report');
+      const payload = {
+        report_title: file?.name || 'Hospital Report',
+        uploaded_file: file?.name || 'Unknown file',
+        ocr_method: analysisResult.ocr_method || 'OCR',
+        extracted_text: analysisResult.extracted_text || '',
+        structured_data: analysisResult.structured_data || {}
+      };
 
-      const response = await fetch(`${apiBase}/api/hospital-report-history`, {
+      const response = await fetch(`${apiBase}/api/hospital-report-history/`, {
         method: 'POST',
-        body: formData,
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -189,6 +195,7 @@ const HospitalReportAnalyzer = () => {
 
       const saved = await response.json();
       setHistoryItems(prev => [saved, ...prev]);
+      playTTS('Report saved successfully', language);
     } catch (e) {
       console.error('Save report failed:', e);
       setAnalysisError(e.message || getPrescriptionText('failedToSavePrescription', language));
@@ -331,103 +338,359 @@ const HospitalReportAnalyzer = () => {
               </div>
             )}
 
-            {analysisResult && (
-              <div className="space-y-4">
-                {/* Extracted Text */}
-                {analysisResult.extracted_text && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-bold text-gray-800 mb-2">📝 {getPrescriptionText('extractedText', language)}</h3>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{analysisResult.extracted_text}</p>
-                  </div>
-                )}
+            {analysisResult && analysisResult.structured_data && (
+              <div className="mt-6">
+                {/* Professional Medical Report - Inline Display */}
+                <div className="bg-white rounded-xl shadow-lg p-8">
+                  {(() => {
+                    const data = analysisResult.structured_data || {};
+                    const hospital = data.hospital_details || {};
+                    const doctor = data.doctor_details || {};
+                    const patient = data.patient_details || {};
+                    const clinical = data.clinical_details || {};
+                    const medicines = data.medicines || [];
+                    const advice = data.medical_advice || {};
+                    
+                    const hasHospitalData = hospital.name || hospital.address || hospital.phone;
+                    const hasDoctorData = doctor.name || doctor.qualifications;
+                    const hasPatientData = patient.name || patient.patient_id || patient.age;
+                    const hasClinicalData = clinical.diagnosis || clinical.chief_complaints?.length > 0;
+                    const isIncompleteData = data.additional_information?.includes("regex fallback");
 
-                {/* Structured Data */}
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <h3 className="font-bold text-gray-800 mb-3">📊 {getPrescriptionText('structuredData', language)}</h3>
-
-                {/* Patient Information */}
-                {analysisResult.structured_data.patient && Object.keys(analysisResult.structured_data.patient).length > 0 && (
-                  <InfoCard title={`👤 ${getPrescriptionText('patientInfo', language)}`} data={analysisResult.structured_data.patient} onSpeak={speakSection} language={language} />
-                )}
-
-                {/* Test Results */}
-                {analysisResult.structured_data.test_results && Object.keys(analysisResult.structured_data.test_results).length > 0 && (
-                  <InfoCard title={`🧪 ${getPrescriptionText('testResults', language)}`} data={analysisResult.structured_data.test_results} onSpeak={speakSection} language={language} />
-                )}
-
-                {/* Medicines */}
-                {analysisResult.structured_data.medicines && analysisResult.structured_data.medicines.length > 0 && (
-                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-gray-800">💊 {getPrescriptionText('medicines', language)}</h3>
-                      <button
-                        onClick={() => speakSection(JSON.stringify(analysisResult.structured_data.medicines), getPrescriptionText('medicines', language))}
-                        className="p-2 bg-green-100 rounded hover:bg-green-200"
-                      >
-                        🔊
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {analysisResult.structured_data.medicines.map((med, idx) => {
-                        const medName = med.medicine_name || med.name || med.medicine || med.drug_name || med.item_name || '';
-                        const dosage = med.dosage || med.strength || med.dose || '';
-                        const frequency = med.frequency || med.freq || '';
-                        const duration = med.duration || med.days || '';
-                        const timing = med.timing || med.time || '';
-                        const instructions = med.special_instructions || med.instructions || med.note || '';
-
-                        return (
-                        <div key={idx} className="bg-white p-3 rounded border w-full">
-                          <div className="font-semibold text-gray-800 wrap-break-word whitespace-normal">
-                            {medName || getPrescriptionText('unnamedMedicine', language)}
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600 mt-2 wrap-break-word">
-                            {dosage && <div>💉 {dosage}</div>}
-                            {frequency && <div>📅 {frequency}</div>}
-                            {duration && <div>⏳ {duration}</div>}
-                            {timing && <div>🕐 {timing}</div>}
-                          </div>
-                          {instructions && (
-                            <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded">
-                              📝 {instructions}
+                    return (
+                      <>
+                        {/* Warning for Incomplete Data */}
+                        {isIncompleteData && (
+                          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                            <div className="flex items-start">
+                              <span className="text-2xl mr-3">⚠️</span>
+                              <div>
+                                <h4 className="font-bold text-yellow-800 mb-1">Incomplete Data Extraction</h4>
+                                <p className="text-sm text-yellow-700">
+                                  Some details could not be extracted. Only medicine information is available. 
+                                  Please verify with the original prescription.
+                                </p>
+                              </div>
                             </div>
-                          )}
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-3 mb-6 no-print">
+                          <button
+                            onClick={saveReport}
+                            disabled={savingReport}
+                            className={`px-6 py-3 rounded-lg font-semibold transition ${
+                              savingReport ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
+                            }`}
+                          >
+                            {savingReport ? '💾 Saving...' : '💾 Save Report to History'}
+                          </button>
                         </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                        
+                        {/* Header - Hospital Details */}
+                        {hasHospitalData && (
+                          <div className="text-center border-b-4 border-blue-600 pb-6 mb-6">
+                            <h1 className="text-3xl font-bold text-blue-900 mb-2">
+                              {hospital.name || 'Medical Center'}
+                            </h1>
+                            {hospital.address && (
+                              <p className="text-gray-700 text-sm mb-1">{hospital.address}</p>
+                            )}
+                            <div className="flex justify-center gap-6 text-sm text-gray-600 mt-2">
+                              {hospital.phone && <span>📞 {hospital.phone}</span>}
+                              {hospital.email && <span>✉️ {hospital.email}</span>}
+                            </div>
+                            {hospital.timings && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                🕒 {hospital.timings} {hospital.closed_days && `• ${hospital.closed_days}`}
+                              </p>
+                            )}
+                          </div>
+                        )}
 
-                {/* Medical Advice */}
-                {analysisResult.structured_data.medical_advice && Object.keys(analysisResult.structured_data.medical_advice).length > 0 && (
-                  <InfoCard
-                    title={`💡 ${getPrescriptionText('medicalAdvice', language)}`}
-                    data={analysisResult.structured_data.medical_advice}
-                    onSpeak={speakSection}
-                    language={language}
-                  />
-                )}
+                        {/* Doctor Details */}
+                        {hasDoctorData && (
+                          <div className="bg-blue-50 rounded-lg p-4 mb-6 border-l-4 border-blue-600">
+                            <h3 className="font-bold text-blue-900 mb-2 text-lg">👨‍⚕️ Doctor Information</h3>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              {doctor.name && (
+                                <div>
+                                  <span className="text-gray-600">Name:</span>
+                                  <p className="font-semibold text-gray-900">{doctor.name}</p>
+                                </div>
+                              )}
+                              {doctor.qualifications && (
+                                <div>
+                                  <span className="text-gray-600">Qualifications:</span>
+                                  <p className="font-semibold text-gray-900">{doctor.qualifications}</p>
+                                </div>
+                              )}
+                              {doctor.specialization && (
+                                <div>
+                                  <span className="text-gray-600">Specialization:</span>
+                                  <p className="font-semibold text-gray-900">{doctor.specialization}</p>
+                                </div>
+                              )}
+                              {doctor.registration_number && (
+                                <div>
+                                  <span className="text-gray-600">Registration No:</span>
+                                  <p className="font-semibold text-gray-900">{doctor.registration_number}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
-                {/* Save Report Button - Below advice section */}
-                {analysisResult && (
-                  <div className="flex items-center justify-center">
-                    <button
-                      onClick={saveReport}
-                      disabled={savingReport}
-                      className={`px-6 py-3 rounded-lg font-semibold transition ${
-                        savingReport ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
-                    >
-                      {savingReport ? `💾 ${getPrescriptionText('saving', language)}` : `💾 ${getPrescriptionText('saveReportToHistory', language)}`}
-                    </button>
-                  </div>
-                )}
+                        {/* Patient Details */}
+                        {hasPatientData && (
+                          <div className="bg-green-50 rounded-lg p-4 mb-6 border-l-4 border-green-600">
+                            <h3 className="font-bold text-green-900 mb-2 text-lg">🧑 Patient Information</h3>
+                            <div className="grid grid-cols-3 gap-3 text-sm">
+                              {patient.name && (
+                                <div>
+                                  <span className="text-gray-600">Name:</span>
+                                  <p className="font-semibold text-gray-900">{patient.name}</p>
+                                </div>
+                              )}
+                              {patient.patient_id && (
+                                <div>
+                                  <span className="text-gray-600">Patient ID:</span>
+                                  <p className="font-semibold text-gray-900">{patient.patient_id}</p>
+                                </div>
+                              )}
+                              {patient.age && (
+                                <div>
+                                  <span className="text-gray-600">Age:</span>
+                                  <p className="font-semibold text-gray-900">{patient.age}</p>
+                                </div>
+                              )}
+                              {patient.gender && (
+                                <div>
+                                  <span className="text-gray-600">Gender:</span>
+                                  <p className="font-semibold text-gray-900">{patient.gender}</p>
+                                </div>
+                              )}
+                              {patient.mobile && (
+                                <div>
+                                  <span className="text-gray-600">Contact:</span>
+                                  <p className="font-semibold text-gray-900">{patient.mobile}</p>
+                                </div>
+                              )}
+                              {patient.visit_date && (
+                                <div>
+                                  <span className="text-gray-600">Visit Date:</span>
+                                  <p className="font-semibold text-gray-900">{patient.visit_date}</p>
+                                </div>
+                              )}
+                              {patient.address && (
+                                <div className="col-span-3">
+                                  <span className="text-gray-600">Address:</span>
+                                  <p className="font-semibold text-gray-900">{patient.address}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Clinical Details */}
+                        {hasClinicalData && (
+                          <div className="bg-orange-50 rounded-lg p-4 mb-6 border-l-4 border-orange-600">
+                            <h3 className="font-bold text-orange-900 mb-2 text-lg">🩺 Clinical Information</h3>
+                            
+                            {/* Vitals */}
+                            {(clinical.weight_kg || clinical.height_cm || clinical.bmi || clinical.blood_pressure) && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">VITAL SIGNS</p>
+                                <div className="grid grid-cols-4 gap-2 text-sm">
+                                  {clinical.weight_kg && (
+                                    <div className="bg-white p-2 rounded">
+                                      <span className="text-gray-600 text-xs">Weight:</span>
+                                      <p className="font-bold text-orange-700">{clinical.weight_kg} kg</p>
+                                    </div>
+                                  )}
+                                  {clinical.height_cm && (
+                                    <div className="bg-white p-2 rounded">
+                                      <span className="text-gray-600 text-xs">Height:</span>
+                                      <p className="font-bold text-orange-700">{clinical.height_cm} cm</p>
+                                    </div>
+                                  )}
+                                  {clinical.bmi && (
+                                    <div className="bg-white p-2 rounded">
+                                      <span className="text-gray-600 text-xs">BMI:</span>
+                                      <p className="font-bold text-orange-700">{clinical.bmi}</p>
+                                    </div>
+                                  )}
+                                  {clinical.blood_pressure && (
+                                    <div className="bg-white p-2 rounded">
+                                      <span className="text-gray-600 text-xs">BP:</span>
+                                      <p className="font-bold text-orange-700">{clinical.blood_pressure}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Complaints */}
+                            {clinical.chief_complaints && clinical.chief_complaints.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">CHIEF COMPLAINTS</p>
+                                <ul className="list-disc list-inside text-sm text-gray-800 bg-white p-2 rounded">
+                                  {clinical.chief_complaints.map((complaint, idx) => (
+                                    <li key={idx}>{complaint}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Diagnosis */}
+                            {clinical.diagnosis && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-600 mb-1">DIAGNOSIS</p>
+                                <p className="font-bold text-orange-900 bg-white p-2 rounded">{clinical.diagnosis}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Medicines - Most Important Section */}
+                        {medicines.length > 0 && (
+                          <div className="bg-red-50 rounded-lg p-4 mb-6 border-l-4 border-red-600">
+                            <h3 className="font-bold text-red-900 mb-3 text-lg">💊 Prescription</h3>
+                            <div className="space-y-3">
+                              {medicines.map((med, idx) => (
+                                <div key={idx} className="bg-white p-4 rounded-lg border border-red-200">
+                                  <div className="flex items-start gap-3">
+                                    <span className="bg-red-600 text-white font-bold rounded-full w-7 h-7 flex items-center justify-center text-sm flex-shrink-0">
+                                      {med.serial_number || idx + 1}
+                                    </span>
+                                    <div className="flex-1">
+                                      <h4 className="font-bold text-gray-900 text-base mb-1">
+                                        {med.medicine_type && <span className="text-red-600">{med.medicine_type}. </span>}
+                                        {med.name}
+                                        {med.strength && <span className="text-gray-600 font-normal ml-2">{med.strength}</span>}
+                                      </h4>
+                                      
+                                      <div className="grid grid-cols-2 gap-2 text-sm mt-2">
+                                        {med.dosage && (
+                                          <div>
+                                            <span className="text-gray-600">Dosage:</span>
+                                            <p className="font-medium text-gray-900">{med.dosage}</p>
+                                          </div>
+                                        )}
+                                        {med.timing && (
+                                          <div>
+                                            <span className="text-gray-600">Timing:</span>
+                                            <p className="font-medium text-gray-900">{med.timing}</p>
+                                          </div>
+                                        )}
+                                        {med.frequency && (
+                                          <div>
+                                            <span className="text-gray-600">Frequency:</span>
+                                            <p className="font-medium text-gray-900">{med.frequency}</p>
+                                          </div>
+                                        )}
+                                        {med.duration && (
+                                          <div>
+                                            <span className="text-gray-600">Duration:</span>
+                                            <p className="font-medium text-gray-900">{med.duration}</p>
+                                          </div>
+                                        )}
+                                        {med.when_to_take && (
+                                          <div>
+                                            <span className="text-gray-600">When to take:</span>
+                                            <p className="font-medium text-gray-900">{med.when_to_take}</p>
+                                          </div>
+                                        )}
+                                        {med.total_quantity && (
+                                          <div>
+                                            <span className="text-gray-600">Total:</span>
+                                            <p className="font-medium text-gray-900">{med.total_quantity}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {med.instructions && (
+                                        <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                          ℹ️ {med.instructions}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Medical Advice */}
+                        {(advice.advice?.length > 0 || advice.dietary_restrictions || advice.precautions || advice.follow_up_date) && (
+                          <div className="bg-purple-50 rounded-lg p-4 mb-6 border-l-4 border-purple-600">
+                            <h3 className="font-bold text-purple-900 mb-2 text-lg">📝 Medical Advice & Instructions</h3>
+                            
+                            {advice.advice && advice.advice.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">GENERAL ADVICE</p>
+                                <ul className="list-disc list-inside text-sm text-gray-800 space-y-1">
+                                  {advice.advice.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {advice.dietary_restrictions && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">DIETARY RESTRICTIONS</p>
+                                <p className="text-sm text-gray-800">{advice.dietary_restrictions}</p>
+                              </div>
+                            )}
+
+                            {advice.precautions && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">PRECAUTIONS</p>
+                                <p className="text-sm text-gray-800">{advice.precautions}</p>
+                              </div>
+                            )}
+
+                            {advice.follow_up_date && (
+                              <div className="bg-purple-100 p-2 rounded">
+                                <p className="text-xs font-semibold text-gray-600">FOLLOW UP</p>
+                                <p className="font-bold text-purple-900">{advice.follow_up_date}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="border-t-2 border-gray-300 pt-4 mt-6 text-center">
+                          <p className="text-xs text-gray-500 mb-1">
+                            This is an AI-assisted analysis of the medical document. Please verify all information with the original prescription.
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
-            </div>
             )}
           </div>
         </div>
+
+        <style jsx>{`
+          @media print {
+            .no-print {
+              display: none !important;
+            }
+            body {
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+            }
+          }
+        `}</style>
 
         {/* History Section */}
         <div className="mt-8">
@@ -483,21 +746,110 @@ const HospitalReportAnalyzer = () => {
 
                   {/* Expanded Details */}
                   {expandedHistoryId === item.id && (
-                    <div className="mt-4 space-y-3">
-                      {/* Patient Information */}
-                      {item.structured_data.patient && Object.keys(item.structured_data.patient).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`👤 ${getPrescriptionText('patientInfo', language)}`}
-                          data={item.structured_data.patient}
-                        />
+                    <div className="mt-4 space-y-3 bg-white p-4 rounded-lg border border-gray-200">
+                      {/* Hospital Details */}
+                      {item.structured_data?.hospital_details && Object.values(item.structured_data.hospital_details).some(v => v) && (
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <h4 className="font-bold text-blue-900 mb-2">🏥 Hospital Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.hospital_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.hospital_details.name}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.address && (
+                              <div className="col-span-2"><span className="text-gray-600">Address:</span> <span className="font-semibold">{item.structured_data.hospital_details.address}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.phone && (
+                              <div><span className="text-gray-600">Phone:</span> <span className="font-semibold">{item.structured_data.hospital_details.phone}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.timings && (
+                              <div><span className="text-gray-600">Timings:</span> <span className="font-semibold">{item.structured_data.hospital_details.timings}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
 
-                      {/* Test Results */}
-                      {item.structured_data.test_results && Object.keys(item.structured_data.test_results).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`🧪 ${getPrescriptionText('testResults', language)}`}
-                          data={item.structured_data.test_results}
-                        />
+                      {/* Doctor Details */}
+                      {item.structured_data?.doctor_details && Object.values(item.structured_data.doctor_details).some(v => v) && (
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <h4 className="font-bold text-blue-900 mb-2">👨‍⚕️ Doctor Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.doctor_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.doctor_details.name}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.qualifications && (
+                              <div><span className="text-gray-600">Qualifications:</span> <span className="font-semibold">{item.structured_data.doctor_details.qualifications}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.specialization && (
+                              <div><span className="text-gray-600">Specialization:</span> <span className="font-semibold">{item.structured_data.doctor_details.specialization}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.registration_number && (
+                              <div><span className="text-gray-600">Registration:</span> <span className="font-semibold">{item.structured_data.doctor_details.registration_number}</span></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Patient Information */}
+                      {item.structured_data?.patient_details && Object.values(item.structured_data.patient_details).some(v => v) && (
+                        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                          <h4 className="font-bold text-green-900 mb-2">🧑 Patient Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.patient_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.patient_details.name}</span></div>
+                            )}
+                            {item.structured_data.patient_details.patient_id && (
+                              <div><span className="text-gray-600">Patient ID:</span> <span className="font-semibold">{item.structured_data.patient_details.patient_id}</span></div>
+                            )}
+                            {item.structured_data.patient_details.age && (
+                              <div><span className="text-gray-600">Age:</span> <span className="font-semibold">{item.structured_data.patient_details.age}</span></div>
+                            )}
+                            {item.structured_data.patient_details.gender && (
+                              <div><span className="text-gray-600">Gender:</span> <span className="font-semibold">{item.structured_data.patient_details.gender}</span></div>
+                            )}
+                            {item.structured_data.patient_details.mobile && (
+                              <div><span className="text-gray-600">Contact:</span> <span className="font-semibold">{item.structured_data.patient_details.mobile}</span></div>
+                            )}
+                            {item.structured_data.patient_details.visit_date && (
+                              <div><span className="text-gray-600">Visit Date:</span> <span className="font-semibold">{item.structured_data.patient_details.visit_date}</span></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Clinical Details */}
+                      {item.structured_data?.clinical_details && Object.values(item.structured_data.clinical_details).some(v => v && v.length > 0) && (
+                        <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                          <h4 className="font-bold text-orange-900 mb-2">🩺 Clinical Information</h4>
+                          <div className="text-xs space-y-2">
+                            {(item.structured_data.clinical_details.weight_kg || item.structured_data.clinical_details.height_cm || item.structured_data.clinical_details.bmi || item.structured_data.clinical_details.blood_pressure) && (
+                              <div className="grid grid-cols-4 gap-2">
+                                {item.structured_data.clinical_details.weight_kg && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">Weight:</span> <span className="font-bold">{item.structured_data.clinical_details.weight_kg} kg</span></div>
+                                )}
+                                {item.structured_data.clinical_details.height_cm && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">Height:</span> <span className="font-bold">{item.structured_data.clinical_details.height_cm} cm</span></div>
+                                )}
+                                {item.structured_data.clinical_details.bmi && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">BMI:</span> <span className="font-bold">{item.structured_data.clinical_details.bmi}</span></div>
+                                )}
+                                {item.structured_data.clinical_details.blood_pressure && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">BP:</span> <span className="font-bold">{item.structured_data.clinical_details.blood_pressure}</span></div>
+                                )}
+                              </div>
+                            )}
+                            {item.structured_data.clinical_details.chief_complaints && item.structured_data.clinical_details.chief_complaints.length > 0 && (
+                              <div>
+                                <span className="font-semibold text-gray-700">Complaints:</span>
+                                <ul className="list-disc list-inside text-gray-600 mt-1">
+                                  {item.structured_data.clinical_details.chief_complaints.map((c, i) => <li key={i}>{c}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {item.structured_data.clinical_details.diagnosis && (
+                              <div><span className="text-gray-600">Diagnosis:</span> <span className="font-bold text-orange-900">{item.structured_data.clinical_details.diagnosis}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
 
                       {/* Medicines */}
@@ -537,11 +889,25 @@ const HospitalReportAnalyzer = () => {
                       )}
 
                       {/* Medical Advice */}
-                      {item.structured_data.medical_advice && Object.keys(item.structured_data.medical_advice).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`💡 ${getPrescriptionText('medicalAdvice', language)}`}
-                          data={item.structured_data.medical_advice}
-                        />
+                      {item.structured_data?.medical_advice && (item.structured_data.medical_advice.advice?.length > 0 || item.structured_data.medical_advice.precautions || item.structured_data.medical_advice.follow_up_date) && (
+                        <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                          <h4 className="font-bold text-purple-900 mb-2">📝 Medical Advice</h4>
+                          <div className="text-xs space-y-2">
+                            {item.structured_data.medical_advice.advice && item.structured_data.medical_advice.advice.length > 0 && (
+                              <div>
+                                <ul className="list-disc list-inside text-gray-700">
+                                  {item.structured_data.medical_advice.advice.map((a, i) => <li key={i}>{a}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {item.structured_data.medical_advice.precautions && (
+                              <div><span className="text-gray-600">Precautions:</span> <span className="font-semibold">{item.structured_data.medical_advice.precautions}</span></div>
+                            )}
+                            {item.structured_data.medical_advice.follow_up_date && (
+                              <div><span className="text-gray-600">Follow Up:</span> <span className="font-bold text-purple-900">{item.structured_data.medical_advice.follow_up_date}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

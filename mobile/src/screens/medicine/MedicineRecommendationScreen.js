@@ -98,7 +98,7 @@ const MedicineRecommendationScreen = () => {
 
       console.log('🔍 Sending symptom recommendation request:', payload);
 
-      const response = await fetch('http://192.168.29.195:8000/api/symptoms/recommend', {
+      const response = await fetch('http://98.70.223.78/api/symptoms/recommend', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

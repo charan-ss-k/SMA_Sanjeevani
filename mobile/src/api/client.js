@@ -425,7 +425,7 @@ class APIClient {
   async analyzePrescriptionImage(imageUri) {
     try {
       const formData = new FormData();
-      formData.append('prescription_image', {
+      formData.append('file', {
         uri: imageUri,
         type: 'image/jpeg',
         name: 'prescription.jpg',
@@ -434,17 +434,33 @@ class APIClient {
       const headers = await this.buildHeaders();
       delete headers['Content-Type']; // FormData sets its own Content-Type
 
-      const response = await this.fetchWithTimeout(`${this.baseURL}/prescriptions/analyze`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
+      // Use extended timeout for prescription analysis (OCR + AI can take 2-3 minutes)
+      const controller = new AbortController();
+      const extendedTimeout = 180000; // 3 minutes for OCR + LLM processing
+      const timeoutId = setTimeout(() => controller.abort(), extendedTimeout);
 
-      if (!response.ok) {
-        throw new Error('Prescription analysis failed');
+      try {
+        const response = await fetch(`${this.baseURL}/prescriptions/analyze`, {
+          method: 'POST',
+          headers,
+          body: formData,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Prescription analysis failed');
+        }
+
+        return await response.json();
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Analysis timeout - OCR and AI processing is taking longer than expected. Please try with a clearer image.');
+        }
+        throw fetchError;
       }
-
-      return await response.json();
     } catch (error) {
       throw this.handleError(error);
     }

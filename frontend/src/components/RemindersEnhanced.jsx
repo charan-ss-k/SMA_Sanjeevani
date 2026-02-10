@@ -5,6 +5,8 @@ import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
 
+const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+
 function speak(text, language) {
   if (!window.speechSynthesis) return;
   const ut = new SpeechSynthesisUtterance(text);
@@ -74,7 +76,7 @@ const RemindersEnhanced = () => {
 
   const fetchReminders = async () => {
     try {
-      const response = await fetch('/api/reminders/', {
+      const response = await fetch(`${API_BASE}/api/reminders/`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -149,7 +151,7 @@ const RemindersEnhanced = () => {
 
       const responses = await Promise.all(
         reminderPayloads.map((payload) =>
-          fetch('/api/reminders/', {
+          fetch(`${API_BASE}/api/reminders/`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -213,7 +215,7 @@ const RemindersEnhanced = () => {
 
       const responses = await Promise.all(
         target.reminder_ids.map((id) =>
-          fetch(`/api/reminders/${id}`, {
+          fetch(`${API_BASE}/api/reminders/${id}`, {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${authToken}`

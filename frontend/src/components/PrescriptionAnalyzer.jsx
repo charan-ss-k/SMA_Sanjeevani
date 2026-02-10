@@ -5,6 +5,8 @@ import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
 
+const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+
 const PrescriptionAnalyzer = () => {
   const { authToken } = useContext(AuthContext);
   const { language } = useContext(LanguageContext);
@@ -82,19 +84,28 @@ const PrescriptionAnalyzer = () => {
     setAnalysisResult(null);
     abortControllerRef.current = new AbortController();
 
+    // Set timeout for prescription analysis (3 minutes for OCR + LLM processing)
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    }, 180000); // 3 minutes timeout
+
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/prescriptions/analyze', {
+      const response = await fetch(`${API_BASE}/api/prescriptions/analyze`, {
         method: 'POST',
         body: formData,
         headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
         signal: abortControllerRef.current.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ detail: 'Analysis failed' }));
         throw new Error(error.detail || getPrescriptionText('analysisError', language));
       }
 
@@ -105,10 +116,13 @@ const PrescriptionAnalyzer = () => {
         playTTS(getPrescriptionText('analysisComplete', language), language);
       }
     } catch (error) {
-      if (error.name !== 'AbortError') {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        setAnalysisError(`❌ Analysis timeout - OCR and AI processing is taking longer than expected. Please try with a clearer image or try again.`);
+      } else {
         setAnalysisError(`❌ ${getPrescriptionText('analysisError', language)}: ${error.message}`);
-        console.error('Prescription analysis error:', error);
       }
+      console.error('Prescription analysis error:', error);
     } finally {
       setAnalyzing(false);
     }

@@ -1,12 +1,14 @@
 """
 Handwritten Prescription Analyzer - Complete Hybrid Implementation
 Combines CNN Preprocessing + Multi-Method OCR + LLM Parsing
+Supports both Ollama and Azure OpenAI providers
 """
 
 import cv2
 import numpy as np
 import json
 import logging
+import os
 import requests
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -23,7 +25,7 @@ class HybridHandwrittenPrescriptionAnalyzer:
     Complete analyzer for handwritten prescriptions using:
     - CNN-based image preprocessing
     - Multi-method OCR (EasyOCR + Tesseract + PaddleOCR)
-    - LLM parsing for structured extraction
+    - LLM parsing for structured extraction (Ollama or Azure OpenAI)
     - Medical validation
     """
 
@@ -206,24 +208,65 @@ class HybridHandwrittenPrescriptionAnalyzer:
         If any field is not found, use null. Be thorough in extracting medicine information.
         """
 
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
+        self.logger.info(f"🔧 Handwritten Prescription Analyzer using LLM provider: {provider}")
+
         try:
-            response = requests.post(
-                f'{self.ollama_url}/api/generate',
-                json={
-                    'model': self.ollama_model,
-                    'prompt': prompt,
-                    'stream': False,
-                    'temperature': 0.3  # Low temperature for precise extraction
-                },
-                timeout=120
-            )
+            if provider == "azure_openai":
+                # Azure OpenAI implementation
+                azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+                azure_api_key = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
+                azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
+                
+                if not azure_endpoint or not azure_api_key:
+                    self.logger.error("Azure OpenAI credentials missing")
+                    return None
+                
+                base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+                api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+                
+                response = requests.post(
+                    api_url,
+                    json={
+                        "messages": [
+                            {"role": "system", "content": "You are a medical AI assistant that extracts prescription information. Respond only with valid JSON."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 2048,
+                    },
+                    headers={
+                        "Content-Type": "application/json",
+                        "api-key": azure_api_key
+                    },
+                    timeout=120
+                )
 
-            if response.status_code != 200:
-                self.logger.error(f"LLM API error: {response.status_code}")
-                return None
+                if response.status_code != 200:
+                    self.logger.error(f"Azure OpenAI API error: {response.status_code}")
+                    return None
 
-            result = response.json()
-            text_response = result.get('response', '')
+                result = response.json()
+                text_response = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            else:  # ollama provider
+                response = requests.post(
+                    f'{self.ollama_url}/api/generate',
+                    json={
+                        'model': self.ollama_model,
+                        'prompt': prompt,
+                        'stream': False,
+                        'temperature': 0.3  # Low temperature for precise extraction
+                    },
+                    timeout=120
+                )
+
+                if response.status_code != 200:
+                    self.logger.error(f"LLM API error: {response.status_code}")
+                    return None
+
+                result = response.json()
+                text_response = result.get('response', '')
 
             # Extract JSON from response
             try:
@@ -418,4 +461,75 @@ class HybridHandwrittenPrescriptionAnalyzer:
                     os.unlink(temp_path)
                 except:
                     pass
+
+
+# ============================================================================
+# Static Wrapper Class for API Compatibility
+# ============================================================================
+
+class HandwrittenPrescriptionAnalyzer:
+    """
+    Static wrapper class for API compatibility.
+    Provides static methods that internally create analyzer instances.
+    """
+    
+    @staticmethod
+    def analyze_handwritten_prescription_from_bytes(image_bytes: bytes, filename: str = 'prescription.jpg') -> Dict[str, Any]:
+        """
+        Static method to analyze prescription from bytes.
+        Creates analyzer instance and processes the image.
+        
+        Args:
+            image_bytes: Image file content
+            filename: Original filename
+            
+        Returns:
+            Analysis result dictionary
+        """
+        try:
+            # Get configuration from environment
+            ollama_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+            ollama_model = os.getenv('OLLAMA_MODEL', 'phi4')
+            
+            # Create analyzer instance
+            analyzer = HybridHandwrittenPrescriptionAnalyzer(
+                ollama_url=ollama_url,
+                ollama_model=ollama_model
+            )
+            
+            # Analyze from bytes
+            return analyzer.analyze_from_bytes(image_bytes, filename)
+            
+        except Exception as e:
+            logger.error(f"❌ Static analysis failed: {str(e)}", exc_info=True)
+            return {
+                'status': 'error',
+                'message': f'Prescription analysis failed: {str(e)}',
+                'error': str(e),
+                'uploaded_file': filename
+            }
+    
+    @staticmethod
+    def get_service_info() -> Dict[str, Any]:
+        """
+        Get service information and capabilities.
+        
+        Returns:
+            Service information dictionary
+        """
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
+        
+        return {
+            'service': 'Handwritten Prescription Analyzer',
+            'version': '2.0',
+            'capabilities': {
+                'preprocessing': 'CNN-based image enhancement',
+                'ocr': 'Multi-method (EasyOCR + Tesseract + PaddleOCR)',
+                'parsing': f'LLM-based ({provider})',
+                'validation': 'Medical safety checks'
+            },
+            'status': 'operational',
+            'llm_provider': provider,
+            'supported_formats': ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp']
+        }
 
