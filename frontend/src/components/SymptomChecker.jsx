@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import assessmentIcon from '../assets/assessment.png';
 import rashIcon from '../assets/rash.png';
+import capsuleIcon from '../assets/capsule.png';
 import medicalReportIcon from '../assets/medical-report (1).png';
 import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
