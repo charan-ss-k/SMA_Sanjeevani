@@ -5,9 +5,10 @@ import os
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from dotenv import load_dotenv
+from app.core.env_loader import load_backend_env
 from urllib.parse import urlparse
 
-load_dotenv()
+load_backend_env()
 
 def create_database_if_not_exists():
     """Create the database if it doesn't exist"""

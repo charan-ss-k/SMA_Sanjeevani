@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { playTTS } from '../utils/tts';
+import { API_BASE } from '../config/apiBase';
 
 const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
   const [bookingData, setBookingData] = useState({
@@ -32,8 +33,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
 
     setLoading(true);
     try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-      const response = await fetch(`${apiBase}/api/appointments/book`, {
+      const response = await fetch(`${API_BASE}/api/appointments/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

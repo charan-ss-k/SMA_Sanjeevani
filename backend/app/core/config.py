@@ -6,9 +6,9 @@ import json
 from typing import Optional, List
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
+from .env_loader import load_backend_env
 
-load_dotenv()
+load_backend_env()
 
 
 class Settings(BaseSettings):
@@ -44,6 +44,8 @@ class Settings(BaseSettings):
         "http://98.70.223.78",
         "https://98.70.223.78",
     ]
+
+    CORS_ORIGIN_REGEX: str = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

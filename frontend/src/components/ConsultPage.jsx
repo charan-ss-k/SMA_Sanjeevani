@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
 import { playTTS, stopAllTTS } from '../utils/tts';
+import { API_BASE } from '../config/apiBase';
 import './ConsultPage.css';
 
 // Translation mapping for dropdown values (states, cities, specializations, and languages)
@@ -174,9 +175,8 @@ const ConsultPage = () => {
   
   const loadSearchOptions = async () => {
     try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-      console.log('📍 Fetching search options from:', `${apiBase}/api/appointments/search/options`);
-      const response = await fetch(`${apiBase}/api/appointments/search/options`);
+      console.log('📍 Fetching search options from:', `${API_BASE}/api/appointments/search/options`);
+      const response = await fetch(`${API_BASE}/api/appointments/search/options`);
       
       console.log('📊 Response status:', response.status);
       if (!response.ok) {
@@ -197,10 +197,8 @@ const ConsultPage = () => {
 
   const loadAppointments = async () => {
     try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-      
       // Fetch all appointments
-      const allResponse = await fetch(`${apiBase}/api/appointments/my-appointments`, {
+      const allResponse = await fetch(`${API_BASE}/api/appointments/my-appointments`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
       
@@ -210,7 +208,7 @@ const ConsultPage = () => {
       }
       
       // Fetch upcoming appointments
-      const upcomingResponse = await fetch(`${apiBase}/api/appointments/upcoming-appointments`, {
+      const upcomingResponse = await fetch(`${API_BASE}/api/appointments/upcoming-appointments`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
       
@@ -242,12 +240,11 @@ const ConsultPage = () => {
 
     try {
       setLoading(true);
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
       const token = localStorage.getItem('access_token');
       
       console.log('✏️ Updating appointment:', editingAppointment.id);
       
-      const response = await fetch(`${apiBase}/api/appointments/appointment/${editingAppointment.id}`, {
+      const response = await fetch(`${API_BASE}/api/appointments/appointment/${editingAppointment.id}`, {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -304,12 +301,11 @@ const ConsultPage = () => {
     
     try {
       setLoading(true);
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
       const token = localStorage.getItem('access_token');
       
       console.log('🗑️ Cancelling appointment:', appointment.id);
       
-      const response = await fetch(`${apiBase}/api/appointments/appointment/${appointment.id}`, {
+      const response = await fetch(`${API_BASE}/api/appointments/appointment/${appointment.id}`, {
         method: 'DELETE',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -362,8 +358,7 @@ const ConsultPage = () => {
     setMessage('');
     
     try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-      const response = await fetch(`${apiBase}/api/appointments/search`, {
+      const response = await fetch(`${API_BASE}/api/appointments/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(searchForm)
@@ -443,7 +438,6 @@ const ConsultPage = () => {
     setError('');
     
     try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
       const token = localStorage.getItem('access_token');
       
       const payload = {
@@ -458,7 +452,7 @@ const ConsultPage = () => {
       
       console.log('📤 Sending appointment booking:', payload);
       
-      const response = await fetch(`${apiBase}/api/appointments/book`, {
+      const response = await fetch(`${API_BASE}/api/appointments/book`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

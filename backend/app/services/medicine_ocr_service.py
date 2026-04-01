@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 HAVE_PYTESSERACT = False
 try:
     import pytesseract
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    windows_tesseract = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    if os.path.exists(windows_tesseract):
+        pytesseract.pytesseract.tesseract_cmd = windows_tesseract
     HAVE_PYTESSERACT = True
     logger.info("✅ Pytesseract loaded successfully")
 except Exception as e:
@@ -135,7 +137,8 @@ def extract_text_from_image(image_array: np.ndarray) -> str:
                     logger.debug(f"PSM {psm_mode} failed: {e}")
                     continue
     
-    # Try EasyOCR as fallback or primary if Tesseract unavailable
+    # Try EasyOCR as fallback or primary if Tesseract unavailable.
+    # Run it on each preprocessed image variant and keep the best text.
     if HAVE_EASYOCR:
         logger.info("🔍 Trying EasyOCR...")
         try:
@@ -144,22 +147,22 @@ def extract_text_from_image(image_array: np.ndarray) -> str:
                 extract_text_from_image._easyocr_reader = easyocr.Reader(['en'], gpu=False)
             
             reader = extract_text_from_image._easyocr_reader
-            
-            # Ensure proper image format
-            if len(image_array.shape) == 2:
-                img_rgb = cv2.cvtColor(image_array, cv2.COLOR_GRAY2RGB)
-            else:
-                img_rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
-            
-            text_list = reader.readtext(img_rgb, detail=0, paragraph=True)
-            text = " ".join(text_list)
-            text = " ".join(text.split())
-            all_texts.append(text)
-            
-            if len(text) > best_length:
-                best_length = len(text)
-                best_text = text
-                best_method = "EasyOCR"
+
+            for method_name, processed_img in preprocessed_images:
+                if len(processed_img.shape) == 2:
+                    img_rgb = cv2.cvtColor(processed_img, cv2.COLOR_GRAY2RGB)
+                else:
+                    img_rgb = cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB)
+
+                text_list = reader.readtext(img_rgb, detail=0, paragraph=True)
+                text = " ".join(text_list)
+                text = " ".join(text.split())
+                all_texts.append(text)
+
+                if len(text) > best_length:
+                    best_length = len(text)
+                    best_text = text
+                    best_method = f"EasyOCR ({method_name})"
         except Exception as e:
             logger.warning(f"EasyOCR failed: {e}")
     
@@ -228,10 +231,41 @@ def extract_medicine_name(ocr_text: str) -> str:
             logger.info(f"Found common medicine pattern: {pattern}")
             return pattern
     
-    # Extract first word or first significant word
+    # Try matching candidates against unified medicine database.
+    try:
+        from app.services.unified_medicine_database import UnifiedMedicineDatabase
+
+        cleaned = ''.join(ch if (ch.isalnum() or ch.isspace()) else ' ' for ch in ocr_text)
+        tokens = [t.lower().strip() for t in cleaned.split() if len(t.strip()) >= 3]
+
+        stop_words = {
+            'tablet', 'tab', 'capsule', 'cap', 'strip', 'mg', 'ml', 'g', 'mrp',
+            'batch', 'exp', 'mfg', 'use', 'before', 'after', 'food', 'take', 'daily'
+        }
+        tokens = [t for t in tokens if t not in stop_words and not t.isdigit()]
+
+        candidates = []
+        candidates.extend(tokens)
+        for i in range(len(tokens) - 1):
+            candidates.append(f"{tokens[i]} {tokens[i+1]}")
+
+        seen = set()
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            if len(candidate) < 3:
+                continue
+            info = UnifiedMedicineDatabase.search_medicine(candidate)
+            if info and isinstance(info, dict):
+                return str(info.get('name') or info.get('Name') or candidate).lower()
+    except Exception as e:
+        logger.debug(f"Database-assisted extraction failed: {e}")
+
+    # Extract first word or first significant word as final fallback.
     words = ocr_text.split()
     for word in words:
-        if len(word) > 3:  # Prefer words longer than 3 characters
+        if len(word) > 3:
             return word.lower()
     
     # Fallback to first word
@@ -263,8 +297,13 @@ async def process_medicine_image(image_path: str) -> Dict[str, Any]:
         ocr_text = extract_text_from_image(image)
         logger.info(f"OCR Text ({len(ocr_text)} chars): {ocr_text[:200]}")
         
-        if len(ocr_text) < 5:
+        if len(ocr_text.strip()) < 5:
             logger.warning("OCR found very little text")
+            return {
+                "success": False,
+                "error": "OCR could not read enough text from image",
+                "message": "Please upload a clearer, well-lit image focused on medicine name"
+            }
         
         # Step 2: Analyze with Phi-4
         logger.info("Step 2: Analyzing with Phi-4...")

@@ -4,8 +4,7 @@ import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
-
-const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+import { API_BASE } from '../config/apiBase';
 
 const PrescriptionAnalyzer = () => {
   const { authToken } = useContext(AuthContext);
@@ -61,14 +60,27 @@ const PrescriptionAnalyzer = () => {
     
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles.length > 0) {
-      setFile(droppedFiles[0]);
-      
+      const dropped = droppedFiles[0];
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/tiff'];
+      if (!allowedTypes.includes(dropped.type)) {
+        setAnalysisError(`❌ ${getPrescriptionText('invalidFileType', language)}`);
+        return;
+      }
+
+      if (dropped.size > 10 * 1024 * 1024) {
+        setAnalysisError(`❌ ${getPrescriptionText('fileTooLarge', language)}`);
+        return;
+      }
+
+      setFile(dropped);
+
       // Create preview
       const reader = new FileReader();
       reader.onload = (result) => {
         setImagePreview(result.target.result);
       };
-      reader.readAsDataURL(droppedFiles[0]);
+      reader.readAsDataURL(dropped);
     }
   };
 

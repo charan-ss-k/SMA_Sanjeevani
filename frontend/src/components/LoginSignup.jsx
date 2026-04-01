@@ -4,8 +4,7 @@ import './Auth.css';
 import { AuthContext } from '../context/AuthContext';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
-
-const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+import { API_BASE } from '../config/apiBase';
 
 export function LoginSignup() {
   const navigate = useNavigate();

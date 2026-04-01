@@ -8,8 +8,7 @@ import totalRemindersIcon from '../assets/remainder_main.png';
 import chatIcon from '../assets/bubble-chat.png';
 import appointmentsIcon from '../assets/doctor-duty-time.png';
 import healthDataIcon from '../assets/health-data.png';
-
-const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+import { API_BASE } from '../config/apiBase';
 
 const DashboardAnalytics = () => {
   const { isAuthenticated, authToken } = useContext(AuthContext);

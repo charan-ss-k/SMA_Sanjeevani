@@ -22,9 +22,9 @@ import { useChat } from '../../context/ChatContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { colors, spacing, typography, borderRadius } from '../../utils/theme';
+import { API_BASE_URL } from '../../config/environment';
 
 const { width } = Dimensions.get('window');
-const API_BASE = 'http://98.70.223.78';
 
 // Feature Slides Data (matching frontend)
 const slides = [
@@ -175,7 +175,7 @@ export default function HomeScreen({ navigation }) {
       console.log('🔄 HomeScreen: Fetching appointments from API with token...');
       
       // Use the same endpoint as ConsultDoctorScreen: /api/appointments/upcoming-appointments
-      const response = await fetch(`${API_BASE}/api/appointments/upcoming-appointments`, {
+      const response = await fetch(`${API_BASE_URL}/appointments/upcoming-appointments`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

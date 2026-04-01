@@ -7,8 +7,9 @@
     <link href="/src/style.css" rel="stylesheet">
     <title>frontend</title>
     <script>
-      // Configure API base URL for production
-      window.__API_BASE__ = 'http://98.70.223.78';
+      // Configure API base URL from Vite env, fallback to localhost.
+      const configuredApiBase = '%VITE_API_BASE_URL%';
+      window.__API_BASE__ = configuredApiBase !== '%VITE_API_BASE_URL%' ? configuredApiBase : 'http://localhost:8000';
     </script>
   </head>
   <body>

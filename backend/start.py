@@ -13,13 +13,12 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # Load environment variables from .env file
 try:
-    from dotenv import load_dotenv
-    env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
-        load_dotenv(env_path)
-        print(f"✅ Loaded environment variables from {env_path}")
+    from app.core.env_loader import load_backend_env
+    loaded_envs = load_backend_env()
+    if loaded_envs:
+        print(f"✅ Loaded environment variables from: {', '.join(str(p) for p in loaded_envs)}")
 except ImportError:
-    print("ℹ️  python-dotenv not installed, skipping .env file (optional)")
+    print("ℹ️  python-dotenv not installed, skipping env file loading")
 
 # Ensure we're in the backend directory
 backend_dir = Path(__file__).parent

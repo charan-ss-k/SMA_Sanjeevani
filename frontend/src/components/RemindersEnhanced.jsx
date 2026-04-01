@@ -4,8 +4,7 @@ import { LanguageContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
-
-const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+import { API_BASE } from '../config/apiBase';
 
 function speak(text, language) {
   if (!window.speechSynthesis) return;

@@ -7,7 +7,7 @@ import Constants from 'expo-constants';
 
 const ENV = {
   dev: {
-    API_BASE_URL: 'http://98.70.223.78', // Azure VM IP
+    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000/api',
     API_TIMEOUT: 30000,
     ENABLE_AI_STREAMING: true,
     ENABLE_TTS: true,

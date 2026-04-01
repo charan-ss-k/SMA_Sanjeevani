@@ -3,6 +3,7 @@ import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
 import calendarIcon from '../assets/calendar.png';
+import { API_BASE } from '../config/apiBase';
 
 const DashboardAppointments = ({ language = 'en' }) => {
   const { language: contextLanguage } = useContext(LanguageContext);
@@ -20,7 +21,6 @@ const DashboardAppointments = ({ language = 'en' }) => {
 
   const loadAppointments = async () => {
     try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
       const token = localStorage.getItem('access_token');
       
       // Try to fetch from API first
@@ -65,7 +65,6 @@ const DashboardAppointments = ({ language = 'en' }) => {
   const cancelAppointment = async (appointment) => {
     if (window.confirm(`Are you sure you want to cancel the appointment with Dr. ${appointment.doctor_name} on ${new Date(appointment.appointment_date).toLocaleDateString()}?`)) {
       try {
-        const apiBase = window.__API_BASE__ || 'http://localhost:8000';
         const token = localStorage.getItem('access_token');
         
         console.log('🗑️ Cancelling appointment:', appointment.id);
@@ -126,7 +125,6 @@ const DashboardAppointments = ({ language = 'en' }) => {
     }
 
     try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
       const token = localStorage.getItem('access_token');
       
       console.log('✏️ Updating appointment:', editingAppointment.id);

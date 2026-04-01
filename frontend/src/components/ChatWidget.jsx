@@ -5,6 +5,7 @@ import { LanguageContext } from '../main';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { t } from '../utils/translations';
 import './ChatWidget.css';
+import { API_BASE } from '../config/apiBase';
 
 // --- SVG Icons ---
 
@@ -166,7 +167,6 @@ const ChatbotWindow = () => {
       }
 
       try {
-        const apiBase = window.__API_BASE__ || 'http://localhost:8000';
         console.log('[ChatWidget] Loading history from database for authenticated user');
         console.log('[ChatWidget] Token available:', !!authToken);
         
@@ -176,7 +176,7 @@ const ChatbotWindow = () => {
           return;
         }
         
-        const response = await fetch(`${apiBase}/api/qa-history/?limit=50`, {
+        const response = await fetch(`${API_BASE}/api/qa-history/?limit=50`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -291,8 +291,7 @@ const ChatbotWindow = () => {
 
     try {
       // Call backend API for medical Q&A
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-      console.log('[ChatWidget] Calling API:', `${apiBase}/api/medical-qa`);
+      console.log('[ChatWidget] Calling API:', `${API_BASE}/api/medical-qa`);
       
       // Prepare headers with authentication if available
       const headers = { 'Content-Type': 'application/json' };
@@ -304,7 +303,7 @@ const ChatbotWindow = () => {
         console.log('[ChatWidget] No authentication token, request will be unauthenticated');
       }
       
-      const response = await fetch(`${apiBase}/api/medical-qa`, {
+      const response = await fetch(`${API_BASE}/api/medical-qa`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({

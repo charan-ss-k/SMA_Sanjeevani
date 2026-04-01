@@ -8,6 +8,7 @@ import { LanguageContext } from '../main';
 import SearchableInput from './SearchableInput';
 import { t } from '../utils/translations';
 import { getSymptomsList, getAllergiesList, getConditionsList, getSymptomDisplay, getAllergyDisplay, getConditionDisplay } from '../utils/symptomTranslations';
+import { API_BASE } from '../config/apiBase';
 
 const SymptomChecker = ({ onResult }) => {
   const { language } = useContext(LanguageContext);
@@ -87,9 +88,7 @@ const SymptomChecker = ({ onResult }) => {
         language,
       };
 
-      // Use configurable API base URL (defaults to localhost:8000)
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-      const url = `${apiBase}/api/symptoms/recommend`;
+      const url = `${API_BASE}/api/symptoms/recommend`;
       
       console.log('[SymptomChecker] Sending POST to:', url);
       console.log('[SymptomChecker] Payload:', payload);

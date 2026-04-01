@@ -3,6 +3,8 @@
  * Handles text-to-speech with sequential playback (no overlapping voices)
  */
 
+import { API_BASE } from '../config/apiBase';
+
 // Global TTS Queue and State Management
 const ttsQueue = [];
 let ttsPlaying = false;
@@ -159,10 +161,8 @@ async function _playTTSInternal(text, language) {
 async function _playCoquiTTS(text, language) {
   return new Promise((resolve, reject) => {
     try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-
       // Fetch audio from Coqui TTS API
-      fetch(`${apiBase}/api/tts`, {
+      fetch(`${API_BASE}/api/tts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,8 +327,7 @@ async function _playWebSpeechTTS(text, language) {
  */
 export async function getAvailableLanguages() {
   try {
-    const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-    const response = await fetch(`${apiBase}/api/tts/languages`);
+    const response = await fetch(`${API_BASE}/api/tts/languages`);
     if (response.ok) {
       return await response.json();
     }

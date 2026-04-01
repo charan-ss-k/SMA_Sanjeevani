@@ -7,16 +7,15 @@ from pathlib import Path
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from dotenv import load_dotenv
 import logging
+from .env_loader import load_backend_env
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load .env from project root
-root_env = Path(__file__).parent.parent.parent.parent / ".env"
-load_dotenv(root_env, override=True)
+# Load backend env files in a stable order
+load_backend_env()
 
 # PostgreSQL connection string (Azure)
 DATABASE_URL = os.getenv(

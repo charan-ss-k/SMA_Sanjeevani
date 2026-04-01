@@ -8,9 +8,9 @@ import os
 import bcrypt
 from jose import JWTError, jwt
 from fastapi import HTTPException, status
-from dotenv import load_dotenv
+from .env_loader import load_backend_env
 
-load_dotenv()
+load_backend_env()
 
 # JWT configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-12345678901234567890")

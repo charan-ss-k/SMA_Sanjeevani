@@ -2,8 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { AuthContext } from '../main';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
-
-const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+import { API_BASE } from '../config/apiBase';
 
 const MedicineIdentificationModal = ({ isOpen, onClose, onSave }) => {
   const { isAuthenticated, authToken } = useContext(AuthContext);

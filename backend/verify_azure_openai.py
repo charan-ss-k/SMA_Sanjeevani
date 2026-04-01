@@ -4,10 +4,10 @@ Checks that all services are properly configured to use Azure OpenAI
 """
 
 import os
-from dotenv import load_dotenv
+from app.core.env_loader import load_backend_env
 
 # Load environment variables
-load_dotenv()
+load_backend_env()
 
 def check_azure_openai_config():
     """Verify Azure OpenAI configuration"""

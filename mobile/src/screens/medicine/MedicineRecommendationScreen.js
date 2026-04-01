@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList, Dimensions } from 'react-native';
 import { colors, typography, spacing } from '../../utils/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../../config/environment';
 
 const { width } = Dimensions.get('window');
 
@@ -98,7 +99,7 @@ const MedicineRecommendationScreen = () => {
 
       console.log('🔍 Sending symptom recommendation request:', payload);
 
-      const response = await fetch('http://98.70.223.78/api/symptoms/recommend', {
+      const response = await fetch(`${API_BASE_URL}/symptoms/recommend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

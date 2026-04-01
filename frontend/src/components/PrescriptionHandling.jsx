@@ -8,8 +8,7 @@ import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
 import { translateData } from '../data/dataTranslations';
-
-const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
+import { API_BASE } from '../config/apiBase';
 
 const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language, translateDefaultValue, getFrequencyLabel }) => (
   <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500 hover:shadow-lg transition">
@@ -388,11 +387,13 @@ const PrescriptionHandling = () => {
         },
       });
 
-      if (response.ok) {
+      if (!response.ok) {
         throw new Error(t('saveFailed', language));
-        if (!isMuted) {
-          playTTS(t('prescriptionDeleted', language), language);
-        }
+      }
+
+      setPrescriptionHistory(prev => prev.filter(p => p.id !== id));
+      if (!isMuted) {
+        playTTS(t('prescriptionDeleted', language), language);
       }
     } catch (err) {
       console.error('Delete error:', err);
