@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { playTTS } from '../utils/tts';
 import { LanguageContext, AuthContext } from '../main';
 import { t } from '../utils/translations';
+import calendarIcon from '../assets/calendar.png';
+import capsuleIcon from '../assets/capsule.png';
+import remainderIcon from '../assets/remainder.png';
 import DashboardAppointments from './DashboardAppointments';
 import DashboardAnalytics from './DashboardAnalytics';
 import ReminderNotification from './ReminderNotification';
@@ -186,7 +189,9 @@ const Home = () => {
                 {t('openMedicineRecommendation', language)}
               </Link>
             </div>
-            <div className="hidden md:block text-6xl">💊</div>
+            <div className="hidden md:block">
+              <img src={capsuleIcon} alt="Medicine" className="h-24 w-24" />
+            </div>
           </div>
         </section>
       </div>
@@ -229,9 +234,10 @@ const Home = () => {
               <div className="mt-6 text-center">
                 <Link 
                   to="/consult"
-                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-lg transition"
+                  className="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-lg transition"
                 >
-                  {t('bookNewAppointment', language)}
+                  <img src={calendarIcon} alt="Calendar" className="h-5 w-5 mr-2 flex-shrink-0" />
+                  {t('bookNewAppointment', language).replace('📅 ', '')}
                 </Link>
               </div>
             </section>
@@ -273,7 +279,7 @@ const Home = () => {
                 <p className="text-gray-700">{t('expertDoctorsDesc', language)}</p>
               </div>
               <div className="bg-green-50 rounded-lg shadow p-6 text-center hover:shadow-xl transition-shadow">
-                <div className="text-4xl mb-2">📅</div>
+                <div className="text-4xl mb-2"><img src={calendarIcon} alt="Calendar" className="h-12 w-12 inline-block" /></div>
                 <h3 className="font-bold text-xl text-green-900">{t('easyBooking', language)}</h3>
                 <p className="text-gray-700">{t('easyBookingDesc', language)}</p>
               </div>
@@ -337,7 +343,10 @@ const Home = () => {
         <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="font-bold text-3xl mb-2">{t('checkSymptoms', language)}</h3>
+              <h3 className="font-bold text-3xl mb-2 flex items-center gap-2">
+                <img src={capsuleIcon} alt="Medicine" className="h-8 w-8" />
+                {t('checkSymptoms', language).replace('💊 ', '')}
+              </h3>
               <p className="text-lg mb-4">
                 {t('getInstantRecommendations', language)}
               </p>
@@ -345,10 +354,12 @@ const Home = () => {
                 to="/medicine-recommendation"
                 className="inline-block bg-amber-400 hover:bg-amber-300 text-green-900 font-bold px-6 py-3 rounded-lg transition"
               >
-                {t('openMedicineRecommendation', language)}
+                {t('openMedicineRecommendation', language).replace('💊 ', '')}
               </Link>
             </div>
-            <div className="hidden md:block text-6xl">💊</div>
+            <div className="hidden md:block">
+              <img src={capsuleIcon} alt="Medicine" className="h-24 w-24" />
+            </div>
           </div>
         </section>
       </div>

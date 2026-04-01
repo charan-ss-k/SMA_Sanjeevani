@@ -8,6 +8,9 @@ import { LanguageContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
+import calendarIcon from '../assets/calendar.png';
+import capsuleIcon from '../assets/capsule.png';
+import remainderIcon from '../assets/remainder.png';
 import { translateData, translateDataBatch } from '../data/dataTranslations';
 import DashboardAppointments from './DashboardAppointments';
 import DashboardReminders from './DashboardReminders';
@@ -460,6 +463,21 @@ const Dashboard = () => {
         <div className="mb-8">
           <h1 className="text-5xl font-bold text-green-800 mb-2">{getTranslation('yourHealthDashboard', language)}</h1>
           <p className="text-xl text-gray-700">{getTranslation('trackSymptomSearches', language)}</p>
+          {/* icons for medicine, upcoming, reminders under subtitle */}
+          <div className="mt-4 flex items-center gap-8">
+            <div className="flex items-center gap-1">
+              <img src={capsuleIcon} alt="Medicine" className="h-6 w-6" />
+              <span className="text-gray-700">{t('medicine', language)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <img src={calendarIcon} alt="Upcoming" className="h-6 w-6" />
+              <span className="text-gray-700">{t('upcoming', language) || 'Upcoming'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <img src={remainderIcon} alt="Reminders" className="h-6 w-6" />
+              <span className="text-gray-700">{t('reminders', language)}</span>
+            </div>
+          </div>
         </div>
 
         {/* Quick Stats Cards */}

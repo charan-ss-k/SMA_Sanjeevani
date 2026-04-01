@@ -6,6 +6,7 @@ import { LanguageContext } from '../main';
 import { AuthContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
+import capsuleIcon from '../assets/capsule.png';
 
 const MedicineRecommendation = () => {
   const { language } = useContext(LanguageContext);
@@ -54,7 +55,8 @@ const MedicineRecommendation = () => {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl md:text-5xl font-bold text-green-800 mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-green-800 mb-4 flex items-center gap-2">
+              <img src={capsuleIcon} alt="Medicine" className="h-10 w-10" />
               {t('medicineRecommendation', language)}
             </h1>
             <p className="text-xl text-gray-700">

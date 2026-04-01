@@ -553,7 +553,7 @@ const ConsultPage = () => {
               setMessage('');
             }}
           >
-            📅 {t('bookAppointmentTab', language)}
+             {t('bookAppointmentTab', language)}
           </button>
           <button
             className={`tab-btn ${tab === 'history' ? 'active' : ''}`}
@@ -563,7 +563,7 @@ const ConsultPage = () => {
               setMessage('');
             }}
           >
-            📋 {t('appointmentHistory', language)}
+             {t('appointmentHistory', language)}
           </button>
           <button
             className={`tab-btn ${tab === 'reminders' ? 'active' : ''}`}
@@ -573,7 +573,7 @@ const ConsultPage = () => {
               setMessage('');
             }}
           >
-            ⏰ {t('remindersUpcoming', language)}
+             {t('remindersUpcoming', language)}
           </button>
         </div>
       </div>
@@ -604,7 +604,7 @@ const ConsultPage = () => {
               <div className="form-grid">
                 {/* State */}
                 <div className="form-group">
-                  <label>🗺️ {t('selectState', language)}</label>
+                  <label> {t('selectState', language)}</label>
                   <select
                     name="state"
                     value={searchForm.state}
@@ -620,7 +620,7 @@ const ConsultPage = () => {
                 
                 {/* City */}
                 <div className="form-group">
-                  <label>🏙️ {t('selectCity', language)}</label>
+                  <label> {t('selectCity', language)}</label>
                   <select
                     name="city"
                     value={searchForm.city}
@@ -636,7 +636,7 @@ const ConsultPage = () => {
                 
                 {/* Locality */}
                 <div className="form-group">
-                  <label>📍 {t('selectLocality', language)}</label>
+                  <label> {t('selectLocality', language)}</label>
                   <select
                     name="locality"
                     value={searchForm.locality}
@@ -652,7 +652,7 @@ const ConsultPage = () => {
                 
                 {/* Specialization */}
                 <div className="form-group">
-                  <label>👨‍⚕️ {t('selectSpecialization', language)}</label>
+                  <label> {t('selectSpecialization', language)}</label>
                   <select
                     name="specialization"
                     value={searchForm.specialization}
@@ -668,7 +668,7 @@ const ConsultPage = () => {
                 
                 {/* Native Language */}
                 <div className="form-group">
-                  <label>🗣️ {t('doctorsNativeLanguage', language)}</label>
+                  <label> {t('doctorsNativeLanguage', language)}</label>
                   <select
                     name="native_language"
                     value={searchForm.native_language}
@@ -684,7 +684,7 @@ const ConsultPage = () => {
                 
                 {/* Languages Known */}
                 <div className="form-group">
-                  <label>💬 {t('languagesDoctorSpeaks', language)}</label>
+                  <label> {t('languagesDoctorSpeaks', language)}</label>
                   <select
                     name="languages_known"
                     value={searchForm.languages_known}
@@ -704,7 +704,7 @@ const ConsultPage = () => {
                 disabled={loading}
                 className="btn btn-primary btn-lg"
               >
-                {loading ? `⏳ ${t('searching', language)}...` : `🔍 ${t('searchDoctors', language)}`}
+                {loading ? `⏳ ${t('searching', language)}...` : ` ${t('searchDoctors', language)}`}
               </button>
             </form>
           </div>
@@ -903,7 +903,7 @@ const ConsultPage = () => {
       {tab === 'history' && (
         <div className="section">
           <div className="section-content">
-            <h2>📋 {t('yourAppointmentHistory', language)}</h2>
+            <h2> {t('yourAppointmentHistory', language)}</h2>
             <p className="section-subtitle">{t('viewAllYourPastAndCurrentAppointments', language)}</p>
             
             {appointmentHistory && appointmentHistory.length > 0 ? (
@@ -982,7 +982,7 @@ const ConsultPage = () => {
       {tab === 'reminders' && (
         <div className="section">
           <div className="section-content">
-            <h2>⏰ {t('upcomingAppointmentsReminders', language)}</h2>
+            <h2> {t('upcomingAppointmentsReminders', language)}</h2>
             <p className="section-subtitle">{t('yourScheduledAppointmentsComing', language)}</p>
             
             {upcomingAppointments && upcomingAppointments.length > 0 ? (

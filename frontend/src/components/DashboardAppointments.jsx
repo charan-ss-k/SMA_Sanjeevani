@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
+import calendarIcon from '../assets/calendar.png';
 
 const DashboardAppointments = ({ language = 'en' }) => {
   const { language: contextLanguage } = useContext(LanguageContext);
@@ -182,7 +183,10 @@ const DashboardAppointments = ({ language = 'en' }) => {
 
   return (
     <div className="appointments-section">
-      <h2>{t('yourAppointments', activeLanguage)}</h2>
+      <h2 className="inline-flex items-center">
+        <img src={calendarIcon} alt="Calendar" className="h-5 w-5 mr-2 flex-shrink-0" />
+        {t('yourAppointments', activeLanguage).replace('📅 ', '')}
+      </h2>
       {appointments.length === 0 ? (
         <div className="empty-state">
           <p>{t('noUpcomingAppointments', activeLanguage)}</p>
@@ -208,8 +212,9 @@ const DashboardAppointments = ({ language = 'en' }) => {
                   <div className="apt-item">
                     <span className="apt-label">🏥</span> {apt.hospital_name}
                   </div>
-                  <div className="apt-item">
-                    <span className="apt-label">📅</span> {new Date(apt.appointment_date).toLocaleDateString()}
+                  <div className="apt-item flex items-center">
+                    <img src={calendarIcon} alt="Date" className="h-4 w-4 mr-1 flex-shrink-0" />
+                    {new Date(apt.appointment_date).toLocaleDateString()}
                   </div>
                   <div className="apt-item">
                     <span className="apt-label">⏰</span> {apt.appointment_time}

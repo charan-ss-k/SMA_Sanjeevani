@@ -1,4 +1,7 @@
 import React, { useState, useContext } from 'react';
+import assessmentIcon from '../assets/assessment.png';
+import rashIcon from '../assets/rash.png';
+import medicalReportIcon from '../assets/medical-report (1).png';
 import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
 import SearchableInput from './SearchableInput';
@@ -152,7 +155,10 @@ const SymptomChecker = ({ onResult }) => {
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Basic Info - Large text for rural users */}
       <div>
-        <h3 className="text-2xl font-bold text-green-800 mb-4">{t('personalInformation', language)}</h3>
+        <h3 className="text-2xl font-bold text-green-800 mb-4 flex items-center gap-2">
+          <img src={assessmentIcon} alt="Personal info" className="h-8 w-8" />
+          {t('personalInformation', language)}
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="border-2 border-green-300 rounded-lg p-4 bg-green-50">
             <label className="block text-lg font-semibold text-gray-800 mb-2">{t('ageYears', language)}</label>
@@ -189,7 +195,10 @@ const SymptomChecker = ({ onResult }) => {
       {/* Symptoms - Searchable */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-2xl font-bold text-green-800">{t('symptomsSearchSelect', language)}</h3>
+          <h3 className="text-2xl font-bold text-green-800 flex items-center gap-2">
+            <img src={rashIcon} alt="Symptoms" className="h-8 w-8" />
+            {t('symptomsSearchSelect', language)}
+          </h3>
           <button
             type="button"
             onClick={() => playTTS(t('selectSymptomsExperiencing', language), language)}
@@ -244,7 +253,10 @@ const SymptomChecker = ({ onResult }) => {
 
       {/* Existing Conditions - Searchable */}
       <div>
-        <h3 className="text-2xl font-bold text-orange-800 mb-4">{t('existingHealthConditions', language)}</h3>
+        <h3 className="text-2xl font-bold text-orange-800 mb-4 flex items-center gap-2">
+          <img src={medicalReportIcon} alt="Health conditions" className="h-8 w-8" />
+          {t('existingHealthConditions', language)}
+        </h3>
         <SearchableInput
           items={getConditionsList(language)}
           selectedItems={conditions}
@@ -313,7 +325,10 @@ const SymptomChecker = ({ onResult }) => {
               <span>{t('stopProcessing', language)}</span>
             </span>
           ) : (
-            t('getRecommendation', language)
+            <span className="flex items-center justify-center gap-2">
+              <img src={capsuleIcon} alt="" className="h-6 w-6" />
+              {t('getRecommendation', language)}
+            </span>
           )}
         </button>
 

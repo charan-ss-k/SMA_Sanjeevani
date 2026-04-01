@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, LanguageContext } from '../main';
 import { t } from '../utils/translations';
+import capsuleIcon from '../assets/capsule.png';
+import calendarIcon from '../assets/calendar.png';
+import remainderIcon from '../assets/remainder.png';
+import totalRemindersIcon from '../assets/remainder_main.png';
+import chatIcon from '../assets/bubble-chat.png';
+import appointmentsIcon from '../assets/doctor-duty-time.png';
+import healthDataIcon from '../assets/health-data.png';
 
 const API_BASE = window.__API_BASE__ || 'http://localhost:8000';
 
@@ -138,7 +145,7 @@ const DashboardAnalytics = () => {
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-        <span>📊</span>
+        <img src={healthDataIcon} alt="Health Dashboard" className="h-8 w-8" />
         <span>{t('healthDashboard', language)}</span>
       </h2>
 
@@ -146,42 +153,54 @@ const DashboardAnalytics = () => {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         {/* Medicines Count */}
         <div className="bg-gradient-to-br from-green-100 to-green-50 rounded-lg p-4 text-center hover:shadow-md transition-shadow">
-          <div className="text-4xl mb-2">💊</div>
+          <div className="mb-2">
+            <img src={capsuleIcon} alt="Medicines" className="h-8 w-8 mx-auto" />
+          </div>
           <div className="text-3xl font-bold text-green-700">{stats.medicinesCount}</div>
           <div className="text-sm text-gray-600 mt-1">{t('medicines', language)}</div>
         </div>
 
         {/* Today's Reminders */}
         <div className="bg-gradient-to-br from-orange-100 to-orange-50 rounded-lg p-4 text-center hover:shadow-md transition-shadow">
-          <div className="text-4xl mb-2">⏰</div>
+          <div className="mb-2">
+            <img src={remainderIcon} alt="Reminders Today" className="h-8 w-8 mx-auto" />
+          </div>
           <div className="text-3xl font-bold text-orange-700">{stats.todayReminders}</div>
           <div className="text-sm text-gray-600 mt-1">{t('remindersToday', language)}</div>
         </div>
 
         {/* Appointments */}
         <div className="bg-gradient-to-br from-blue-100 to-blue-50 rounded-lg p-4 text-center hover:shadow-md transition-shadow">
-          <div className="text-4xl mb-2">📅</div>
+          <div className="mb-2">
+            <img src={calendarIcon} alt="Upcoming" className="h-8 w-8 mx-auto" />
+          </div>
           <div className="text-3xl font-bold text-blue-700">{stats.upcomingAppointments}</div>
           <div className="text-sm text-gray-600 mt-1">{t('upcomingAppointments', language)}</div>
         </div>
 
         {/* Chat History */}
         <div className="bg-gradient-to-br from-purple-100 to-purple-50 rounded-lg p-4 text-center hover:shadow-md transition-shadow">
-          <div className="text-4xl mb-2">💬</div>
+          <div className="mb-2">
+            <img src={chatIcon} alt="Chat History" className="h-8 w-8 mx-auto" />
+          </div>
           <div className="text-3xl font-bold text-purple-700">{stats.chatHistory}</div>
           <div className="text-sm text-gray-600 mt-1">{t('chatHistory', language)}</div>
         </div>
 
         {/* Total Reminders */}
         <div className="bg-gradient-to-br from-pink-100 to-pink-50 rounded-lg p-4 text-center hover:shadow-md transition-shadow">
-          <div className="text-4xl mb-2">🔔</div>
+          <div className="mb-2">
+            <img src={totalRemindersIcon} alt="Total Reminders" className="h-8 w-8 mx-auto" />
+          </div>
           <div className="text-3xl font-bold text-pink-700">{stats.totalReminders}</div>
           <div className="text-sm text-gray-600 mt-1">{t('totalReminders', language)}</div>
         </div>
 
         {/* Total Appointments */}
         <div className="bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-lg p-4 text-center hover:shadow-md transition-shadow">
-          <div className="text-4xl mb-2">🏥</div>
+          <div className="mb-2">
+            <img src={appointmentsIcon} alt="Total Appointments" className="h-8 w-8 mx-auto" />
+          </div>
           <div className="text-3xl font-bold text-indigo-700">{stats.totalAppointments}</div>
           <div className="text-sm text-gray-600 mt-1">{t('totalAppointments', language)}</div>
         </div>

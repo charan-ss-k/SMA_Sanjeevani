@@ -1,6 +1,16 @@
 import React, { useContext, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import logo from '../assets/Sanjeevani Logo.png';
+import homeIcon from '../assets/home.png';
+import capsuleIcon from '../assets/capsule.png';
+import consultIcon from '../assets/consult.png';
+import analyticsIcon from '../assets/analytics.png';
+import reportIcon from '../assets/medical-report.png';
+import serviceIcon from '../assets/customer-service.png';
+import aboutIcon from '../assets/about.png';
+import contactIcon from '../assets/contact.png';
+import prescriptionIcon from '../assets/prescription.png';
+import remindersIcon from '../assets/remainder_main.png';
 import LanguageSwitcher from './LanguageSwitcher';
 import { AuthContext } from '../main';
 import AuthModal from './AuthModal';
@@ -38,33 +48,39 @@ const Navbar = ({ language, onLanguageChange }) => {
           {/* Primary Navigation - Key Features Only */}
           <ul className="flex items-center space-x-2 text-base font-medium">
             <li>
-              <Link to="/" className={getLinkClass('/')}>
-                🏠 {t('home', language)}
+              <Link to="/" className={`${getLinkClass('/')} inline-flex items-center`}>  {/* inline-flex keeps it flow with text */}
+                <img src={homeIcon} alt="Home" className="h-6 w-6 mr-1 flex-shrink-0" />
+                <span>{t('home', language)}</span>
               </Link>
             </li>
             <li>
-              <Link to="/medicine-recommendation" className={getLinkClass('/medicine-recommendation')}>
-                💊 {t('medicine', language)}
+              <Link to="/medicine-recommendation" className={`${getLinkClass('/medicine-recommendation')} inline-flex items-center`}>  {/* icon plus text */}
+                <img src={capsuleIcon} alt="Medicine" className="h-5 w-5 mr-1 flex-shrink-0" />
+                <span>{t('medicine', language)}</span>
               </Link>
             </li>
             <li>
-              <Link to="/consult" className={getLinkClass('/consult')}>
-                🏥 {t('consult', language)}
+              <Link to="/consult" className={`${getLinkClass('/consult')} inline-flex items-center`}>  {/* icon + text */}
+                <img src={consultIcon} alt="Consult" className="h-5 w-5 mr-1 flex-shrink-0" />
+                <span>{t('consult', language)}</span>
               </Link>
             </li>
             <li>
-              <Link to="/dashboard" className={getLinkClass('/dashboard')}>
-                📊 {t('analysis', language)}
+              <Link to="/dashboard" className={`${getLinkClass('/dashboard')} inline-flex items-center`}>  {/* icon + text */}
+                <img src={analyticsIcon} alt="Analysis" className="h-5 w-5 mr-1 flex-shrink-0" />
+                <span>{t('analysis', language)}</span>
               </Link>
             </li>
             <li>
-              <Link to="/prescription" className={getLinkClass('/prescription')}>
-                📋 {t('prescription', language)}
+              <Link to="/prescription" className={`${getLinkClass('/prescription')} inline-flex items-center`}>  {/* icon + text */}
+                <img src={prescriptionIcon} alt="Prescription" className="h-5 w-5 mr-1 flex-shrink-0" />
+                <span>{t('prescription', language)}</span>
               </Link>
             </li>
             <li>
-              <Link to="/reminders" className={getLinkClass('/reminders')}>
-                ⏰ {t('reminders', language)}
+              <Link to="/reminders" className={`${getLinkClass('/reminders')} inline-flex items-center`}>  {/* icon + text */}
+                <img src={remindersIcon} alt="Reminders" className="h-5 w-5 mr-1 flex-shrink-0" />
+                <span>{t('reminders', language)}</span>
               </Link>
             </li>
             
@@ -86,31 +102,31 @@ const Navbar = ({ language, onLanguageChange }) => {
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                   <Link 
                     to="/hospital-report" 
-                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100"
+                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100 flex items-center"
                     onClick={() => setShowMoreMenu(false)}
                   >
-                    🏥 {t('report', language)}
+                    <img src={reportIcon} alt="Report" className="h-5 w-5 mr-2 flex-shrink-0" /> {t('report', language)}
                   </Link>
                   <Link 
                     to="/services" 
-                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100"
+                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100 flex items-center"
                     onClick={() => setShowMoreMenu(false)}
                   >
-                    🛠️ {t('services', language)}
+                    <img src={serviceIcon} alt="Services" className="h-5 w-5 mr-2 flex-shrink-0" /> {t('services', language)}
                   </Link>
                   <Link 
                     to="/about" 
-                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100"
+                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors border-b border-gray-100 flex items-center"
                     onClick={() => setShowMoreMenu(false)}
                   >
-                    ℹ️ {t('about', language)}
+                    <img src={aboutIcon} alt="About" className="h-5 w-5 mr-2 flex-shrink-0" /> {t('about', language)}
                   </Link>
                   <Link 
                     to="/contact" 
-                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors rounded-b-lg"
+                    className="block px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors rounded-b-lg flex items-center"
                     onClick={() => setShowMoreMenu(false)}
                   >
-                    📞 {t('contact', language)}
+                    <img src={contactIcon} alt="Contact" className="h-5 w-5 mr-2 flex-shrink-0" /> {t('contact', language)}
                   </Link>
                 </div>
               )}
@@ -133,7 +149,7 @@ const Navbar = ({ language, onLanguageChange }) => {
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-40">
                     <div className="p-4 border-b border-gray-200">
                       <p className="font-semibold text-gray-800">{user?.full_name || user?.username}</p>
-                      <p className="text-sm text-gray-500">{user?.email}</p>
+                      <p className="text-sm text-gray-500 truncate">{user?.email}</p>
                     </div>
                     <button
                       onClick={() => {
