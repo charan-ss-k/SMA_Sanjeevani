@@ -183,8 +183,19 @@ export default function MedicineIdentificationScreen() {
     setError(null);
 
     try {
-      const medicines = await identifyMedicineFromImage(selectedImage);
-      setIdentifiedMedicines(medicines);
+      const result = await identifyMedicineFromImage(selectedImage);
+      const normalized = Array.isArray(result)
+        ? result
+        : [result].filter(Boolean).map((item) => ({
+            name: item.medicine_name || item.name || 'Unknown Medicine',
+            composition: item.composition || item.generic_name || item.category || 'Not available',
+            confidence: typeof item.confidence === 'number' ? Math.round(item.confidence * 100) : null,
+            indication: item.indication || item.use || item.usage || '',
+            dosage: item.dosage || 'As prescribed',
+            sideEffects: item.side_effects || item.sideEffects || '',
+          }));
+
+      setIdentifiedMedicines(normalized);
     } catch (err) {
       setError(err.message || 'Failed to identify medicine');
       setIdentifiedMedicines([]);

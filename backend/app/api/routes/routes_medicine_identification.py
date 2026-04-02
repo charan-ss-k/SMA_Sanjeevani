@@ -15,7 +15,11 @@ import numpy as np
 from app.core.database import get_db
 from app.core.middleware import get_current_user, get_current_user_optional
 from app.core.rls_context import get_db_with_rls
-from app.services.medicine_ocr_service import process_medicine_image
+from app.services.medicine_ocr_service import (
+    process_medicine_image,
+    extract_text_from_image,
+    analyze_medicine_with_phi4,
+)
 from app.models.models import Prescription, MedicineHistory
 
 logger = logging.getLogger(__name__)
@@ -207,19 +211,26 @@ async def save_to_prescription(
 
 @router.get("/health")
 async def health_check():
-    """Check if medicine identification service is available"""
+    """Check if medicine identification service is available."""
     try:
-        # Try importing required libraries
-        import cv2
-        import pytesseract
+        vision_api_key = os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip()
+        if not vision_api_key:
+            return {
+                "status": "degraded",
+                "service": "medicine-identification",
+                "error": "GOOGLE_CLOUD_VISION_API_KEY not configured",
+                "components": {
+                    "opencv": "available",
+                    "google_vision": "missing-api-key"
+                }
+            }
         
         return {
             "status": "healthy",
             "service": "medicine-identification",
             "components": {
                 "opencv": "available",
-                "pytesseract": "available",
-                "easyocr": "available (optional)"
+                "google_vision": "configured"
             }
         }
     except Exception as e:

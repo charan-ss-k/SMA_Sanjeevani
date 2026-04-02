@@ -28,10 +28,10 @@ export const Alert = ({
   }, [dismissAfter, onDismiss]);
 
   const typeStyles = {
-    info: { bg: colors.info, icon: 'ℹ' },
-    success: { bg: colors.success, icon: '✓' },
-    error: { bg: colors.error, icon: '✕' },
-    warning: { bg: colors.warning, icon: '⚠' },
+    info: { bg: '#E0F2FE', text: '#0C4A6E', icon: 'ℹ' },
+    success: { bg: '#DCFCE7', text: '#14532D', icon: '✓' },
+    error: { bg: '#FEE2E2', text: '#7F1D1D', icon: '✕' },
+    warning: { bg: '#FEF3C7', text: '#78350F', icon: '⚠' },
   };
 
   const typeStyle = typeStyles[type];
@@ -41,7 +41,9 @@ export const Alert = ({
       style={{
         opacity,
         backgroundColor: typeStyle.bg,
-        borderRadius: borderRadius.md,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.04)',
         padding: spacing.md,
         marginVertical: spacing.sm,
         flexDirection: 'row',
@@ -51,7 +53,7 @@ export const Alert = ({
         style={{
           fontSize: 20,
           marginRight: spacing.md,
-          color: colors.white,
+          color: typeStyle.text,
         }}
       >
         {typeStyle.icon}
@@ -61,7 +63,7 @@ export const Alert = ({
           <Text
             style={{
               fontWeight: '600',
-              color: colors.white,
+              color: typeStyle.text,
               marginBottom: spacing.xs,
             }}
           >
@@ -71,8 +73,8 @@ export const Alert = ({
         {message && (
           <Text
             style={{
-              color: colors.white,
-              opacity: 0.9,
+              color: typeStyle.text,
+              opacity: 0.95,
               fontSize: 14,
             }}
           >
@@ -87,7 +89,7 @@ export const Alert = ({
         >
           <Text
             style={{
-              color: colors.white,
+              color: typeStyle.text,
               fontWeight: '600',
               fontSize: 14,
             }}

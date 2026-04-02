@@ -66,12 +66,17 @@ const AppHeader = () => {
         
         <View style={styles.header}>
           <View style={styles.logoContainer}>
+            <View style={styles.logoBadge}>
             <Image
               source={require('../../assets/Sanjeevani Logo.png')}
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Sanjeevani</Text>
+            </View>
+            <View>
+              <Text style={styles.title}>Sanjeevani</Text>
+              <Text style={styles.subtitle}>Your personal health companion</Text>
+            </View>
           </View>
 
           <View style={styles.userSection}>
@@ -143,39 +148,56 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   topStripe: {
-    height: 12,
-    backgroundColor: '#166534', // Dark green (green-800)
+    height: 10,
+    backgroundColor: '#166534',
   },
   header: {
-    height: 80,
-    backgroundColor: '#fef3c7', // Amber-100
+    height: 86,
+    backgroundColor: '#fef3c7',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    shadowColor: '#000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fcd34d',
+    shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 5,
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logo: {
-    width: 48,
-    height: 48,
+  logoBadge: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: '#E6F8F5',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: spacing.md,
+    borderWidth: 1,
+    borderColor: '#BFEDE6',
+  },
+  logo: {
+    width: 34,
+    height: 34,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#166534', // Green-800
-    letterSpacing: 0.5,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#166534',
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
   },
   userSection: {
     flexDirection: 'row',
@@ -192,14 +214,14 @@ const styles = StyleSheet.create({
   userButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#15803d', // Green-700
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
+    backgroundColor: '#15803d',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
     gap: spacing.xs,
   },
   loginButton: {
-    backgroundColor: '#15803d', // Green-700
+    backgroundColor: '#15803d',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: 20,
@@ -213,7 +235,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#16a34a', // Green-600
+    backgroundColor: '#16a34a',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -227,7 +249,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: 92, // Account for header height
+    paddingTop: 98,
     paddingRight: spacing.lg,
   },
   dropdown: {

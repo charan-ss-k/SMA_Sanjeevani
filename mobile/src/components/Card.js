@@ -22,24 +22,27 @@ export const Card = ({
 
   const variants = {
     default: {
-      backgroundColor: colors.white,
-      borderRadius: borderRadius.lg,
-      borderWidth: 0,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.xl,
+      borderWidth: 1,
+      borderColor: '#EEF2F7',
     },
     elevated: {
-      backgroundColor: colors.white,
-      borderRadius: borderRadius.lg,
-      elevation: 3,
-      shadowColor: colors.black,
-      shadowOpacity: 0.1,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 3,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.xl,
+      borderWidth: 1,
+      borderColor: '#D1FAE5',
+      elevation: 5,
+      shadowColor: '#0F172A',
+      shadowOpacity: 0.08,
+      shadowOffset: { width: 0, height: 6 },
+      shadowRadius: 12,
     },
     outlined: {
-      backgroundColor: colors.white,
-      borderRadius: borderRadius.lg,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: borderRadius.xl,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.borderStrong,
     },
   };
 

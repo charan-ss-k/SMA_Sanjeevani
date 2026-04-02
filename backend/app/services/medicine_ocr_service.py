@@ -1,95 +1,20 @@
 """
 Medicine OCR and Identification Service
-Uses OCR to read medicine packaging and Phi-4 LLM to analyze the medicine
+Uses Google Vision OCR to read medicine packaging and Phi-4 LLM to analyze the medicine.
 """
 import cv2
 import numpy as np
 import logging
 import os
-import tempfile
 from typing import Dict, Any
-import requests
+
+from app.services.google_vision_ocr import GoogleVisionOCRService
 
 logger = logging.getLogger(__name__)
 
-# Try to import pytesseract (optional, falls back to easyocr)
-HAVE_PYTESSERACT = False
-try:
-    import pytesseract
-    windows_tesseract = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    if os.path.exists(windows_tesseract):
-        pytesseract.pytesseract.tesseract_cmd = windows_tesseract
-    HAVE_PYTESSERACT = True
-    logger.info("✅ Pytesseract loaded successfully")
-except Exception as e:
-    logger.debug(f"⚠️ Pytesseract not available: {e}")
-
-# EasyOCR support (primary OCR engine)
-HAVE_EASYOCR = False
-try:
-    import easyocr
-    HAVE_EASYOCR = True
-    logger.info("✅ EasyOCR loaded successfully")
-except ImportError:
-    logger.error("❌ EasyOCR not installed - OCR features will not work")
-
-
-def preprocess_image_multiple_methods(image_array: np.ndarray) -> list:
-    """
-    Try multiple preprocessing strategies for medicine packaging OCR.
-    Handles reflective surfaces, blister packs, prescriptions, bottles.
-    
-    Args:
-        image_array: numpy array of image (from cv2.imread or PIL)
-    
-    Returns:
-        list of (method_name, processed_image) tuples
-    """
-    if isinstance(image_array, str):
-        # If it's a path, read it
-        img = cv2.imread(image_array)
-    else:
-        img = image_array
-    
-    if img is None:
-        raise ValueError("Could not load image")
-    
-    # Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
-    results = []
-    
-    # METHOD 1: Mild denoise + grayscale
-    mild_denoise = cv2.fastNlMeansDenoising(gray, None, h=8, templateWindowSize=7, searchWindowSize=21)
-    results.append(('Gray Denoised', mild_denoise))
-    
-    # METHOD 2: CLAHE + OTSU
-    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
-    clahe_img = clahe.apply(mild_denoise)
-    blurred = cv2.GaussianBlur(clahe_img, (3, 3), 0)
-    _, otsu = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    results.append(('CLAHE OTSU', otsu))
-    
-    # METHOD 3: CLAHE + Adaptive Mean
-    adaptive = cv2.adaptiveThreshold(
-        clahe_img, 255,
-        cv2.ADAPTIVE_THRESH_MEAN_C,
-        cv2.THRESH_BINARY,
-        21, 10
-    )
-    results.append(('CLAHE Adaptive Mean', adaptive))
-    
-    # METHOD 4: Inverted OTSU
-    inverted = cv2.bitwise_not(otsu)
-    results.append(('Inverted OTSU', inverted))
-    
-    return results
-
-
 def extract_text_from_image(image_array: np.ndarray) -> str:
     """
-    Extract text from medicine packaging using OCR.
-    Tries multiple preprocessing and OCR methods to get best result.
+    Extract text from medicine packaging using Google Vision OCR only.
     
     Args:
         image_array: numpy array of image
@@ -97,81 +22,25 @@ def extract_text_from_image(image_array: np.ndarray) -> str:
     Returns:
         Extracted text from the image
     """
-    logger.info(f"📷 Starting OCR extraction. Pytesseract: {HAVE_PYTESSERACT}, EasyOCR: {HAVE_EASYOCR}")
-    
-    try:
-        preprocessed_images = preprocess_image_multiple_methods(image_array)
-    except Exception as e:
-        logger.error(f"Preprocessing failed: {e}")
-        raise
-    
-    best_text = ""
-    best_length = 0
-    best_method = ""
-    all_texts = []
-    
-    # Try Tesseract first if available
-    if HAVE_PYTESSERACT:
-        logger.info("🔍 Trying Tesseract OCR...")
-        psm_modes = [
-            ('Auto', 3),
-            ('Single Block', 6),
-            ('Single Line', 7),
-            ('Sparse Text', 11)
-        ]
-        
-        # Try all preprocessing + PSM combinations
-        for method_name, processed_img in preprocessed_images:
-            for psm_name, psm_mode in psm_modes:
-                try:
-                    config = f'--oem 3 --psm {psm_mode}'
-                    text = pytesseract.image_to_string(processed_img, config=config)
-                    text = " ".join(text.split())  # Clean whitespace
-                    all_texts.append(text)
-                    
-                    if len(text) > best_length:
-                        best_length = len(text)
-                        best_text = text
-                        best_method = f"{method_name} + PSM {psm_mode}"
-                except Exception as e:
-                    logger.debug(f"PSM {psm_mode} failed: {e}")
-                    continue
-    
-    # Try EasyOCR as fallback or primary if Tesseract unavailable.
-    # Run it on each preprocessed image variant and keep the best text.
-    if HAVE_EASYOCR:
-        logger.info("🔍 Trying EasyOCR...")
-        try:
-            if not hasattr(extract_text_from_image, '_easyocr_reader'):
-                logger.info("📥 Loading EasyOCR reader...")
-                extract_text_from_image._easyocr_reader = easyocr.Reader(['en'], gpu=False)
-            
-            reader = extract_text_from_image._easyocr_reader
+    vision_api_key = os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip()
+    if not vision_api_key:
+        raise RuntimeError("GOOGLE_CLOUD_VISION_API_KEY not found. Google Vision OCR cannot run.")
 
-            for method_name, processed_img in preprocessed_images:
-                if len(processed_img.shape) == 2:
-                    img_rgb = cv2.cvtColor(processed_img, cv2.COLOR_GRAY2RGB)
-                else:
-                    img_rgb = cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB)
+    logger.info("🔍 Using Google Vision OCR for medicine identification")
+    vision_result = GoogleVisionOCRService.extract_text_from_image(
+        image_array,
+        vision_api_key,
+        language_hints=["en"],
+    )
+    vision_text = (vision_result.get("text") or "").strip()
 
-                text_list = reader.readtext(img_rgb, detail=0, paragraph=True)
-                text = " ".join(text_list)
-                text = " ".join(text.split())
-                all_texts.append(text)
+    if vision_result.get("status") != "success" or len(vision_text) < 5:
+        raise RuntimeError(
+            f"Google Vision OCR failed or insufficient text. status={vision_result.get('status')} error={vision_result.get('error')}"
+        )
 
-                if len(text) > best_length:
-                    best_length = len(text)
-                    best_text = text
-                    best_method = f"EasyOCR ({method_name})"
-        except Exception as e:
-            logger.warning(f"EasyOCR failed: {e}")
-    
-    logger.info(f"Best OCR result: {best_method} ({best_length} chars)")
-    
-    if best_length < 5:
-        logger.warning("OCR found very little text, result may be poor")
-    
-    return best_text
+    logger.info("✅ Google Vision OCR succeeded for medicine identification")
+    return vision_text
 
 
 def analyze_medicine_with_phi4(ocr_text: str) -> Dict[str, Any]:

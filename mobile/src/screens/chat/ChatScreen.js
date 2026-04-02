@@ -53,10 +53,12 @@ const ChatMessageBubble = ({ message, isUser, onSpeak, isMuted }) => {
           variant="elevated"
           padding="md"
           style={{
-            backgroundColor: isUser ? colors.primary : colors.white,
-            borderRadius: 16,
-            borderBottomRightRadius: isUser ? 4 : 16,
-            borderBottomLeftRadius: isUser ? 16 : 4,
+            backgroundColor: isUser ? '#15803d' : '#FFFFFF',
+            borderRadius: 18,
+            borderBottomRightRadius: isUser ? 6 : 18,
+            borderBottomLeftRadius: isUser ? 18 : 6,
+            borderWidth: isUser ? 0 : 1,
+            borderColor: '#BBF7D0',
           }}
         >
           {isUser ? (
@@ -287,8 +289,45 @@ export default function ChatScreen() {
           contentContainerStyle={{
             padding: spacing.md,
             paddingBottom: spacing.xl,
-            backgroundColor: '#f8fffe', // Light green-blue background like frontend
+            backgroundColor: '#F0FDF4',
           }}
+          ListHeaderComponent={
+            <View
+              style={{
+                marginBottom: spacing.md,
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: '#BBF7D0',
+                padding: spacing.lg,
+                shadowColor: '#0F172A',
+                shadowOpacity: 0.08,
+                shadowOffset: { width: 0, height: 6 },
+                shadowRadius: 14,
+                elevation: 4,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    backgroundColor: '#E0F2FE',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: spacing.sm,
+                  }}
+                >
+                  <Text style={{ fontSize: 24 }}>🩺</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: '#0C4A6E' }}>AI Health Assistant</Text>
+                  <Text style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>Ask in simple language and get structured medical guidance</Text>
+                </View>
+              </View>
+            </View>
+          }
           ListEmptyComponent={
             <View
               style={{
@@ -369,8 +408,8 @@ export default function ChatScreen() {
           style={{
             padding: spacing.md,
             paddingBottom: Platform.OS === 'ios' ? spacing.md : spacing.lg,
-            backgroundColor: colors.white,
-            borderTopColor: colors.border,
+            backgroundColor: '#FFFFFF',
+            borderTopColor: '#D1FAE5',
             borderTopWidth: 1,
             minHeight: 70,
           }}
@@ -379,7 +418,11 @@ export default function ChatScreen() {
             style={{
               flexDirection: 'row',
               alignItems: 'flex-end',
-              gap: spacing.sm,
+              backgroundColor: '#F8FAFC',
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: '#D1FAE5',
+              padding: 6,
             }}
           >
             <TextInput
@@ -401,14 +444,14 @@ export default function ChatScreen() {
               style={{
                 flex: 1,
                 borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 8,
+                borderColor: '#D1D5DB',
+                borderRadius: 12,
                 paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
+                paddingVertical: spacing.sm + 2,
                 color: colors.text,
                 fontSize: 16,
                 minHeight: 44,
-                backgroundColor: colors.gray[100],
+                backgroundColor: '#FFFFFF',
               }}
             />
             
@@ -416,9 +459,10 @@ export default function ChatScreen() {
               <Pressable
                 onPress={handleStop}
                 style={{
-                  backgroundColor: colors.warning,
-                  borderRadius: 8,
+                  backgroundColor: '#D97706',
+                  borderRadius: 12,
                   padding: spacing.md,
+                  marginLeft: spacing.sm,
                   justifyContent: 'center',
                   alignItems: 'center',
                   minWidth: 44,
@@ -434,10 +478,11 @@ export default function ChatScreen() {
                 style={{
                   backgroundColor:
                     inputText.trim() && !isStreaming
-                      ? colors.primary
+                      ? '#15803d'
                       : colors.gray[200],
-                  borderRadius: 8,
+                  borderRadius: 12,
                   padding: spacing.md,
+                  marginLeft: spacing.sm,
                   justifyContent: 'center',
                   alignItems: 'center',
                   minWidth: 44,

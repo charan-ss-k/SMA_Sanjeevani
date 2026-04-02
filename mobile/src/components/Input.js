@@ -54,13 +54,18 @@ export const Input = ({
         style={[
           {
             borderWidth: 1,
-            borderColor: error ? colors.error : isFocused ? colors.secondary : colors.border,
-            borderRadius: borderRadius.md,
+            borderColor: error ? colors.error : isFocused ? colors.primary : colors.borderStrong,
+            borderRadius: borderRadius.lg,
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.md,
             fontSize: typography.body.fontSize,
             color: colors.text,
-            backgroundColor: colors.white,
+            backgroundColor: '#FFFFFF',
+            shadowColor: isFocused ? colors.primary : 'transparent',
+            shadowOpacity: isFocused ? 0.15 : 0,
+            shadowOffset: { width: 0, height: 4 },
+            shadowRadius: 8,
+            elevation: isFocused ? 2 : 0,
           },
           inputStyle,
         ]}

@@ -15,12 +15,12 @@ export const Badge = ({
   style = {},
 }) => {
   const variants = {
-    default: { bg: colors.gray[200], text: colors.text },
-    success: { bg: colors.success, text: colors.white },
-    error: { bg: colors.error, text: colors.white },
-    warning: { bg: colors.warning, text: colors.white },
-    info: { bg: colors.info, text: colors.white },
-    primary: { bg: colors.secondary, text: colors.white },
+    default: { bg: '#EEF2F7', text: '#334155' },
+    success: { bg: '#DCFCE7', text: '#14532D' },
+    error: { bg: '#FEE2E2', text: '#7F1D1D' },
+    warning: { bg: '#FEF3C7', text: '#78350F' },
+    info: { bg: '#E0F2FE', text: '#0C4A6E' },
+    primary: { bg: '#DCFCE7', text: '#166534' },
   };
 
   const sizes = {
@@ -40,6 +40,8 @@ export const Badge = ({
         {
           backgroundColor: variantStyle.bg,
           borderRadius: borderRadius.full,
+          borderWidth: 1,
+          borderColor: 'rgba(15, 23, 42, 0.08)',
           paddingHorizontal: sizeStyle.padding * 2,
           paddingVertical: sizeStyle.padding,
           alignSelf: 'flex-start',
