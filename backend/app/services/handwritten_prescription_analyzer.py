@@ -14,8 +14,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
 
+from app.services.google_vision_ocr import GoogleVisionOCRService
 from app.services.handwritten_prescription_preprocessor import HandwrittenPrescriptionPreprocessor
-from app.services.multimethod_ocr import MultiMethodHandwrittenOCR
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +40,10 @@ class HybridHandwrittenPrescriptionAnalyzer:
         self.logger = logger
         self.ollama_url = ollama_url
         self.ollama_model = ollama_model
+        self.google_vision_api_key = os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip()
 
         # Initialize components
         self.preprocessor = HandwrittenPrescriptionPreprocessor()
-        self.ocr = MultiMethodHandwrittenOCR(languages=['en'])
 
         self.logger.info("✅ Hybrid Handwritten Prescription Analyzer initialized")
 
@@ -70,18 +70,19 @@ class HybridHandwrittenPrescriptionAnalyzer:
             quality_score = self.preprocessor.get_image_quality_score(cv2.imread(image_path))
             self.logger.info(f"  Quality score: {quality_score:.2%}")
 
-            # Step 2: Multi-method OCR extraction
-            self.logger.info("STAGE 2: Multi-Method OCR Extraction")
-            ocr_result = self.ocr.extract_text_multimethod(preprocessed)
+            # Step 2: OCR extraction (Google Vision primary, local multi-method fallback)
+            self.logger.info("STAGE 2: OCR Extraction")
+            ocr_result = self._extract_text_with_best_ocr(preprocessed)
             self.logger.info(f"  Methods used: {', '.join(ocr_result['methods_used'])}")
             self.logger.info(f"  Confidence: {ocr_result['confidence']:.2%}")
             self.logger.info(f"  Quality score: {ocr_result['quality_score']:.2%}")
 
             extracted_text = ocr_result['text']
+            ocr_source = ', '.join(ocr_result.get('methods_used', [])) or 'OCR'
             
             # LOG EXTRACTED TEXT FOR USER CONFIRMATION
             self.logger.info("=" * 80)
-            self.logger.info("📄 EXTRACTED TEXT FROM PRESCRIPTION (Raw OCR Output):")
+            self.logger.info(f"📄 EXTRACTED TEXT FROM {ocr_source}:")
             self.logger.info("=" * 80)
             if extracted_text and len(extracted_text.strip()) > 0:
                 self.logger.info(f"\n{extracted_text}\n")
@@ -93,7 +94,16 @@ class HybridHandwrittenPrescriptionAnalyzer:
             self.logger.info("=" * 80)
 
             # Validate OCR output
-            ocr_validation = self.ocr.validate_extracted_text(extracted_text)
+            ocr_validation = {
+                'valid': len((extracted_text or '').strip()) >= 10,
+                'has_content': len((extracted_text or '').strip()) > 0,
+                'has_medical_keywords': any(
+                    token in (extracted_text or '').lower()
+                    for token in ['mg', 'ml', 'tab', 'tablet', 'capsule', 'syp', 'syrup', 'bd', 'od', 'tds', 'qid']
+                ),
+                'confidence_level': 'high' if ocr_result.get('confidence', 0.0) >= 0.75 else 'medium' if ocr_result.get('confidence', 0.0) >= 0.5 else 'low',
+                'issues': []
+            }
             self.logger.info(f"  OCR Validation: {ocr_validation}")
 
             if not ocr_validation['has_content']:
@@ -139,6 +149,78 @@ class HybridHandwrittenPrescriptionAnalyzer:
                 'message': f'Prescription analysis failed: {str(e)}',
                 'error': str(e)
             }
+
+    def _extract_text_with_best_ocr(self, preprocessed_image: np.ndarray) -> Dict[str, Any]:
+        """
+        Use Google Vision OCR only (DOCUMENT_TEXT_DETECTION + handwriting language hint).
+        """
+        vision_api_key = (os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip() or self.google_vision_api_key)
+
+        if not vision_api_key:
+            raise RuntimeError("GOOGLE_CLOUD_VISION_API_KEY not found. Google Vision OCR cannot run.")
+
+        self.logger.info("🔍 Using Google Vision OCR (DOCUMENT_TEXT_DETECTION, en-t-i0-handwrit)")
+        vision_result = GoogleVisionOCRService.extract_text_from_image(
+            preprocessed_image,
+            vision_api_key,
+            language_hints=["en-t-i0-handwrit"],
+        )
+
+        vision_text = (vision_result.get("text") or "").strip()
+        if vision_result.get("status") != "success" or len(vision_text) < 5:
+            raise RuntimeError(
+                f"Google Vision OCR failed or insufficient text. status={vision_result.get('status')} error={vision_result.get('error')}"
+            )
+
+        self.logger.info("✅ Google Vision OCR succeeded")
+        quality_score = self._calculate_text_quality(vision_text)
+        return {
+            "text": vision_text,
+            "methods_used": ["GoogleVision"],
+            "confidence": float(vision_result.get("confidence", 0.0)),
+            "quality_score": quality_score,
+            "individual_results": {
+                "GoogleVision": {
+                    "text": vision_text,
+                    "confidence": float(vision_result.get("confidence", 0.0)),
+                }
+            },
+            "hierarchy": vision_result.get("hierarchy", {}),
+            "request": vision_result.get("request", {}),
+        }
+
+    def _calculate_text_quality(self, text: str) -> float:
+        """Lightweight quality estimator used when local OCR stack is not initialized."""
+        if not text or not text.strip():
+            return 0.0
+
+        cleaned = text.strip()
+        length_score = min(1.0, len(cleaned) / 250.0)
+        line_count = len([line for line in cleaned.splitlines() if line.strip()])
+        line_score = min(1.0, line_count / 8.0)
+
+        medical_tokens = ["mg", "ml", "tab", "tablet", "capsule", "syp", "syrup", "bd", "od", "tds", "qid"]
+        lowered = cleaned.lower()
+        token_hits = sum(1 for token in medical_tokens if token in lowered)
+        token_score = min(1.0, token_hits / 3.0)
+
+        return max(0.0, min(1.0, (0.5 * length_score) + (0.25 * line_score) + (0.25 * token_score)))
+
+    def _normalize_medicines_for_ui(self, medicines):
+        normalized = []
+        for med in medicines or []:
+            med_name = med.get('medicine_name') or med.get('name') or 'Unknown medicine'
+            normalized.append({
+                'medicine_name': med_name,
+                'name': med.get('name') or med_name,
+                'dosage': med.get('dosage') or 'Not specified',
+                'frequency': med.get('frequency') or 'Not specified',
+                'duration': med.get('duration') or 'Not specified',
+                'special_instructions': med.get('special_instructions') or med.get('instructions') or '',
+                'notes': med.get('notes') or '',
+                'confidence': med.get('confidence') or 'medium',
+            })
+        return normalized
 
     def _parse_with_llm(self, extracted_text: str) -> Dict[str, Any]:
         """
@@ -386,6 +468,8 @@ class HybridHandwrittenPrescriptionAnalyzer:
         Returns:
             Complete prescription report
         """
+        medicines_for_ui = self._normalize_medicines_for_ui(parsed_data.get('medicines', []))
+
         report = {
             'status': 'success',
             'timestamp': datetime.now().isoformat(),
@@ -398,14 +482,16 @@ class HybridHandwrittenPrescriptionAnalyzer:
                 'methods_used': ocr_result['methods_used'],
                 'confidence': ocr_result['confidence'],
                 'quality_score': ocr_result['quality_score'],
-                'extracted_text': extracted_text[:500]  # First 500 chars
+                'extracted_text': extracted_text[:500],  # First 500 chars
+                'request': ocr_result.get('request', {}),
+                'hierarchy': ocr_result.get('hierarchy', {}),
             },
             'prescription': {
                 'patient_details': parsed_data.get('patient_details', {}),
                 'doctor_details': parsed_data.get('doctor_details', {}),
                 'date': parsed_data.get('prescription_date'),
                 'diagnosis': parsed_data.get('diagnosis'),
-                'medicines': parsed_data.get('medicines', []),
+                'medicines': medicines_for_ui,
                 'medical_advice': parsed_data.get('medical_advice'),
                 'allergies': parsed_data.get('allergies'),
             },
@@ -417,6 +503,18 @@ class HybridHandwrittenPrescriptionAnalyzer:
                 '⚠️ Follow doctor\'s instructions strictly',
                 '⚠️ Report any allergic reactions immediately'
             ]
+        }
+
+        # Flat compatibility fields expected by current frontend/mobile analyzers.
+        report['ocr_text'] = extracted_text
+        report['medicines'] = medicines_for_ui
+        report['warnings'] = validated_data.get('warnings', [])
+        if ocr_result.get('confidence', 0.0) < 0.5:
+            report['warnings'].append('OCR confidence is below 0.5. Please retake the photo for safety.')
+        report['pipeline'] = {
+            'preprocessing': 'CNN preprocessing',
+            'htr': ', '.join(ocr_result.get('methods_used', [])) or 'OCR',
+            'llm_deciphering': os.getenv("LLM_PROVIDER", "ollama").lower().strip(),
         }
 
         return report

@@ -6,6 +6,108 @@ import { playTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
 import { API_BASE } from '../config/apiBase';
 
+const Icon = ({ children, className = 'h-5 w-5', ...props }) => (
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} {...props}>
+    {children}
+  </svg>
+);
+
+const CameraIcon = (props) => (
+  <Icon {...props}>
+    <path d="M8 7.5 9.5 5h5L16 7.5H18.5A2.5 2.5 0 0 1 21 10v8A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5v-8A2.5 2.5 0 0 1 5.5 7.5H8Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="12" cy="13.5" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+  </Icon>
+);
+
+const UploadIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 16V6m0 0 4 4m-4-4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M5 16.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icon>
+);
+
+const AnalyzeIcon = (props) => (
+  <Icon {...props}>
+    <path d="m11 5 8 8-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icon>
+);
+
+const CancelIcon = (props) => (
+  <Icon {...props}>
+    <path d="M6 6 18 18M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icon>
+);
+
+const ResetIcon = (props) => (
+  <Icon {...props}>
+    <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M20 4v6h-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </Icon>
+);
+
+const SpeakerIcon = (props) => (
+  <Icon {...props}>
+    <path d="M5 14V10h4l5-4v12l-5-4H5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M16 9a3 3 0 0 1 0 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M18.5 6.5a7 7 0 0 1 0 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icon>
+);
+
+const MuteIcon = (props) => (
+  <Icon {...props}>
+    <path d="M5 14V10h4l5-4v12l-5-4H5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M16.5 9.5 20 13m0-3.5-3.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icon>
+);
+
+const CheckIcon = (props) => (
+  <Icon {...props}>
+    <path d="m5 12 4 4 10-10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </Icon>
+);
+
+const WarningIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 4 3 20h18L12 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M12 9v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <circle cx="12" cy="16.5" r="1" fill="currentColor" />
+  </Icon>
+);
+
+const ErrorIcon = (props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M9.5 9.5 14.5 14.5M14.5 9.5 9.5 14.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icon>
+);
+
+const MedicineIcon = (props) => (
+  <Icon {...props}>
+    <path d="M8 6.5a3.5 3.5 0 0 1 5 0l4.5 4.5a3.5 3.5 0 0 1 0 5l-1.5 1.5a3.5 3.5 0 0 1-5 0L6.5 13a3.5 3.5 0 0 1 0-5L8 6.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    <path d="M10 10.5h4M12 8.5v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icon>
+);
+
+const TimeIcon = (props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.8" />
+    <path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </Icon>
+);
+
+const LabelIcon = (props) => (
+  <Icon {...props}>
+    <path d="M6 8h12M6 12h8M6 16h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </Icon>
+);
+
+const DotIcon = (props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="3" fill="currentColor" />
+  </Icon>
+);
+
 const PrescriptionAnalyzer = () => {
   const { authToken } = useContext(AuthContext);
   const { language } = useContext(LanguageContext);
@@ -166,6 +268,8 @@ const PrescriptionAnalyzer = () => {
     playTTS(text, language);
   };
 
+  const iconButtonClass = 'inline-flex items-center justify-center gap-2';
+
   // Medicine card component
   const MedicineCard = ({ medicine, index }) => (
     <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500 hover:shadow-lg transition">
@@ -185,35 +289,51 @@ const PrescriptionAnalyzer = () => {
           className="p-2 bg-amber-50 rounded hover:bg-amber-100 transition"
           title={getPrescriptionText('speak', language)}
         >
-          🔊
+          <SpeakerIcon className="h-5 w-5 text-amber-700" />
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm mb-3">
         <div className="bg-blue-50 p-3 rounded">
-          <div className="text-gray-600 text-xs font-semibold">💊 {getPrescriptionText('dosage', language).toUpperCase()}</div>
+          <div className="text-gray-600 text-xs font-semibold inline-flex items-center gap-1.5">
+            <MedicineIcon className="h-4 w-4 text-blue-600" />
+            {getPrescriptionText('dosage', language).toUpperCase()}
+          </div>
           <div className="text-gray-800 font-bold mt-1">{medicine.dosage || getPrescriptionText('noNotes', language)}</div>
         </div>
         <div className="bg-purple-50 p-3 rounded">
-          <div className="text-gray-600 text-xs font-semibold">📅 {getPrescriptionText('frequency', language).toUpperCase()}</div>
+          <div className="text-gray-600 text-xs font-semibold inline-flex items-center gap-1.5">
+            <TimeIcon className="h-4 w-4 text-purple-600" />
+            {getPrescriptionText('frequency', language).toUpperCase()}
+          </div>
           <div className="text-gray-800 font-bold mt-1">{medicine.frequency || getPrescriptionText('noNotes', language)}</div>
         </div>
         <div className="bg-green-50 p-3 rounded col-span-2">
-          <div className="text-gray-600 text-xs font-semibold">⏳ {getPrescriptionText('duration', language).toUpperCase()}</div>
+          <div className="text-gray-600 text-xs font-semibold inline-flex items-center gap-1.5">
+            <TimeIcon className="h-4 w-4 text-green-600" />
+            {getPrescriptionText('duration', language).toUpperCase()}
+          </div>
           <div className="text-gray-800 font-bold mt-1">{medicine.duration || getPrescriptionText('asNeeded', language)}</div>
         </div>
       </div>
 
       {medicine.special_instructions && (
         <div className="bg-amber-50 border-l-2 border-amber-500 p-3 rounded mb-3">
-          <div className="text-xs font-semibold text-amber-800">📋 {getPrescriptionText('warnings', language).toUpperCase()}</div>
+          <div className="text-xs font-semibold text-amber-800 inline-flex items-center gap-1.5">
+            <WarningIcon className="h-4 w-4 text-amber-700" />
+            {getPrescriptionText('warnings', language).toUpperCase()}
+          </div>
           <div className="text-sm text-amber-900 mt-1">{medicine.special_instructions}</div>
         </div>
       )}
 
       {medicine.notes && (
         <div className="bg-gray-50 p-3 rounded text-sm text-gray-600">
-          <span className="font-semibold">📝 {getPrescriptionText('notes', language)}:</span> {medicine.notes}
+          <span className="font-semibold inline-flex items-center gap-1.5">
+            <LabelIcon className="h-4 w-4 text-gray-500" />
+            {getPrescriptionText('notes', language)}:
+          </span>{' '}
+          {medicine.notes}
         </div>
       )}
     </div>
@@ -221,9 +341,10 @@ const PrescriptionAnalyzer = () => {
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-6">
-        <h3 className="text-2xl font-bold text-gray-800 mb-2">
-          📸 {getPrescriptionText('handwrittenPrescriptionAnalyzer', language)}
+      <div className="bg-linear-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-6">
+        <h3 className="text-2xl font-bold text-gray-800 mb-2 inline-flex items-center gap-3">
+          <CameraIcon className="h-7 w-7 text-blue-700" />
+          {getPrescriptionText('handwrittenPrescriptionAnalyzer', language)}
         </h3>
         <p className="text-gray-600 text-sm">
           {getPrescriptionText('uploadHandwrittenPrescription', language)}
@@ -244,8 +365,11 @@ const PrescriptionAnalyzer = () => {
           onChange={handleFileSelect}
           className="hidden"
         />
-        <div className="text-4xl mb-3">📷</div>
-        <p className="text-gray-800 font-semibold mb-2">
+        <div className="mb-3 flex justify-center">
+          <CameraIcon className="h-12 w-12 text-blue-600" />
+        </div>
+        <p className="text-gray-800 font-semibold mb-2 inline-flex items-center gap-2 justify-center">
+          <UploadIcon className="h-5 w-5 text-blue-700" />
           {getPrescriptionText('dragImageHere', language)}
         </p>
         <p className="text-gray-600 text-sm">
@@ -265,7 +389,7 @@ const PrescriptionAnalyzer = () => {
             <div className="absolute top-2 right-2 flex gap-2">
               {analyzing && (
                 <div className="bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                  ⏳ {getPrescriptionText('analyzing', language)}
+                  {getPrescriptionText('analyzing', language)}
                 </div>
               )}
             </div>
@@ -285,35 +409,38 @@ const PrescriptionAnalyzer = () => {
         <button
           onClick={handleAnalyze}
           disabled={!file || analyzing}
-          className="flex-1 bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition"
+          className={`flex-1 bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition ${iconButtonClass}`}
         >
-          {analyzing ? `⏳ ${getPrescriptionText('analyzing', language)}` : `🔍 ${getPrescriptionText('analyze', language)}`}
+          <AnalyzeIcon className={`h-5 w-5 ${analyzing ? 'animate-pulse' : ''}`} />
+          {analyzing ? getPrescriptionText('analyzing', language) : getPrescriptionText('analyze', language)}
         </button>
         {analyzing && (
           <button
             onClick={handleCancel}
-            className="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition"
+            className={`bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition ${iconButtonClass}`}
           >
-            ✕ {getPrescriptionText('cancel', language)}
+            <CancelIcon className="h-5 w-5" />
+            {getPrescriptionText('cancel', language)}
           </button>
         )}
         {(file || imagePreview) && (
           <button
             onClick={handleClear}
-            className="bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-600 transition"
+            className={`bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-600 transition ${iconButtonClass}`}
           >
-            🔄 {getPrescriptionText('clear', language)}
+            <ResetIcon className="h-5 w-5" />
+            {getPrescriptionText('clear', language)}
           </button>
         )}
         <button
           onClick={() => setIsMuted(!isMuted)}
-          className={`font-semibold py-3 px-6 rounded-lg transition ${
+          className={`font-semibold py-3 px-6 rounded-lg transition ${iconButtonClass} ${
             isMuted
               ? 'bg-gray-300 text-gray-700 hover:bg-gray-400'
               : 'bg-amber-500 text-white hover:bg-amber-600'
           }`}
         >
-          {isMuted ? '🔇' : '🔊'}
+          {isMuted ? <MuteIcon className="h-5 w-5" /> : <SpeakerIcon className="h-5 w-5" />}
         </button>
       </div>
 
@@ -325,9 +452,6 @@ const PrescriptionAnalyzer = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
             </div>
             <p className="text-gray-700 font-semibold mb-2">{getPrescriptionText('analyzingPrescription', language)}</p>
-            <p className="text-gray-600 text-sm">
-              {getPrescriptionText('processingPipeline', language)}
-            </p>
           </div>
         </div>
       )}
@@ -338,32 +462,33 @@ const PrescriptionAnalyzer = () => {
           {/* Status Alert */}
           {analysisResult.status === 'success' && (
             <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
-              <p className="text-green-800 font-semibold">✅ {getPrescriptionText('analysisComplete', language)}</p>
+              <p className="text-green-800 font-semibold inline-flex items-center gap-2">
+                <CheckIcon className="h-5 w-5 text-green-700" />
+                {getPrescriptionText('analysisComplete', language)}
+              </p>
               <p className="text-green-700 text-sm">
-                {getPrescriptionText('found', language)} {analysisResult.medicines?.length || 0} {getPrescriptionText('medicines', language)}
+                {analysisResult.medicines?.length > 0
+                  ? `${getPrescriptionText('found', language)} ${analysisResult.medicines.length} ${getPrescriptionText('medicines', language)}`
+                  : 'OCR text extracted successfully. Medicine parsing may require manual review.'}
               </p>
             </div>
           )}
 
           {analysisResult.status === 'warning' && (
             <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg">
-              <p className="text-yellow-800 font-semibold">⚠️ {analysisResult.message}</p>
+              <p className="text-yellow-800 font-semibold inline-flex items-center gap-2">
+                <WarningIcon className="h-5 w-5 text-yellow-700" />
+                {analysisResult.message}
+              </p>
             </div>
           )}
 
           {analysisResult.status === 'error' && (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
-              <p className="text-red-800 font-semibold">❌ {analysisResult.error}</p>
-            </div>
-          )}
-
-          {/* OCR Text Display */}
-          {analysisResult.ocr_text && (
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <h4 className="font-bold text-gray-800 mb-2">🔍 {getPrescriptionText('recognizedTextOCR', language)}</h4>
-              <div className="bg-white p-3 rounded border border-gray-300 text-sm text-gray-700 max-h-32 overflow-y-auto font-mono">
-                {analysisResult.ocr_text}
-              </div>
+              <p className="text-red-800 font-semibold inline-flex items-center gap-2">
+                <ErrorIcon className="h-5 w-5 text-red-700" />
+                {analysisResult.error}
+              </p>
             </div>
           )}
 
@@ -371,7 +496,8 @@ const PrescriptionAnalyzer = () => {
           {analysisResult.medicines && analysisResult.medicines.length > 0 && (
             <div>
               <h4 className="font-bold text-gray-800 mb-4 text-lg">
-                💊 {getPrescriptionText('decipheredMedicines', language)} ({analysisResult.medicines.length})
+                <MedicineIcon className="inline-block h-5 w-5 mr-2 text-blue-700 align-[-2px]" />
+                {getPrescriptionText('decipheredMedicines', language)} ({analysisResult.medicines.length})
               </h4>
               <div className="grid gap-4">
                 {analysisResult.medicines.map((medicine, index) => (
@@ -384,37 +510,21 @@ const PrescriptionAnalyzer = () => {
           {/* Warnings */}
           {analysisResult.warnings && analysisResult.warnings.length > 0 && (
             <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-lg">
-              <p className="font-bold text-orange-800 mb-2">⚠️ {getPrescriptionText('importantWarnings', language)}</p>
+              <p className="font-bold text-orange-800 mb-2 inline-flex items-center gap-2">
+                <WarningIcon className="h-5 w-5 text-orange-700" />
+                {getPrescriptionText('importantWarnings', language)}
+              </p>
               <ul className="space-y-1">
                 {analysisResult.warnings.map((warning, idx) => (
-                  <li key={idx} className="text-orange-800 text-sm">
-                    • {warning}
+                  <li key={idx} className="text-orange-800 text-sm inline-flex items-start gap-2">
+                    <DotIcon className="h-4 w-4 text-orange-700 mt-1 shrink-0" />
+                    <span>{warning}</span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          {/* Pipeline Info */}
-          {analysisResult.pipeline && (
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-              <p className="font-bold text-blue-800 mb-2">🔄 {getPrescriptionText('processingPipelineLabel', language)}</p>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="bg-white p-2 rounded border border-blue-200">
-                  <p className="text-sm font-semibold text-gray-700">{getPrescriptionText('preprocessing', language)}</p>
-                  <p className="text-xs text-blue-600">{analysisResult.pipeline.preprocessing}</p>
-                </div>
-                <div className="bg-white p-2 rounded border border-blue-200">
-                  <p className="text-sm font-semibold text-gray-700">{getPrescriptionText('htrTrOCR', language)}</p>
-                  <p className="text-xs text-blue-600">{analysisResult.pipeline.htr}</p>
-                </div>
-                <div className="bg-white p-2 rounded border border-blue-200">
-                  <p className="text-sm font-semibold text-gray-700">{getPrescriptionText('llmDeciphering', language)}</p>
-                  <p className="text-xs text-blue-600">{analysisResult.pipeline.llm_deciphering}</p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
