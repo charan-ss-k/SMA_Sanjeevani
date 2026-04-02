@@ -3,6 +3,22 @@ import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
 import { playTTS, stopAllTTS } from '../utils/tts';
 import { API_BASE } from '../config/apiBase';
+import calendarIcon from '../assets/calendar.png';
+import appointmenthistory from '../assets/health-data.png';
+import reminderMainIcon from '../assets/remainder_main.png';
+import checkIcon from '../assets/check.png';
+import apartmentIcon from '../assets/apartment.png';
+import cityIcon from '../assets/cityscape.png';
+import gpsIcon from '../assets/gps.png';
+import consultIcon from '../assets/consult.png';
+import emailIcon from '../assets/email.png';
+import callIcon from '../assets/call.png';
+import hospitalIcon from '../assets/hospital.png';
+import editIcon from '../assets/edit (1).png';
+import trashIcon from '../assets/trash.png';
+import remainderIcon from '../assets/remainder.png';
+import checklistIcon from '../assets/checklist.png';
+import disketteIcon from '../assets/diskette.png';
 import './ConsultPage.css';
 
 // Translation mapping for dropdown values (states, cities, specializations, and languages)
@@ -547,7 +563,8 @@ const ConsultPage = () => {
               setMessage('');
             }}
           >
-             {t('bookAppointmentTab', language)}
+            <img src={calendarIcon} alt="Calendar" className="consult-calendar-icon" />
+            {t('bookAppointmentTab', language).replace('📅 ', '')}
           </button>
           <button
             className={`tab-btn ${tab === 'history' ? 'active' : ''}`}
@@ -557,7 +574,8 @@ const ConsultPage = () => {
               setMessage('');
             }}
           >
-             {t('appointmentHistory', language)}
+            <img src={appointmenthistory} alt="Appointment History" className="consult-calendar-icon" />
+            {t('appointmentHistory', language).replace('📋 ', '')}
           </button>
           <button
             className={`tab-btn ${tab === 'reminders' ? 'active' : ''}`}
@@ -567,7 +585,8 @@ const ConsultPage = () => {
               setMessage('');
             }}
           >
-             {t('remindersUpcoming', language)}
+            <img src={reminderMainIcon} alt="Reminders" className="consult-calendar-icon" />
+            {t('remindersUpcoming', language).replace('⏰ ', '')}
           </button>
         </div>
       </div>
@@ -598,7 +617,7 @@ const ConsultPage = () => {
               <div className="form-grid">
                 {/* State */}
                 <div className="form-group">
-                  <label> {t('selectState', language)}</label>
+                  <label className="state-label"><img src={apartmentIcon} alt="State" className="consult-calendar-icon" /> {t('selectState', language)}</label>
                   <select
                     name="state"
                     value={searchForm.state}
@@ -614,7 +633,7 @@ const ConsultPage = () => {
                 
                 {/* City */}
                 <div className="form-group">
-                  <label> {t('selectCity', language)}</label>
+                  <label className="state-label"><img src={cityIcon} alt="City" className="consult-calendar-icon" /> {t('selectCity', language)}</label>
                   <select
                     name="city"
                     value={searchForm.city}
@@ -630,7 +649,7 @@ const ConsultPage = () => {
                 
                 {/* Locality */}
                 <div className="form-group">
-                  <label> {t('selectLocality', language)}</label>
+                  <label className="state-label"><img src={gpsIcon} alt="Locality" className="consult-calendar-icon" /> {t('selectLocality', language)}</label>
                   <select
                     name="locality"
                     value={searchForm.locality}
@@ -646,7 +665,7 @@ const ConsultPage = () => {
                 
                 {/* Specialization */}
                 <div className="form-group">
-                  <label> {t('selectSpecialization', language)}</label>
+                  <label className="state-label"><img src={consultIcon} alt="Specialization" className="consult-calendar-icon" /> {t('selectSpecialization', language)}</label>
                   <select
                     name="specialization"
                     value={searchForm.specialization}
@@ -698,7 +717,7 @@ const ConsultPage = () => {
                 disabled={loading}
                 className="btn btn-primary btn-lg"
               >
-                {loading ? `⏳ ${t('searching', language)}...` : ` ${t('searchDoctors', language)}`}
+                {loading ? `⏳ ${t('searching', language).replace('⏳ ', '').replace('⏳', '')}...` : ` ${t('searchDoctors', language).replace('⏳ ', '').replace('⏳', '')}`}
               </button>
             </form>
           </div>
@@ -711,7 +730,10 @@ const ConsultPage = () => {
           <div className="section-content">
             <div className="results-header">
               <div>
-                <h2>👨‍⚕️ {doctors.length} {t('doctorsFound', language)}</h2>
+                <h2 className="booking-header-with-icon">
+                  <img src={calendarIcon} alt="Calendar" className="consult-calendar-icon consult-calendar-icon-lg" />
+                  {translateMessage('doctorsFound', language, { count: doctors.length })}
+                </h2>
               </div>
               <button
                 onClick={() => setStep('search')}
@@ -733,33 +755,33 @@ const ConsultPage = () => {
                   
                   <div className="doctor-info">
                     <div className="info-item">
-                      <span className="label">🏥 {t('hospital', language)}</span>
+                      <span className="label state-label"><img src={hospitalIcon} alt="Hospital" className="consult-calendar-icon" /> {t('hospital', language)}</span>
                       <span className="value">{doctor.hospital}</span>
                     </div>
                     <div className="info-item">
-                      <span className="label">📍 {t('location', language)}</span>
+                      <span className="label state-label"><img src={gpsIcon} alt="Location" className="consult-calendar-icon" /> {t('location', language)}</span>
                       <span className="value">{doctor.locality}, {doctor.city}</span>
                     </div>
                     <div className="info-item">
-                      <span className="label">🗺️ {t('selectState', language)}</span>
+                      <span className="label state-label"><img src={apartmentIcon} alt="State" className="consult-calendar-icon" /> {t('selectState', language)}</span>
                       <span className="value">{doctor.state}</span>
                     </div>
                     <div className="info-item">
-                      <span className="label">📞 {t('phone', language)}</span>
+                      <span className="label state-label"><img src={callIcon} alt="Phone" className="consult-calendar-icon" /> {t('phone', language)}</span>
                       <span className="value">{doctor.phone}</span>
                     </div>
                     <div className="info-item">
-                      <span className="label">📧 {t('email', language)}</span>
+                      <span className="label state-label"><img src={emailIcon} alt="Email" className="consult-calendar-icon" /> {t('email', language)}</span>
                       <span className="value email">{doctor.email}</span>
                     </div>
                     <div className="info-item">
-                      <span className="label">🗣️ {t('nativeLanguage', language)}</span>
+                      <span className="label">{t('nativeLanguage', language)}</span>
                       <span className="value">{doctor.native_language}</span>
                     </div>
                   </div>
                   
                   <div className="languages">
-                    <span className="label">💬 {t('languagesSpoken', language)}:</span>
+                    <span className="label">{t('languagesSpoken', language)}:</span>
                     <div className="language-badges">
                       {doctor.languages_known.map((lang, i) => (
                         <span key={i} className="badge">{lang}</span>
@@ -771,7 +793,8 @@ const ConsultPage = () => {
                     onClick={() => handleBookAppointment(doctor)}
                     className="btn btn-primary btn-book"
                   >
-                    📅 {t('bookAppointment', language)}
+                    <img src={calendarIcon} alt="Calendar" className="consult-calendar-icon" />
+                    {t('bookAppointment', language).replace('📅 ', '').replace('📅', '').replace('🗓️ ', '').replace('🗓️', '')}
                   </button>
                 </div>
               ))}
@@ -784,7 +807,10 @@ const ConsultPage = () => {
           {step === 'booking' && selectedDoctor && (
         <div className="section booking-section">
           <div className="section-content">
-            <h2>📅 {t('bookingFormTitle', language)}</h2>
+            <div className="booking-header-with-icon">
+              <img src={calendarIcon} alt="Calendar" className="consult-calendar-icon consult-calendar-icon-lg" />
+              <h2>{t('bookingFormTitle', language).replace('📅 ', '')}</h2>
+            </div>
             
             <div className="doctor-summary">
               <h3>{selectedDoctor.name}</h3>
@@ -897,7 +923,10 @@ const ConsultPage = () => {
       {tab === 'history' && (
         <div className="section">
           <div className="section-content">
-            <h2> {t('yourAppointmentHistory', language)}</h2>
+            <h2 className="booking-header-with-icon">
+              <img src={appointmenthistory} alt="Appointment History" className="consult-calendar-icon consult-calendar-icon-lg" />
+              {t('yourAppointmentHistory', language).replace('📋 ', '')}
+            </h2>
             <p className="section-subtitle">{t('viewAllYourPastAndCurrentAppointments', language)}</p>
             
             {appointmentHistory && appointmentHistory.length > 0 ? (
@@ -914,19 +943,19 @@ const ConsultPage = () => {
                       </span>
                       <h3>Dr. {apt.doctor_name}</h3>
                       <div className="appointment-detail">
-                        <span className="label">{t('selectSpecialization', language)}:</span>
+                        <span className="label state-label"><img src={consultIcon} alt="Specialization" className="consult-calendar-icon" /> {t('selectSpecialization', language)}:</span>
                         <span className="value">{apt.specialization}</span>
                       </div>
                       <div className="appointment-detail">
-                        <span className="label">{t('hospital', language)}:</span>
+                        <span className="label state-label"><img src={hospitalIcon} alt="Hospital" className="consult-calendar-icon" /> {t('hospital', language)}:</span>
                         <span className="value">{apt.hospital}</span>
                       </div>
                       <div className="appointment-detail">
-                        <span className="label">{t('location', language)}:</span>
+                        <span className="label state-label"><img src={gpsIcon} alt="Location" className="consult-calendar-icon" /> {t('location', language)}:</span>
                         <span className="value">{apt.city}, {apt.state}</span>
                       </div>
                       <div className="appointment-detail">
-                        <span className="label">📅 {t('dateTime', language)}:</span>
+                        <span className="label state-label"><img src={calendarIcon} alt="Date & Time" className="consult-calendar-icon" /> {t('dateTime', language)}:</span>
                         <span className="value">
                           {new Date(apt.appointment_date).toLocaleDateString()} {apt.appointment_time}
                         </span>
@@ -947,14 +976,14 @@ const ConsultPage = () => {
                           onClick={() => handleEditAppointment(apt)}
                           title="Edit appointment"
                         >
-                          ✏️ {t('edit', language)}
+                          <img src={editIcon} alt="Edit" className="action-icon" /> {t('edit', language)}
                         </button>
                         <button
                           className="action-btn delete-btn"
                           onClick={() => cancelAppointment(apt)}
                           title="Delete appointment"
                         >
-                          🗑️ {t('delete', language)}
+                          <img src={trashIcon} alt="Delete" className="action-icon" /> {t('delete', language)}
                         </button>
                       </div>
                     </div>
@@ -976,7 +1005,10 @@ const ConsultPage = () => {
       {tab === 'reminders' && (
         <div className="section">
           <div className="section-content">
-            <h2> {t('upcomingAppointmentsReminders', language)}</h2>
+            <h2 className="booking-header-with-icon">
+              <img src={reminderMainIcon} alt="Reminders" className="consult-calendar-icon consult-calendar-icon-lg" />
+              {t('upcomingAppointmentsReminders', language).replace('⏰ ', '')}
+            </h2>
             <p className="section-subtitle">{t('yourScheduledAppointmentsComing', language)}</p>
             
             {upcomingAppointments && upcomingAppointments.length > 0 ? (
@@ -992,15 +1024,15 @@ const ConsultPage = () => {
                       </span>
                       <h3>Dr. {apt.doctor_name}</h3>
                       <div className="appointment-detail">
-                        <span className="label">{t('selectSpecialization', language)}:</span>
+                        <span className="label state-label"><img src={consultIcon} alt="Specialization" className="consult-calendar-icon" /> {t('selectSpecialization', language)}:</span>
                         <span className="value">{apt.specialization}</span>
                       </div>
                       <div className="appointment-detail">
-                        <span className="label">{t('hospital', language)}:</span>
+                        <span className="label state-label"><img src={hospitalIcon} alt="Hospital" className="consult-calendar-icon" /> {t('hospital', language)}:</span>
                         <span className="value">{apt.hospital}</span>
                       </div>
                       <div className="appointment-detail">
-                        <span className="label">{t('location', language)}:</span>
+                        <span className="label state-label"><img src={gpsIcon} alt="Location" className="consult-calendar-icon" /> {t('location', language)}:</span>
                         <span className="value">{apt.locality}, {apt.city}</span>
                       </div>
                       <div className="appointment-detail">
@@ -1036,7 +1068,9 @@ const ConsultPage = () => {
               </div>
             ) : (
               <div className="empty-state">
-                <div className="empty-state-icon">✅</div>
+                <div className="empty-state-icon">
+                  <img src={checkIcon} alt="Check" />
+                </div>
                 <h3>{t('noUpcomingAppointments', language)}</h3>
                 <p>{t('noUpcomingAppointmentsMessage', language)}</p>
               </div>
@@ -1056,13 +1090,13 @@ const ConsultPage = () => {
             
             <div className="edit-modal-body">
               <div className="modal-appointment-info">
-                <p><strong>👨‍⚕️ {t('doctor', language)}:</strong> {editingAppointment.doctor_name}</p>
-                <p><strong>🏥 {t('hospital', language)}:</strong> {editingAppointment.hospital}</p>
-                <p><strong>📍 {t('location', language)}:</strong> {editingAppointment.city}, {editingAppointment.state}</p>
+                <p><strong><img src={consultIcon} alt="Doctor" className="consult-calendar-icon" /> {t('doctor', language)}:</strong> {editingAppointment.doctor_name}</p>
+                <p><strong><img src={hospitalIcon} alt="Hospital" className="consult-calendar-icon" /> {t('hospital', language)}:</strong> {editingAppointment.hospital}</p>
+                <p><strong><img src={gpsIcon} alt="Location" className="consult-calendar-icon" /> {t('location', language)}:</strong> {editingAppointment.city}, {editingAppointment.state}</p>
               </div>
 
               <div className="modal-form-group">
-                <label htmlFor="edit-modal-date">📅 {t('appointmentDate', language)}</label>
+                <label htmlFor="edit-modal-date"><img src={calendarIcon} alt="Date" className="consult-calendar-icon" /> {t('appointmentDate', language)}</label>
                 <input
                   id="edit-modal-date"
                   type="date"
@@ -1075,7 +1109,7 @@ const ConsultPage = () => {
               </div>
 
               <div className="modal-form-group">
-                <label htmlFor="edit-modal-time">⏰ {t('appointmentTime', language)}</label>
+                <label htmlFor="edit-modal-time"><img src={remainderIcon} alt="Time" className="consult-calendar-icon" /> {t('appointmentTime', language)}</label>
                 <input
                   id="edit-modal-time"
                   type="time"
@@ -1087,7 +1121,7 @@ const ConsultPage = () => {
               </div>
 
               <div className="modal-form-group">
-                <label htmlFor="edit-modal-notes">📝 {t('notes', language)}</label>
+                <label htmlFor="edit-modal-notes"><img src={checklistIcon} alt="Notes" className="consult-calendar-icon" /> {t('notes', language)}</label>
                 <textarea
                   id="edit-modal-notes"
                   value={editNotes}
@@ -1103,8 +1137,8 @@ const ConsultPage = () => {
               <button className="modal-btn modal-cancel" onClick={handleCancelEdit}>
                 {t('cancel', language)}
               </button>
-              <button className="modal-btn modal-save" onClick={handleSaveEdit} disabled={loading}>
-                {loading ? '⏳ Saving...' : `💾 ${t('save', language)}`}
+              <button className="modal-btn modal-save" style={{display: 'inline-flex', alignItems: 'center', gap: '8px'}} onClick={handleSaveEdit} disabled={loading}>
+                {loading ? '⏳ Saving...' : <><img src={disketteIcon} alt="Save" className="consult-calendar-icon" /> {t('save', language)}</> }
               </button>
             </div>
           </div>
