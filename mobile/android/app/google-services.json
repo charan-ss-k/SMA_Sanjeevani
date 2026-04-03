@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "185795954703",
+    "project_id": "sanjeevani-1fc1e",
+    "storage_bucket": "sanjeevani-1fc1e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:185795954703:android:58a86f4b83caa5e12fbb7a",
+        "android_client_info": {
+          "package_name": "com.sanjeevani.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaBG_yYFQsvw_1cg-uz8yLQqr2x0dIZxI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
