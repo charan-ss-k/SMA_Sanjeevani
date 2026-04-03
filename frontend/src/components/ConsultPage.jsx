@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { LanguageContext } from '../main';
+import { AuthContext, LanguageContext } from '../main';
 import { t } from '../utils/translations';
 import { playTTS, stopAllTTS } from '../utils/tts';
 import { API_BASE } from '../config/apiBase';
@@ -19,6 +19,7 @@ import trashIcon from '../assets/trash.png';
 import remainderIcon from '../assets/remainder.png';
 import checklistIcon from '../assets/checklist.png';
 import disketteIcon from '../assets/diskette.png';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import './ConsultPage.css';
 
 // Translation mapping for dropdown values (states, cities, specializations, and languages)
@@ -129,8 +130,15 @@ const translateMessage = (key, language, replacements = {}) => {
   return message;
 };
 
+const stripLeadingIcon = (value = '') => value.replace(/^\p{Extended_Pictographic}+\s*/u, '').trim();
+
+const getUserEmail = (user) => user?.email || user?.email_address || user?.username || '';
+
+const getUserPhone = (user) => user?.phone_number || user?.mobile || user?.phone || user?.contact_number || user?.contact || '';
+
 const ConsultPage = () => {
   const { language } = useContext(LanguageContext);
+  const { user } = useContext(AuthContext);
   const [isSpeaking, setIsSpeaking] = useState(false);
   
   // State management
@@ -182,6 +190,14 @@ const ConsultPage = () => {
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
+
+  useEffect(() => {
+    setBookingForm(prev => ({
+      ...prev,
+      patient_email: prev.patient_email || getUserEmail(user),
+      patient_phone: prev.patient_phone || getUserPhone(user),
+    }));
+  }, [user]);
 
   const speakText = async (text) => {
     if (!text || !text.trim()) return;
@@ -423,8 +439,8 @@ const ConsultPage = () => {
     setStep('booking');
     setBookingForm({
       patient_name: '',
-      patient_email: '',
-      patient_phone: '',
+      patient_email: getUserEmail(user),
+      patient_phone: getUserPhone(user),
       appointment_date: '',
       appointment_time: '',
       notes: ''
@@ -554,7 +570,7 @@ const ConsultPage = () => {
             }}
           >
             <img src={calendarIcon} alt="Calendar" className="consult-calendar-icon" />
-            {t('bookAppointmentTab', language).replace('📅 ', '')}
+            {stripLeadingIcon(t('bookAppointmentTab', language))}
           </button>
           <button
             className={`tab-btn ${tab === 'history' ? 'active' : ''}`}
@@ -565,7 +581,7 @@ const ConsultPage = () => {
             }}
           >
             <img src={appointmenthistory} alt="Appointment History" className="consult-calendar-icon" />
-            {t('appointmentHistory', language).replace('📋 ', '')}
+            {stripLeadingIcon(t('appointmentHistory', language))}
           </button>
           <button
             className={`tab-btn ${tab === 'reminders' ? 'active' : ''}`}
@@ -576,7 +592,7 @@ const ConsultPage = () => {
             }}
           >
             <img src={reminderMainIcon} alt="Reminders" className="consult-calendar-icon" />
-            {t('remindersUpcoming', language).replace('⏰ ', '')}
+            {stripLeadingIcon(t('remindersUpcoming', language))}
           </button>
         </div>
       </div>
@@ -723,7 +739,7 @@ const ConsultPage = () => {
                 disabled={loading}
                 className="btn btn-primary btn-lg"
               >
-                {loading ? `⏳ ${t('searching', language).replace('⏳ ', '').replace('⏳', '')}...` : ` ${t('searchDoctors', language).replace('⏳ ', '').replace('⏳', '')}`}
+                {loading ? `${stripLeadingIcon(t('searching', language))}...` : stripLeadingIcon(t('searchDoctors', language))}
               </button>
             </form>
           </div>
@@ -815,7 +831,7 @@ const ConsultPage = () => {
                     className="btn btn-primary btn-book"
                   >
                     <img src={calendarIcon} alt="Calendar" className="consult-calendar-icon" />
-                    {t('bookAppointment', language).replace('📅 ', '').replace('📅', '').replace('🗓️ ', '').replace('🗓️', '')}
+                    {stripLeadingIcon(t('bookAppointment', language))}
                   </button>
                 </div>
               ))}
@@ -861,23 +877,31 @@ const ConsultPage = () => {
                     name="patient_email"
                     value={bookingForm.patient_email}
                     onChange={handleBookingChange}
-                    placeholder={t('enterYourEmail', language)}
+                    placeholder={getUserEmail(user) ? '' : t('enterYourEmail', language)}
                     className="form-control"
+                    autoComplete="email"
                     required
                   />
+                  {getUserEmail(user) && (
+                    <p className="mt-1 text-xs text-gray-500">Loaded from your account</p>
+                  )}
                 </div>
                 
                 <div className="form-group">
-                  <label>{t('appointmentPhone', language)} *</label>
+                  <label>{t('appointmentPhone', language)}</label>
                   <input
                     type="tel"
                     name="patient_phone"
                     value={bookingForm.patient_phone}
                     onChange={handleBookingChange}
-                    placeholder={t('enterYourPhoneNumber', language)}
+                    placeholder={getUserPhone(user) ? '' : t('enterYourPhoneNumber', language)}
                     className="form-control"
+                    autoComplete="tel"
                     required
                   />
+                  {getUserPhone(user) && (
+                    <p className="mt-1 text-xs text-gray-500">Loaded from your account</p>
+                  )}
                 </div>
                 
                 <div className="form-group">
@@ -923,14 +947,14 @@ const ConsultPage = () => {
                   disabled={loading}
                   className="btn btn-primary btn-lg"
                 >
-                  {loading ? `⏳ ${t('booking', language)}...` : `✅ ${t('confirmAppointment', language)}`}
+                  {loading ? `${stripLeadingIcon(t('booking', language))}...` : stripLeadingIcon(t('confirmAppointment', language))}
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep('results')}
                   className="btn btn-secondary btn-lg"
                 >
-                  ← {t('backToResults', language)}
+                  {stripLeadingIcon(t('backToResults', language))}
                 </button>
               </div>
             </form>
@@ -946,7 +970,7 @@ const ConsultPage = () => {
           <div className="section-content">
             <h2 className="booking-header-with-icon">
               <img src={appointmenthistory} alt="Appointment History" className="consult-calendar-icon consult-calendar-icon-lg" />
-              {t('yourAppointmentHistory', language).replace('📋 ', '')}
+              {stripLeadingIcon(t('yourAppointmentHistory', language))}
             </h2>
             <p className="section-subtitle">{t('viewAllYourPastAndCurrentAppointments', language)}</p>
             
@@ -1028,7 +1052,7 @@ const ConsultPage = () => {
           <div className="section-content">
             <h2 className="booking-header-with-icon">
               <img src={reminderMainIcon} alt="Reminders" className="consult-calendar-icon consult-calendar-icon-lg" />
-              {t('upcomingAppointmentsReminders', language).replace('⏰ ', '')}
+              {stripLeadingIcon(t('upcomingAppointmentsReminders', language))}
             </h2>
             <p className="section-subtitle">{t('yourScheduledAppointmentsComing', language)}</p>
             
@@ -1057,11 +1081,11 @@ const ConsultPage = () => {
                         <span className="value">{apt.locality}, {apt.city}</span>
                       </div>
                       <div className="appointment-detail">
-                        <span className="label">⏰ {t('appointmentTime', language)}:</span>
+                        <span className="label state-label"><img src={remainderIcon} alt="Time" className="consult-calendar-icon" /> {stripLeadingIcon(t('appointmentTime', language))}:</span>
                         <span className="value">{apt.appointment_time}</span>
                       </div>
                       <div className="appointment-detail">
-                        <span className="label">📞 {t('contact', language)}:</span>
+                        <span className="label state-label"><img src={callIcon} alt="Contact" className="consult-calendar-icon" /> {stripLeadingIcon(t('contact', language))}:</span>
                         <span className="value">{apt.doctor_phone}</span>
                       </div>
                       {apt.notes && (
@@ -1077,7 +1101,10 @@ const ConsultPage = () => {
                         <button className="btn btn-reminder" onClick={() => {
                           speakText(`${t('yourAppointmentWithDr', language)} ${apt.doctor_name} ${t('isComingUpIn', language)} ${daysUntil} ${t('daysFormat', language)} ${t('at', language)} ${apt.appointment_time}`);
                         }}>
-                          🔔 {t('setReminder', language)}
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <NotificationsIcon sx={{ fontSize: 18 }} />
+                            <span>{stripLeadingIcon(t('setReminder', language))}</span>
+                          </span>
                         </button>
                         <button className="btn btn-delete" onClick={() => cancelAppointment(apt)} title="Delete appointment">
                           🗑️ {t('delete', language)}
@@ -1159,7 +1186,7 @@ const ConsultPage = () => {
                 {t('cancel', language)}
               </button>
               <button className="modal-btn modal-save" style={{display: 'inline-flex', alignItems: 'center', gap: '8px'}} onClick={handleSaveEdit} disabled={loading}>
-                {loading ? '⏳ Saving...' : <><img src={disketteIcon} alt="Save" className="consult-calendar-icon" /> {t('save', language)}</> }
+                {loading ? 'Saving...' : <><img src={disketteIcon} alt="Save" className="consult-calendar-icon" /> {stripLeadingIcon(t('save', language))}</> }
               </button>
             </div>
           </div>

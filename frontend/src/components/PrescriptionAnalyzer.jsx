@@ -354,13 +354,13 @@ const PrescriptionAnalyzer = () => {
   );
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <div className="bg-linear-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-6">
-        <h3 className="text-2xl font-bold text-gray-800 mb-2 inline-flex items-center gap-3">
-          <CameraIcon className="h-7 w-7 text-blue-700" />
+    <div className="w-full rounded-2xl border border-emerald-100 bg-white p-6 shadow-lg">
+      <div className="mb-6 rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+        <h3 className="mb-2 inline-flex items-center gap-3 text-2xl font-bold text-emerald-950">
+          <CameraIcon className="h-7 w-7 text-emerald-700" />
           {getPrescriptionText('handwrittenPrescriptionAnalyzer', language)}
         </h3>
-        <p className="text-gray-600 text-sm">
+        <p className="text-sm text-emerald-900/70">
           {getPrescriptionText('uploadHandwrittenPrescription', language)}
         </p>
       </div>
@@ -369,7 +369,7 @@ const PrescriptionAnalyzer = () => {
       <div
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50 cursor-pointer hover:bg-blue-100 transition mb-6"
+        className="mb-6 cursor-pointer rounded-2xl border-2 border-dashed border-emerald-300 bg-gradient-to-br from-white via-emerald-50 to-emerald-100 p-8 text-center shadow-sm transition hover:from-emerald-50 hover:to-emerald-100"
         onClick={() => fileInputRef.current?.click()}
       >
         <input
@@ -380,13 +380,13 @@ const PrescriptionAnalyzer = () => {
           className="hidden"
         />
         <div className="mb-3 flex justify-center">
-          <CameraIcon className="h-12 w-12 text-blue-600" />
+          <CameraIcon className="h-12 w-12 text-emerald-700" />
         </div>
-        <p className="text-gray-800 font-semibold mb-2 inline-flex items-center gap-2 justify-center">
-          <UploadIcon className="h-5 w-5 text-blue-700" />
+        <p className="mb-2 inline-flex items-center justify-center gap-2 font-semibold text-emerald-950">
+          <UploadIcon className="h-5 w-5 text-emerald-700" />
           {getPrescriptionText('dragImageHere', language)}
         </p>
-        <p className="text-gray-600 text-sm">
+        <p className="text-sm text-emerald-900/70">
           {getPrescriptionText('supportedFormats', language)}
         </p>
       </div>
@@ -394,7 +394,7 @@ const PrescriptionAnalyzer = () => {
       {/* Image Preview */}
       {imagePreview && (
         <div className="mb-6">
-          <div className="relative bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-md">
             <img
               src={imagePreview}
               alt="Prescription preview"
@@ -423,7 +423,7 @@ const PrescriptionAnalyzer = () => {
         <button
           onClick={handleAnalyze}
           disabled={!file || analyzing}
-          className={`flex-1 bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition ${iconButtonClass}`}
+          className={`flex-1 rounded-xl bg-gradient-to-r from-emerald-600 to-violet-600 py-3 font-semibold text-white transition hover:from-emerald-700 hover:to-violet-700 disabled:from-gray-400 disabled:to-gray-400 ${iconButtonClass}`}
         >
           <AnalyzeIcon className={`h-5 w-5 ${analyzing ? 'animate-pulse' : ''}`} />
           {analyzing ? getPrescriptionText('analyzing', language) : getPrescriptionText('analyze', language)}
@@ -440,7 +440,7 @@ const PrescriptionAnalyzer = () => {
         {(file || imagePreview) && (
           <button
             onClick={handleClear}
-            className={`bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-600 transition ${iconButtonClass}`}
+            className={`rounded-xl bg-rose-600 px-6 py-3 font-semibold text-white transition hover:bg-rose-700 ${iconButtonClass}`}
           >
             <ResetIcon className="h-5 w-5" />
             {getPrescriptionText('clear', language)}
@@ -450,12 +450,12 @@ const PrescriptionAnalyzer = () => {
 
       {/* Loading State */}
       {analyzing && (
-        <div className="flex justify-center items-center py-12">
+        <div className="flex items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50/40 py-12">
           <div className="text-center">
             <div className="inline-block">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <div className="mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-emerald-600"></div>
             </div>
-            <p className="text-gray-700 font-semibold mb-2">{getPrescriptionText('analyzingPrescription', language)}</p>
+            <p className="mb-2 font-semibold text-emerald-900">{getPrescriptionText('analyzingPrescription', language)}</p>
           </div>
         </div>
       )}

@@ -6,6 +6,7 @@ import { AuthContext } from '../context/AuthContext.jsx';
 import { t } from '../utils/translations';
 import './ChatWidget.css';
 import { API_BASE } from '../config/apiBase';
+import { useLocation } from 'react-router-dom';
 
 // --- SVG Icons ---
 
@@ -67,9 +68,10 @@ const StopIcon = () => (
 );
 
 // --- Chatbot Window Component ---
-const ChatbotWindow = () => {
+const ChatbotWindow = ({ containerRef }) => {
   const { language } = useContext(LanguageContext);
   const { token, isAuthenticated } = useContext(AuthContext);
+  const location = useLocation();
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -95,6 +97,19 @@ const ChatbotWindow = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    return () => {
+      stopAllTTS();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    stopAllTTS();
+  }, [location.pathname]);
 
   // Update welcome message when language changes
   useEffect(() => {
@@ -377,7 +392,7 @@ const ChatbotWindow = () => {
   };
 
   return (
-    <div className="fixed bottom-24 right-8 z-50 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200" style={{maxWidth: '400px'}}>
+    <div ref={containerRef} className="fixed bottom-24 right-8 z-50 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200" style={{maxWidth: '400px'}}>
       <div className="flex flex-col h-[70vh] md:h-[600px]">
         {/* Chat Header */}
         <div className="p-4 bg-gradient-to-r from-green-600 to-blue-600 text-white flex items-center space-x-3">
@@ -495,10 +510,15 @@ const ChatWidget = () => {
   // State to manage if the chat window is open or not
   const [isOpen, setIsOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const chatWindowRef = useRef(null);
+  const toggleButtonRef = useRef(null);
 
   // Function to toggle the chat window
   const toggleChat = () => {
     const newState = !isOpen;
+    if (!newState) {
+      stopAllTTS();
+    }
     setIsOpen(newState);
     // Force reload of history when opening
     if (newState) {
@@ -506,15 +526,39 @@ const ChatWidget = () => {
     }
   };
 
+  useEffect(() => {
+    const handleOutsideInteraction = (event) => {
+      if (!isOpen) return;
+
+      const target = event.target;
+      const clickedInsideChat = chatWindowRef.current?.contains(target);
+      const clickedToggleButton = toggleButtonRef.current?.contains(target);
+
+      if (clickedInsideChat || clickedToggleButton) return;
+
+      stopAllTTS();
+      setIsOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handleOutsideInteraction, true);
+    document.addEventListener('touchstart', handleOutsideInteraction, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsideInteraction, true);
+      document.removeEventListener('touchstart', handleOutsideInteraction, true);
+    };
+  }, [isOpen]);
+
   return (
     <>
       {/* Conditionally render the chat window based on 'isOpen' state */}
       {/* Key prop forces remount when reloadKey changes, which reloads history */}
-      {isOpen && <ChatbotWindow key={reloadKey} />}
+      {isOpen && <ChatbotWindow key={reloadKey} containerRef={chatWindowRef} />}
 
       {/* The toggle button, using the icon from ChatbotIcon.jsx */}
       <div className="fixed bottom-8 right-8 z-50">
         <button 
+          ref={toggleButtonRef}
           onClick={toggleChat} 
           className="bg-green-500 hover:bg-green-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:shadow-xl transition-all animate-pulse"
         >

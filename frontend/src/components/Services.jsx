@@ -100,7 +100,7 @@ const Services = () => {
           ))}
         </div>
 
-        <div className="mt-8 md:mt-10">
+        <div className="mt-10 md:mt-14">
           <AppDownloadBanner />
         </div>
       </div>

@@ -84,7 +84,7 @@ const Home = () => {
   }, [isPaused]); // Add isPaused as a dependency
 
   return (
-    <div className="pt-16 pb-12 min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_40%),linear-gradient(180deg,_#f8fffb_0%,_#effcf5_45%,_#f8fafc_100%)]">
+    <div className="pt-24 md:pt-28 pb-12 min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_40%),linear-gradient(180deg,_#f8fffb_0%,_#effcf5_45%,_#f8fafc_100%)]">
       {/* Large Carousel (top) - Only show when NOT authenticated */}
       {!isAuthenticated && (
       <div className="w-full overflow-hidden px-4 sm:px-6">
@@ -216,7 +216,7 @@ const Home = () => {
         {isAuthenticated ? (
           <>
             {/* Welcome Section with User Info */}
-            <section className="bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-3xl border border-blue-100 shadow-lg p-6 mb-6">
+            <section className="mt-4 md:mt-6 bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-3xl border border-blue-100 shadow-lg p-6 mb-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-3xl font-bold text-blue-900 mb-2">

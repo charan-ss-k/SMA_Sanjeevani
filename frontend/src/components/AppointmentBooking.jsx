@@ -82,7 +82,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
   return (
     <div className="appointment-booking-section">
       <div className="booking-header">
-        <h2>📅 Book Appointment</h2>
+        <h2>Book Appointment</h2>
         <button onClick={onBack} className="back-btn">
           ← Back
         </button>
@@ -90,7 +90,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
 
       {successMessage && (
         <div className="success-message">
-          <p>✅ {successMessage}</p>
+          <p>{successMessage}</p>
         </div>
       )}
 
@@ -102,10 +102,10 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
             <span className="specialization">{doctor.specialization}</span>
           </div>
           <div className="doctor-info-details">
-            <p><strong>🏥 Hospital:</strong> {doctor.hospital_name}</p>
-            <p><strong>📍 Location:</strong> {doctor.locality}, {doctor.city}</p>
-            <p><strong>📧 Email:</strong> {doctor.email_address}</p>
-            <p><strong>📞 Phone:</strong> {doctor.phone_number}</p>
+            <p><strong>Hospital:</strong> {doctor.hospital_name}</p>
+            <p><strong>Location:</strong> {doctor.locality}, {doctor.city}</p>
+            <p><strong>Email:</strong> {doctor.email_address}</p>
+            <p><strong>Phone:</strong> {doctor.phone_number}</p>
           </div>
         </div>
 
@@ -114,7 +114,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
           <h3>Patient Details</h3>
 
           <div className="form-group">
-            <label>👤 Patient Name (Required) *</label>
+            <label>Patient Name (Required) *</label>
             <input
               type="text"
               name="patient_name"
@@ -127,7 +127,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
 
           <div className="form-row">
             <div className="form-group">
-              <label>📅 Appointment Date (Required) *</label>
+              <label>Appointment Date (Required) *</label>
               <input
                 type="date"
                 name="appointment_date"
@@ -138,7 +138,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
             </div>
 
             <div className="form-group">
-              <label>⏰ Appointment Time (Required) *</label>
+              <label>Appointment Time (Required) *</label>
               <input
                 type="time"
                 name="appointment_time"
@@ -150,7 +150,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
           </div>
 
           <div className="form-group">
-            <label>🩺 Symptoms Brief (Required) *</label>
+            <label>Symptoms Brief (Required) *</label>
             <textarea
               name="symptoms_brief"
               value={bookingData.symptoms_brief}
@@ -162,7 +162,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
           </div>
 
           <div className="form-group">
-            <label>📞 Phone Number (Required) *</label>
+            <label>Phone Number (Required) *</label>
             <input
               type="tel"
               name="phone_number"
@@ -174,7 +174,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
           </div>
 
           <div className="form-group">
-            <label>📧 Email (Required) *</label>
+            <label>Email (Required) *</label>
             <input
               type="email"
               name="email"
@@ -186,7 +186,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
           </div>
 
           <div className="form-group">
-            <label>📝 Additional Notes (Optional)</label>
+            <label>Additional Notes (Optional)</label>
             <textarea
               name="notes"
               value={bookingData.notes}
@@ -202,7 +202,7 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
             disabled={loading}
             className="book-appointment-btn"
           >
-            {loading ? '⏳ Booking...' : '✅ Confirm Appointment'}
+            {loading ? 'Booking...' : 'Confirm Appointment'}
           </button>
         </div>
       </div>

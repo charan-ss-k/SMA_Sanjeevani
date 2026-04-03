@@ -3,6 +3,32 @@ import { AuthContext, LanguageContext } from '../main';
 import { playTTS, stopAllTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
 import { API_BASE } from '../config/apiBase';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import DescriptionIcon from '@mui/icons-material/Description';
+import SearchIcon from '@mui/icons-material/Search';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import ClearIcon from '@mui/icons-material/Clear';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import StopCircleIcon from '@mui/icons-material/StopCircle';
+import SaveIcon from '@mui/icons-material/Save';
+import PhoneIcon from '@mui/icons-material/Phone';
+import EmailIcon from '@mui/icons-material/Email';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import PersonIcon from '@mui/icons-material/Person';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import HealingIcon from '@mui/icons-material/Healing';
+import MedicationIcon from '@mui/icons-material/Medication';
+import NoteAltIcon from '@mui/icons-material/NoteAlt';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import HistoryIcon from '@mui/icons-material/History';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const HospitalReportAnalyzer = () => {
   const { authToken } = useContext(AuthContext);
@@ -20,6 +46,7 @@ const HospitalReportAnalyzer = () => {
   const [expandedHistoryId, setExpandedHistoryId] = useState(null);
   const fileInputRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const stripLeadingEmoji = (value = '') => value.replace(/^\p{Extended_Pictographic}+\s*/u, '').trim();
 
   const speakText = async (text) => {
     if (!text || !text.trim()) return;
@@ -226,13 +253,14 @@ const HospitalReportAnalyzer = () => {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 to-green-50 p-6 mt-24">
+    <div className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-violet-50 p-6 mt-24">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-emerald-100">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h1 className="text-3xl font-bold text-gray-800">
-              🏥 {getPrescriptionText('hospitalReportAnalyzer', language)}
+            <h1 className="inline-flex items-center gap-2 text-3xl font-bold text-emerald-900">
+              <LocalHospitalIcon fontSize="large" />
+              {stripLeadingEmoji(getPrescriptionText('hospitalReportAnalyzer', language))}
             </h1>
           </div>
           <p className="text-gray-600 mt-2">
@@ -242,14 +270,14 @@ const HospitalReportAnalyzer = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Upload Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">📤 {getPrescriptionText('uploadReport', language)}</h2>
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-emerald-100">
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-emerald-900 mb-4"><CloudUploadIcon />{stripLeadingEmoji(getPrescriptionText('uploadReport', language))}</h2>
 
             {/* Drag & Drop Area */}
             <div
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50 hover:bg-blue-100 transition cursor-pointer"
+              className="border-2 border-dashed border-emerald-300 rounded-lg p-8 text-center bg-emerald-50 hover:bg-emerald-100 transition cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
             >
               {imagePreview ? (
@@ -263,7 +291,9 @@ const HospitalReportAnalyzer = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="text-6xl">📄</div>
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-200 bg-white text-emerald-700 shadow-sm">
+                    <DescriptionIcon sx={{ fontSize: 36 }} />
+                  </div>
                   <p className="text-lg font-semibold text-gray-700">
                     {getPrescriptionText('dropReportHereOrClick', language)}
                   </p>
@@ -293,14 +323,17 @@ const HospitalReportAnalyzer = () => {
                     : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
-                {analyzing ? `🔄 ${getPrescriptionText('analyzingReport', language)}` : `🔍 ${getPrescriptionText('analyzeReport', language)}`}
+                <span className="inline-flex items-center gap-2">
+                  {analyzing ? <AutorenewIcon className="animate-spin" /> : <SearchIcon />}
+                  {analyzing ? getPrescriptionText('analyzingReport', language) : stripLeadingEmoji(getPrescriptionText('analyzeReport', language))}
+                </span>
               </button>
               {analyzing && (
                 <button
                   onClick={cancelAnalysis}
                   className="px-4 py-3 rounded-lg font-semibold bg-orange-500 text-white hover:bg-orange-600"
                 >
-                  ⏸️ {getPrescriptionText('stopAnalysis', language)}
+                  <span className="inline-flex items-center gap-2"><PauseCircleOutlineIcon />{stripLeadingEmoji(getPrescriptionText('stopAnalysis', language))}</span>
                 </button>
               )}
               {file && !analyzing && (
@@ -308,7 +341,7 @@ const HospitalReportAnalyzer = () => {
                   onClick={clearReport}
                   className="px-4 py-3 rounded-lg font-semibold bg-red-500 text-white hover:bg-red-600"
                 >
-                  ❌ {getPrescriptionText('clearReport', language)}
+                  <span className="inline-flex items-center gap-2"><ClearIcon />{stripLeadingEmoji(getPrescriptionText('clearReport', language))}</span>
                 </button>
               )}
             </div>
@@ -321,12 +354,12 @@ const HospitalReportAnalyzer = () => {
           </div>
 
           {/* Results Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">📊 {getPrescriptionText('analysisResults', language)}</h2>
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-violet-100">
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-violet-900 mb-4"><AssessmentIcon />{stripLeadingEmoji(getPrescriptionText('analysisResults', language))}</h2>
 
             {analyzing && (
               <div className="bg-gray-100 rounded-lg p-4">
-                <p className="text-gray-600">🔄 {getPrescriptionText('analyzingReport', language)}...</p>
+                <p className="inline-flex items-center gap-2 text-gray-600"><AutorenewIcon className="animate-spin" />{getPrescriptionText('analyzingReport', language)}...</p>
               </div>
             )}
 
@@ -359,9 +392,9 @@ const HospitalReportAnalyzer = () => {
                       <>
                         {/* Warning for Incomplete Data */}
                         {isIncompleteData && (
-                          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg">
                             <div className="flex items-start">
-                              <span className="text-2xl mr-3">⚠️</span>
+                              <WarningAmberIcon className="mr-3 text-yellow-700" />
                               <div>
                                 <h4 className="font-bold text-yellow-800 mb-1">Incomplete Data Extraction</h4>
                                 <p className="text-sm text-yellow-700">
@@ -393,7 +426,7 @@ const HospitalReportAnalyzer = () => {
                             }}
                             className="px-6 py-3 rounded-lg font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 transition"
                           >
-                            {isSpeaking ? '⏹️ Stop' : '🔊 Speak'}
+                            <span className="inline-flex items-center gap-2">{isSpeaking ? <StopCircleIcon /> : <VolumeUpIcon />}{isSpeaking ? 'Stop' : 'Speak'}</span>
                           </button>
                           <button
                             onClick={saveReport}
@@ -402,7 +435,7 @@ const HospitalReportAnalyzer = () => {
                               savingReport ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
                             }`}
                           >
-                            {savingReport ? '💾 Saving...' : '💾 Save Report to History'}
+                            <span className="inline-flex items-center gap-2"><SaveIcon />{savingReport ? 'Saving...' : 'Save Report to History'}</span>
                           </button>
                         </div>
                         
@@ -416,12 +449,12 @@ const HospitalReportAnalyzer = () => {
                               <p className="text-gray-700 text-sm mb-1">{hospital.address}</p>
                             )}
                             <div className="flex justify-center gap-6 text-sm text-gray-600 mt-2">
-                              {hospital.phone && <span>📞 {hospital.phone}</span>}
-                              {hospital.email && <span>✉️ {hospital.email}</span>}
+                              {hospital.phone && <span className="inline-flex items-center gap-1"><PhoneIcon sx={{ fontSize: 14 }} /> {hospital.phone}</span>}
+                              {hospital.email && <span className="inline-flex items-center gap-1"><EmailIcon sx={{ fontSize: 14 }} /> {hospital.email}</span>}
                             </div>
                             {hospital.timings && (
-                              <p className="text-xs text-gray-500 mt-2">
-                                🕒 {hospital.timings} {hospital.closed_days && `• ${hospital.closed_days}`}
+                              <p className="text-xs text-gray-500 mt-2 inline-flex items-center gap-1">
+                                <AccessTimeIcon sx={{ fontSize: 14 }} /> {hospital.timings} {hospital.closed_days && `• ${hospital.closed_days}`}
                               </p>
                             )}
                           </div>
@@ -429,8 +462,8 @@ const HospitalReportAnalyzer = () => {
 
                         {/* Doctor Details */}
                         {hasDoctorData && (
-                          <div className="bg-blue-50 rounded-lg p-4 mb-6 border-l-4 border-blue-600">
-                            <h3 className="font-bold text-blue-900 mb-2 text-lg">👨‍⚕️ Doctor Information</h3>
+                          <div className="bg-violet-50 rounded-lg p-4 mb-6 border-l-4 border-violet-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-violet-900 mb-2 text-lg"><MedicalServicesIcon />Doctor Information</h3>
                             <div className="grid grid-cols-2 gap-3 text-sm">
                               {doctor.name && (
                                 <div>
@@ -462,8 +495,8 @@ const HospitalReportAnalyzer = () => {
 
                         {/* Patient Details */}
                         {hasPatientData && (
-                          <div className="bg-green-50 rounded-lg p-4 mb-6 border-l-4 border-green-600">
-                            <h3 className="font-bold text-green-900 mb-2 text-lg">🧑 Patient Information</h3>
+                          <div className="bg-emerald-50 rounded-lg p-4 mb-6 border-l-4 border-emerald-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-emerald-900 mb-2 text-lg"><PersonIcon />Patient Information</h3>
                             <div className="grid grid-cols-3 gap-3 text-sm">
                               {patient.name && (
                                 <div>
@@ -513,8 +546,8 @@ const HospitalReportAnalyzer = () => {
 
                         {/* Clinical Details */}
                         {hasClinicalData && (
-                          <div className="bg-orange-50 rounded-lg p-4 mb-6 border-l-4 border-orange-600">
-                            <h3 className="font-bold text-orange-900 mb-2 text-lg">🩺 Clinical Information</h3>
+                          <div className="bg-violet-50 rounded-lg p-4 mb-6 border-l-4 border-violet-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-violet-900 mb-2 text-lg"><HealingIcon />Clinical Information</h3>
                             
                             {/* Vitals */}
                             {(clinical.weight_kg || clinical.height_cm || clinical.bmi || clinical.blood_pressure) && (
@@ -573,8 +606,8 @@ const HospitalReportAnalyzer = () => {
 
                         {/* Medicines - Most Important Section */}
                         {medicines.length > 0 && (
-                          <div className="bg-red-50 rounded-lg p-4 mb-6 border-l-4 border-red-600">
-                            <h3 className="font-bold text-red-900 mb-3 text-lg">💊 Prescription</h3>
+                          <div className="bg-emerald-50 rounded-lg p-4 mb-6 border-l-4 border-emerald-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-emerald-900 mb-3 text-lg"><MedicationIcon />Prescription</h3>
                             <div className="space-y-3">
                               {medicines.map((med, idx) => (
                                 <div key={idx} className="bg-white p-4 rounded-lg border border-red-200">
@@ -629,8 +662,8 @@ const HospitalReportAnalyzer = () => {
                                       </div>
                                       
                                       {med.instructions && (
-                                        <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                                          ℹ️ {med.instructions}
+                                        <div className="mt-2 inline-flex items-start gap-1.5 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                          <InfoOutlinedIcon sx={{ fontSize: 14 }} /> {med.instructions}
                                         </div>
                                       )}
                                     </div>
@@ -643,8 +676,8 @@ const HospitalReportAnalyzer = () => {
 
                         {/* Medical Advice */}
                         {(advice.advice?.length > 0 || advice.dietary_restrictions || advice.precautions || advice.follow_up_date) && (
-                          <div className="bg-purple-50 rounded-lg p-4 mb-6 border-l-4 border-purple-600">
-                            <h3 className="font-bold text-purple-900 mb-2 text-lg">📝 Medical Advice & Instructions</h3>
+                          <div className="bg-violet-50 rounded-lg p-4 mb-6 border-l-4 border-violet-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-violet-900 mb-2 text-lg"><NoteAltIcon />Medical Advice & Instructions</h3>
                             
                             {advice.advice && advice.advice.length > 0 && (
                               <div className="mb-3">
@@ -712,14 +745,14 @@ const HospitalReportAnalyzer = () => {
 
         {/* History Section */}
         <div className="mt-8">
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-violet-100">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">📚 {getPrescriptionText('reportHistory', language)}</h2>
+              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-violet-900"><HistoryIcon />{stripLeadingEmoji(getPrescriptionText('reportHistory', language))}</h2>
               <button
                 onClick={refreshHistory}
                 className="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
               >
-                🔄 {getPrescriptionText('refresh', language)}
+                <span className="inline-flex items-center gap-1"><RefreshIcon sx={{ fontSize: 16 }} />{stripLeadingEmoji(getPrescriptionText('refresh', language))}</span>
               </button>
             </div>
 
@@ -756,19 +789,19 @@ const HospitalReportAnalyzer = () => {
                         }}
                         className="px-3 py-2 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 text-sm"
                       >
-                        {isSpeaking ? '⏹️' : '🔊'}
+                        {isSpeaking ? <StopCircleIcon sx={{ fontSize: 18 }} /> : <VolumeUpIcon sx={{ fontSize: 18 }} />}
                       </button>
                       <button
                         onClick={() => setExpandedHistoryId(expandedHistoryId === item.id ? null : item.id)}
                         className="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
                       >
-                        {expandedHistoryId === item.id ? `▲ ${getPrescriptionText('hideDetails', language)}` : `▼ ${getPrescriptionText('viewDetails', language)}`}
+                        <span className="inline-flex items-center gap-1">{expandedHistoryId === item.id ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}{expandedHistoryId === item.id ? stripLeadingEmoji(getPrescriptionText('hideDetails', language)) : stripLeadingEmoji(getPrescriptionText('viewDetails', language))}</span>
                       </button>
                       <button
                         onClick={() => deleteHistoryItem(item.id)}
                         className="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
                       >
-                        🗑️ {getPrescriptionText('deleteReport', language)}
+                        <span className="inline-flex items-center gap-1"><DeleteOutlineIcon sx={{ fontSize: 16 }} />{stripLeadingEmoji(getPrescriptionText('deleteReport', language))}</span>
                       </button>
                     </div>
                   </div>
@@ -779,7 +812,7 @@ const HospitalReportAnalyzer = () => {
                       {/* Hospital Details */}
                       {item.structured_data?.hospital_details && Object.values(item.structured_data.hospital_details).some(v => v) && (
                         <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                          <h4 className="font-bold text-blue-900 mb-2">🏥 Hospital Information</h4>
+                          <h4 className="inline-flex items-center gap-2 font-bold text-blue-900 mb-2"><LocalHospitalIcon sx={{ fontSize: 18 }} />Hospital Information</h4>
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             {item.structured_data.hospital_details.name && (
                               <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.hospital_details.name}</span></div>
@@ -800,7 +833,7 @@ const HospitalReportAnalyzer = () => {
                       {/* Doctor Details */}
                       {item.structured_data?.doctor_details && Object.values(item.structured_data.doctor_details).some(v => v) && (
                         <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                          <h4 className="font-bold text-blue-900 mb-2">👨‍⚕️ Doctor Information</h4>
+                          <h4 className="inline-flex items-center gap-2 font-bold text-blue-900 mb-2"><MedicalServicesIcon sx={{ fontSize: 18 }} />Doctor Information</h4>
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             {item.structured_data.doctor_details.name && (
                               <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.doctor_details.name}</span></div>
@@ -821,7 +854,7 @@ const HospitalReportAnalyzer = () => {
                       {/* Patient Information */}
                       {item.structured_data?.patient_details && Object.values(item.structured_data.patient_details).some(v => v) && (
                         <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                          <h4 className="font-bold text-green-900 mb-2">🧑 Patient Information</h4>
+                          <h4 className="inline-flex items-center gap-2 font-bold text-green-900 mb-2"><PersonIcon sx={{ fontSize: 18 }} />Patient Information</h4>
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             {item.structured_data.patient_details.name && (
                               <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.patient_details.name}</span></div>
@@ -848,7 +881,7 @@ const HospitalReportAnalyzer = () => {
                       {/* Clinical Details */}
                       {item.structured_data?.clinical_details && Object.values(item.structured_data.clinical_details).some(v => v && v.length > 0) && (
                         <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
-                          <h4 className="font-bold text-orange-900 mb-2">🩺 Clinical Information</h4>
+                          <h4 className="inline-flex items-center gap-2 font-bold text-orange-900 mb-2"><HealingIcon sx={{ fontSize: 18 }} />Clinical Information</h4>
                           <div className="text-xs space-y-2">
                             {(item.structured_data.clinical_details.weight_kg || item.structured_data.clinical_details.height_cm || item.structured_data.clinical_details.bmi || item.structured_data.clinical_details.blood_pressure) && (
                               <div className="grid grid-cols-4 gap-2">
@@ -884,7 +917,7 @@ const HospitalReportAnalyzer = () => {
                       {/* Medicines */}
                       {item.structured_data.medicines && item.structured_data.medicines.length > 0 && (
                         <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                          <h4 className="font-bold text-gray-800 mb-2">💊 {getPrescriptionText('medicines', language)}</h4>
+                          <h4 className="inline-flex items-center gap-2 font-bold text-gray-800 mb-2"><MedicationIcon sx={{ fontSize: 18 }} />{stripLeadingEmoji(getPrescriptionText('medicines', language))}</h4>
                           <div className="space-y-2">
                             {item.structured_data.medicines.map((med, idx) => {
                               const medName = med.medicine_name || med.name || med.medicine || med.drug_name || med.item_name || '';
@@ -900,14 +933,14 @@ const HospitalReportAnalyzer = () => {
                                     {medName || getPrescriptionText('unnamedMedicine', language)}
                                   </div>
                                   <div className="grid grid-cols-2 gap-2 text-gray-600 mt-2 text-xs">
-                                    {dosage && <div>💉 {dosage}</div>}
-                                    {frequency && <div>📅 {frequency}</div>}
-                                    {duration && <div>⏳ {duration}</div>}
-                                    {timing && <div>🕐 {timing}</div>}
+                                    {dosage && <div>Dosage: {dosage}</div>}
+                                    {frequency && <div>Frequency: {frequency}</div>}
+                                    {duration && <div>Duration: {duration}</div>}
+                                    {timing && <div>Timing: {timing}</div>}
                                   </div>
                                   {instructions && (
-                                    <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded">
-                                      📝 {instructions}
+                                    <div className="mt-2 inline-flex items-start gap-1.5 text-xs text-blue-700 bg-blue-50 p-2 rounded">
+                                      <NoteAltIcon sx={{ fontSize: 14 }} /> {instructions}
                                     </div>
                                   )}
                                 </div>
@@ -920,7 +953,7 @@ const HospitalReportAnalyzer = () => {
                       {/* Medical Advice */}
                       {item.structured_data?.medical_advice && (item.structured_data.medical_advice.advice?.length > 0 || item.structured_data.medical_advice.precautions || item.structured_data.medical_advice.follow_up_date) && (
                         <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
-                          <h4 className="font-bold text-purple-900 mb-2">📝 Medical Advice</h4>
+                          <h4 className="inline-flex items-center gap-2 font-bold text-purple-900 mb-2"><NoteAltIcon sx={{ fontSize: 18 }} />Medical Advice</h4>
                           <div className="text-xs space-y-2">
                             {item.structured_data.medical_advice.advice && item.structured_data.medical_advice.advice.length > 0 && (
                               <div>
@@ -964,7 +997,7 @@ const InfoCard = ({ title, data, onSpeak, language }) => {
           onClick={() => onSpeak(dataString, title)}
           className="p-2 bg-blue-100 rounded hover:bg-blue-200"
         >
-          🔊
+          <VolumeUpIcon sx={{ fontSize: 18 }} />
         </button>
       </div>
       <div className="space-y-1 text-sm">

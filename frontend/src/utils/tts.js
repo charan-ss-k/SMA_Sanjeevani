@@ -28,40 +28,64 @@ export async function playTTS(text, language = 'english', options = {}) {
 
   stopAllTTS();
 
-  currentAbortController = new AbortController();
+  const speakWithBrowser = () => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') {
+      return false;
+    }
 
-  const response = await fetch(`${API_BASE}/api/tts`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      text,
-      language,
-      provider: 'bhashini',
-    }),
-    signal: currentAbortController.signal,
-  });
+    const utterance = new SpeechSynthesisUtterance(text);
+    const langMap = {
+      english: 'en-US',
+      telugu: 'te-IN',
+      hindi: 'hi-IN',
+      marathi: 'mr-IN',
+      bengali: 'bn-IN',
+      tamil: 'ta-IN',
+      kannada: 'kn-IN',
+      malayalam: 'ml-IN',
+      gujarati: 'gu-IN',
+    };
 
-  if (!response.ok) {
-    throw new Error(`TTS request failed with status ${response.status}`);
-  }
-
-  const data = await response.json();
-  if (!data?.audio) {
-    throw new Error('Bhashini TTS returned no audio');
-  }
-
-  const binaryString = atob(data.audio);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i += 1) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-
-  const blob = new Blob([bytes], { type: data.format === 'mp3' ? 'audio/mpeg' : 'audio/wav' });
-  const audioUrl = URL.createObjectURL(blob);
+    utterance.lang = langMap[language] || 'en-US';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return true;
+  };
 
   try {
+    currentAbortController = new AbortController();
+
+    const response = await fetch(`${API_BASE}/api/tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text,
+        language,
+        provider: 'bhashini',
+      }),
+      signal: currentAbortController.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`TTS request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data?.audio) {
+      throw new Error('Bhashini TTS returned no audio');
+    }
+
+    const binaryString = atob(data.audio);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i += 1) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const blob = new Blob([bytes], { type: data.format === 'mp3' ? 'audio/mpeg' : 'audio/wav' });
+    const audioUrl = URL.createObjectURL(blob);
+
     await new Promise((resolve, reject) => {
       const audio = new Audio(audioUrl);
       currentAudio = audio;
@@ -84,18 +108,26 @@ export async function playTTS(text, language = 'english', options = {}) {
           reject(error);
         });
     });
-  } finally {
     URL.revokeObjectURL(audioUrl);
     currentAbortController = null;
+    return true;
+  } catch (error) {
+    currentAbortController = null;
+    if (speakWithBrowser()) {
+      return true;
+    }
+    throw error;
   }
-
-  return true;
 }
 
 /**
  * Stop all TTS playback and clear queue
  */
 export function stopAllTTS() {
+  if (typeof window !== 'undefined' && window.speechSynthesis && typeof window.speechSynthesis.cancel === 'function') {
+    window.speechSynthesis.cancel();
+  }
+
   if (currentAudio) {
     currentAudio.pause();
     currentAudio.currentTime = 0;

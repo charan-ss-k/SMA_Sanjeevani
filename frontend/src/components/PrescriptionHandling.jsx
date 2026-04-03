@@ -11,12 +11,35 @@ import { translateData } from '../data/dataTranslations';
 import { API_BASE } from '../config/apiBase';
 import capsuleIcon from '../assets/capsule.png';
 import prescriptionIcon from '../assets/prescription.png';
+import MedicationIcon from '@mui/icons-material/Medication';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import VaccinesIcon from '@mui/icons-material/Vaccines';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import NotesIcon from '@mui/icons-material/Notes';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import BlockIcon from '@mui/icons-material/Block';
+import DescriptionIcon from '@mui/icons-material/Description';
+import StopCircleIcon from '@mui/icons-material/StopCircle';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import SaveIcon from '@mui/icons-material/Save';
+import SearchIcon from '@mui/icons-material/Search';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import CategoryIcon from '@mui/icons-material/Category';
+import BusinessIcon from '@mui/icons-material/Business';
+import PaidIcon from '@mui/icons-material/Paid';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language, translateDefaultValue, getFrequencyLabel }) => (
   <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500 hover:shadow-lg transition">
     <div className="flex gap-3 items-start">
-      <div className="h-14 w-14 bg-gradient-to-br from-green-100 to-blue-100 rounded-md flex items-center justify-center font-bold text-green-700">
-        💊
+      <div className="h-14 w-14 bg-gradient-to-br from-green-100 to-blue-100 rounded-md flex items-center justify-center text-green-700">
+        <MedicationIcon fontSize="small" />
       </div>
       <div className="flex-1">
         <div className="flex items-center justify-between mb-2">
@@ -26,16 +49,22 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language, translateDefau
               : translateData(med.name, 'medicine', language)}
           </h4>
           <div className="flex items-center gap-1">
-            <button onClick={onSpeak} className="p-2 bg-amber-50 rounded hover:bg-amber-100 text-sm">🔊</button>
-            <button onClick={onEdit} className="p-2 bg-blue-50 rounded hover:bg-blue-100 text-sm">✏️</button>
-            <button onClick={onDelete} className="p-2 bg-red-50 rounded hover:bg-red-100 text-sm">🗑️</button>
+            <button onClick={onSpeak} className="p-2 bg-amber-50 rounded hover:bg-amber-100 text-amber-700" aria-label="Speak medicine details">
+              <VolumeUpIcon fontSize="small" />
+            </button>
+            <button onClick={onEdit} className="p-2 bg-blue-50 rounded hover:bg-blue-100 text-blue-700" aria-label="Edit medicine">
+              <EditIcon fontSize="small" />
+            </button>
+            <button onClick={onDelete} className="p-2 bg-red-50 rounded hover:bg-red-100 text-red-700" aria-label="Delete medicine">
+              <DeleteOutlineIcon fontSize="small" />
+            </button>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
-          <div>💉 <span className="font-semibold text-sm">{getPrescriptionText('dosage', language)}:</span> {translateDefaultValue(med.dosage)}</div>
-          <div>📅 <span className="font-semibold text-sm">{getPrescriptionText('frequency', language)}:</span> {getFrequencyLabel(med.frequency)}</div>
-          <div>⏳ <span className="font-semibold text-sm">{getPrescriptionText('duration', language)}:</span> {translateDefaultValue(med.duration)}</div>
-          <div>📦 <span className="font-semibold text-sm">{med.quantity}</span> {getPrescriptionText('units', language)}</div>
+          <div className="inline-flex items-center gap-1.5"><VaccinesIcon sx={{ fontSize: 16 }} /><span className="font-semibold text-sm">{getPrescriptionText('dosage', language)}:</span> {translateDefaultValue(med.dosage)}</div>
+          <div className="inline-flex items-center gap-1.5"><CalendarMonthIcon sx={{ fontSize: 16 }} /><span className="font-semibold text-sm">{getPrescriptionText('frequency', language)}:</span> {getFrequencyLabel(med.frequency)}</div>
+          <div className="inline-flex items-center gap-1.5"><ScheduleIcon sx={{ fontSize: 16 }} /><span className="font-semibold text-sm">{getPrescriptionText('duration', language)}:</span> {translateDefaultValue(med.duration)}</div>
+          <div className="inline-flex items-center gap-1.5"><Inventory2Icon sx={{ fontSize: 16 }} /><span className="font-semibold text-sm">{med.quantity}</span> {getPrescriptionText('units', language)}</div>
         </div>
         {med.reminders && med.reminders.length > 0 && (
           <div className="mt-2 p-2 bg-green-50 rounded">
@@ -43,13 +72,13 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language, translateDefau
             <div className="flex flex-wrap gap-1 mt-1">
               {med.reminders.map((r, i) => (
                 <span key={i} className="bg-green-200 text-green-900 px-2 py-1 rounded text-xs font-medium">
-                  ⏰ {r}
+                  <span className="inline-flex items-center gap-1"><AccessTimeIcon sx={{ fontSize: 12 }} />{r}</span>
                 </span>
               ))}
             </div>
           </div>
         )}
-        <div className="mt-2 text-xs text-gray-500">📝 {med.notes || getPrescriptionText('noNotes', language)}</div>
+        <div className="mt-2 text-xs text-gray-500 inline-flex items-center gap-1.5"><NotesIcon sx={{ fontSize: 14 }} />{med.notes || getPrescriptionText('noNotes', language)}</div>
       </div>
     </div>
   </div>
@@ -444,32 +473,36 @@ const PrescriptionHandling = () => {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-4 mb-8 auto-rows-fr items-stretch">
-          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-emerald-100 p-5 md:p-6 text-center shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+          <div className="relative flex h-full min-h-[150px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-emerald-100 p-4 md:min-h-[165px] md:p-5 text-center shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div className="absolute left-0 top-0 h-1.5 w-full bg-emerald-500" />
             <div className="flex w-full flex-1 flex-col items-center justify-center">
-              <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700 leading-tight">
-                {getPrescriptionText('myMedicines', language)}
-              </h3>
-              <div className="mt-3 h-10 w-10 rounded-xl bg-white/80 border border-emerald-200 flex items-center justify-center shadow-sm">
-                <img src={capsuleIcon} alt="My medicines" className="h-5 w-5 object-contain" />
+              <div className="mb-2 inline-flex items-center justify-center gap-2">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-emerald-200 bg-white/80 shadow-sm">
+                  <img src={capsuleIcon} alt="My medicines" className="h-3.5 w-3.5 object-contain" />
+                </span>
+                <h3 className="text-[11px] md:text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 leading-tight">
+                  {getPrescriptionText('myMedicines', language)}
+                </h3>
               </div>
-              <p className="mt-3 text-3xl md:text-4xl font-black tabular-nums text-emerald-900 leading-none">{stats.totalMedicines}</p>
+              <p className="mt-2 text-2xl md:text-3xl font-black tabular-nums text-emerald-900 leading-none">{stats.totalMedicines}</p>
             </div>
-            <p className="mt-4 text-xs md:text-sm leading-relaxed text-emerald-900/70">Currently in your tracker</p>
+            <p className="mt-2 text-xs leading-relaxed text-emerald-900/70">Currently in your tracker</p>
           </div>
 
-          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-white via-violet-50 to-violet-100 p-5 md:p-6 text-center shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+          <div className="relative flex h-full min-h-[150px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-white via-violet-50 to-violet-100 p-4 md:min-h-[165px] md:p-5 text-center shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div className="absolute left-0 top-0 h-1.5 w-full bg-violet-500" />
             <div className="flex w-full flex-1 flex-col items-center justify-center">
-              <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-violet-700 leading-tight">
-                {getPrescriptionText('prescriptionHistory', language)}
-              </h3>
-              <div className="mt-3 h-10 w-10 rounded-xl bg-white/80 border border-violet-200 flex items-center justify-center shadow-sm">
-                <img src={prescriptionIcon} alt="Prescription history" className="h-5 w-5 object-contain" />
+              <div className="mb-2 inline-flex items-center justify-center gap-2">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-violet-200 bg-white/80 shadow-sm">
+                  <img src={prescriptionIcon} alt="Prescription history" className="h-3.5 w-3.5 object-contain" />
+                </span>
+                <h3 className="text-[11px] md:text-xs font-semibold uppercase tracking-[0.18em] text-violet-700 leading-tight">
+                  {getPrescriptionText('prescriptionHistory', language)}
+                </h3>
               </div>
-              <p className="mt-3 text-3xl md:text-4xl font-black tabular-nums text-violet-900 leading-none">{stats.totalPrescriptions}</p>
+              <p className="mt-2 text-2xl md:text-3xl font-black tabular-nums text-violet-900 leading-none">{stats.totalPrescriptions}</p>
             </div>
-            <p className="mt-4 text-xs md:text-sm leading-relaxed text-violet-900/70">Uploaded and saved records</p>
+            <p className="mt-2 text-xs leading-relaxed text-violet-900/70">Uploaded and saved records</p>
           </div>
         </div>
 
@@ -496,7 +529,10 @@ const PrescriptionHandling = () => {
                 : 'border-b-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
-            🔍 {getPrescriptionText('analyzePrescription', language)}
+            <span className="inline-flex items-center gap-2">
+              <img src={capsuleIcon} alt="Analyze prescriptions" className="h-5 w-5 object-contain" />
+              <span>{getPrescriptionText('analyzePrescription', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</span>
+            </span>
           </button>
         </div>
 
@@ -511,8 +547,11 @@ const PrescriptionHandling = () => {
           <>
 
         {/* AI Medicine Identification Section - Inline */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">🔍 {t('aiMedicineIdentification', language)}</h2>
+        <div className="bg-white rounded-2xl border border-emerald-100 shadow-lg p-6 mb-8">
+          <h2 className="mb-4 inline-flex items-center gap-2 text-2xl font-bold text-gray-800">
+            <PsychologyIcon />
+            {t('aiMedicineIdentification', language)}
+          </h2>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Upload Section */}
@@ -520,7 +559,7 @@ const PrescriptionHandling = () => {
               <div
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                className="border-2 border-dashed border-blue-300 rounded-xl p-6 bg-[#eaf3ff]"
+                className="rounded-2xl border-2 border-dashed border-emerald-300 bg-gradient-to-br from-white via-emerald-50 to-emerald-100 p-6 shadow-sm"
               >
                 <input
                   ref={fileInputRef}
@@ -535,9 +574,11 @@ const PrescriptionHandling = () => {
                     className="text-center cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 text-4xl">📷</div>
-                    <p className="text-2xl font-semibold text-slate-800 mb-2">Drag medicine image here or click to upload</p>
-                    <p className="text-lg text-slate-600">Supported: JPG, PNG, WebP, BMP, TIFF (Max 10MB)</p>
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-200 bg-white text-emerald-700 shadow-sm">
+                      <PhotoCameraIcon sx={{ fontSize: 34 }} />
+                    </div>
+                    <p className="mb-2 text-2xl font-bold text-emerald-950">Drag medicine image here or click to upload</p>
+                    <p className="text-base text-emerald-900/70">Supported: JPG, PNG, WebP, BMP, TIFF (Max 10MB)</p>
                   </div>
                 ) : (
                   <div>
@@ -545,7 +586,7 @@ const PrescriptionHandling = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg font-semibold transition"
+                        className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-semibold text-white transition hover:bg-emerald-700"
                       >
                         {t('changeImage', language)}
                       </button>
@@ -556,7 +597,7 @@ const PrescriptionHandling = () => {
                           setAnalysisResult(null);
                           setAnalysisError('');
                         }}
-                        className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-semibold transition"
+                        className="flex-1 rounded-xl bg-rose-600 py-2.5 font-semibold text-white transition hover:bg-rose-700"
                       >
                         {t('clear', language)}
                       </button>
@@ -568,28 +609,28 @@ const PrescriptionHandling = () => {
               {file && !analyzing && !analysisResult && (
                 <button
                   onClick={handleAnalyze}
-                  className="w-full mt-4 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white py-4 rounded-lg text-2xl font-bold transition"
+                  className="mt-4 w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-4 text-2xl font-black text-white transition hover:from-emerald-700 hover:to-teal-700"
                 >
-                  → {t('analyzeNow', language)}
+                  <span className="inline-flex items-center gap-2"><ArrowForwardIcon />{t('analyzeNow', language)}</span>
                 </button>
               )}
               
               {analyzing && (
-                <div className="mt-4 flex flex-col items-center gap-3 p-4 bg-blue-50 rounded-lg">
-                  <div className="animate-spin h-8 w-8 border-4 border-blue-300 border-t-blue-700 rounded-full"></div>
-                  <div className="text-blue-900 font-semibold">{t('analyzingPleaseWait', language)}</div>
+                <div className="mt-4 flex flex-col items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-300 border-t-emerald-700"></div>
+                  <div className="font-semibold text-emerald-900">{t('analyzingPleaseWait', language)}</div>
                   <button
                     onClick={handleCancelAnalysis}
-                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition"
+                    className="rounded-lg bg-rose-600 px-6 py-2 font-semibold text-white transition hover:bg-rose-700"
                   >
-                    ⛔ {t('stopAnalysis', language)}
+                    <span className="inline-flex items-center gap-1.5"><BlockIcon sx={{ fontSize: 16 }} />{t('stopAnalysis', language)}</span>
                   </button>
                 </div>
               )}
               
               {analysisError && (
-                <div className="mt-4 p-4 bg-red-50 border-l-4 border-red-500 rounded">
-                  <p className="text-red-800 font-semibold">{analysisError}</p>
+                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <p className="font-semibold text-rose-800">{analysisError}</p>
                 </div>
               )}
             </div>
@@ -597,59 +638,59 @@ const PrescriptionHandling = () => {
             {/* Analysis Results Section */}
             <div>
               {analysisResult ? (
-                <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-6 border-2 border-green-300">
+                <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-white via-emerald-50 to-teal-50 p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">📋 {t('analysisResults', language)}</h3>
+                    <h3 className="inline-flex items-center gap-2 text-xl font-bold text-gray-800"><DescriptionIcon />{t('analysisResults', language)}</h3>
                     <button
                       onClick={handleSpeakAnalysisResult}
                       className="bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-lg transition"
                       title={t('listenToResults', language)}
                     >
-                      {isSpeaking ? '⏹️' : '🔊'}
+                      {isSpeaking ? <StopCircleIcon /> : <VolumeUpIcon />}
                     </button>
                   </div>
                   
                   <div className="space-y-4">
                     {analysisResult.medicine_name && (
-                      <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border-2 border-green-300 shadow-md">
-                        <div className="text-xs uppercase tracking-wider text-green-700 font-bold mb-1">{t('medicineName', language)}</div>
-                        <div className="text-2xl font-extrabold text-green-900 bg-yellow-100 px-3 py-2 rounded inline-block">
-                          💊 {analysisResult.medicine_name}
+                      <div className="rounded-lg border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-violet-50 p-4 shadow-md">
+                        <div className="mb-1 text-xs font-bold uppercase tracking-wider text-emerald-700">{t('medicineName', language)}</div>
+                        <div className="inline-flex items-center gap-2 rounded bg-white px-3 py-2 text-2xl font-extrabold text-emerald-900">
+                          <MedicationIcon sx={{ fontSize: 24 }} /> {analysisResult.medicine_name}
                         </div>
                       </div>
                     )}
                     
                     {analysisResult.dosage && (
-                      <div className="bg-white p-4 rounded-lg border-l-4 border-blue-500 shadow-sm">
-                        <div className="text-xs uppercase tracking-wider text-blue-700 font-bold mb-1">{t('dosage', language)}</div>
-                        <div className="text-lg font-semibold text-gray-800">💉 {analysisResult.dosage}</div>
+                      <div className="rounded-lg border-l-4 border-emerald-500 bg-white p-4 shadow-sm">
+                        <div className="mb-1 text-xs font-bold uppercase tracking-wider text-emerald-700">{t('dosage', language)}</div>
+                        <div className="inline-flex items-center gap-1.5 text-lg font-semibold text-gray-800"><VaccinesIcon sx={{ fontSize: 18 }} />{analysisResult.dosage}</div>
                       </div>
                     )}
                     
                     {analysisResult.category && (
-                      <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-sm">
-                        <div className="text-xs uppercase tracking-wider text-purple-700 font-bold mb-1">{t('category', language)}</div>
-                        <div className="text-lg font-semibold text-gray-800">🏷️ {analysisResult.category}</div>
+                      <div className="rounded-lg border-l-4 border-violet-500 bg-white p-4 shadow-sm">
+                        <div className="mb-1 text-xs font-bold uppercase tracking-wider text-violet-700">{t('category', language)}</div>
+                        <div className="inline-flex items-center gap-1.5 text-lg font-semibold text-gray-800"><CategoryIcon sx={{ fontSize: 18 }} />{analysisResult.category}</div>
                       </div>
                     )}
                     
                     {analysisResult.manufacturer && (
-                      <div className="bg-white p-4 rounded-lg border-l-4 border-indigo-500 shadow-sm">
-                        <div className="text-xs uppercase tracking-wider text-indigo-700 font-bold mb-1">{t('manufacturer', language)}</div>
-                        <div className="text-lg font-semibold text-gray-800">🏭 {analysisResult.manufacturer}</div>
+                      <div className="rounded-lg border-l-4 border-emerald-500 bg-white p-4 shadow-sm">
+                        <div className="mb-1 text-xs font-bold uppercase tracking-wider text-emerald-700">{t('manufacturer', language)}</div>
+                        <div className="inline-flex items-center gap-1.5 text-lg font-semibold text-gray-800"><BusinessIcon sx={{ fontSize: 18 }} />{analysisResult.manufacturer}</div>
                       </div>
                     )}
                     
                     {analysisResult.price && (
-                      <div className="bg-white p-4 rounded-lg border-l-4 border-amber-500 shadow-sm">
-                        <div className="text-xs uppercase tracking-wider text-amber-700 font-bold mb-1">{t('price', language)}</div>
-                        <div className="text-xl font-bold text-amber-800">💰 {analysisResult.price}</div>
+                      <div className="rounded-lg border-l-4 border-violet-500 bg-white p-4 shadow-sm">
+                        <div className="mb-1 text-xs font-bold uppercase tracking-wider text-violet-700">{t('price', language)}</div>
+                        <div className="inline-flex items-center gap-1.5 text-xl font-bold text-violet-800"><PaidIcon sx={{ fontSize: 20 }} />{analysisResult.price}</div>
                       </div>
                     )}
                     
                     {analysisResult.full_information && (
-                      <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 shadow-sm">
-                        <div className="text-xs uppercase tracking-wider text-blue-800 font-bold mb-2">ℹ️ {t('additionalInformation', language)}</div>
+                      <div className="rounded-lg border-2 border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                        <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-800"><InfoOutlinedIcon sx={{ fontSize: 14 }} />{t('additionalInformation', language)}</div>
                         <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{analysisResult.full_information}</div>
                       </div>
                     )}
@@ -657,15 +698,15 @@ const PrescriptionHandling = () => {
                   
                   <button
                     onClick={handleSaveAnalysisResult}
-                    className="w-full mt-4 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white py-3 rounded-lg font-bold transition"
+                    className="mt-4 w-full rounded-lg bg-gradient-to-r from-emerald-600 to-violet-600 py-3 font-bold text-white transition hover:from-emerald-700 hover:to-violet-700"
                   >
-                    ✓ {t('saveToPrescriptions', language)}
+                    <span className="inline-flex items-center gap-1.5"><SaveIcon sx={{ fontSize: 18 }} />{t('saveToPrescriptions', language)}</span>
                   </button>
                 </div>
               ) : (
-                <div className="h-full flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                  <div className="text-center text-gray-500">
-                    <div className="text-6xl mb-3">🔍</div>
+                <div className="flex h-full items-center justify-center rounded-2xl border-2 border-dashed border-emerald-200 bg-emerald-50/40">
+                  <div className="text-center text-emerald-900/60">
+                    <div className="mb-3"><SearchIcon sx={{ fontSize: 52 }} /></div>
                     <p className="font-semibold">{t('analysisResultsWillAppearHere', language)}</p>
                   </div>
                 </div>
@@ -677,7 +718,7 @@ const PrescriptionHandling = () => {
         {/* Prescription History Section - Inline */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">📚 {t('prescriptionHistory', language)}</h2>
+            <h2 className="inline-flex items-center gap-2 text-2xl font-bold text-gray-800"><MenuBookIcon />{t('prescriptionHistory', language)}</h2>
             <button
               onClick={() => {
                 setShowHistory(!showHistory);
@@ -727,13 +768,13 @@ const PrescriptionHandling = () => {
                               onClick={() => speakText(`${prescription.medicine_name}. ${prescription.dosage}. ${prescription.frequency}. ${prescription.notes}`)}
                               className="p-2 bg-amber-50 rounded hover:bg-amber-100"
                             >
-                              {isSpeaking ? '⏹️' : '🔊'}
+                              {isSpeaking ? <StopCircleIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
                             </button>
                             <button
                               onClick={() => handleDeletePrescription(prescription.id)}
                               className="p-2 bg-red-50 rounded hover:bg-red-100"
                             >
-                              🗑️
+                              <DeleteOutlineIcon fontSize="small" />
                             </button>
                           </div>
                         </td>

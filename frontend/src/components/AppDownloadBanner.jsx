@@ -10,6 +10,19 @@ const AppDownloadBanner = () => {
     return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrRedirectUrl)}`;
   }, [qrRedirectUrl]);
 
+  const userAgent = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const isAndroid = /Android/i.test(userAgent);
+  const isIPadOSDesktopMode = platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent) || isIPadOSDesktopMode;
+  const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(userAgent);
+  const isDesktopOrKiosk = !isMobile;
+  const shouldShowBanner = isAndroid || isDesktopOrKiosk;
+
+  if (!shouldShowBanner) {
+    return null;
+  }
+
   return (
     <section className="overflow-hidden rounded-[2rem] border border-rose-100 bg-[radial-gradient(circle_at_20%_20%,rgba(236,72,153,0.08),transparent_45%),linear-gradient(135deg,#fdf6f8_0%,#fff9fb_45%,#f9fcff_100%)] p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] md:p-10">
       <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
@@ -25,13 +38,21 @@ const AppDownloadBanner = () => {
               ? 'अपॉइंटमेंट, रिपोर्ट और हेल्थ फीचर्स अब मोबाइल ऐप पर आसानी से पाएँ।'
               : 'Experience seamless health services with the Sanjeevani mobile app.'}
           </p>
-          <a
-            href={downloadPath}
-            download
-            className="mt-6 inline-flex items-center rounded-xl bg-slate-900 px-7 py-3 text-base font-bold text-white transition hover:bg-slate-800"
-          >
-            {isHindi ? 'Download Now' : 'Download Now'}
-          </a>
+          {isAndroid ? (
+            <a
+              href={downloadPath}
+              download
+              className="mt-6 inline-flex items-center rounded-xl bg-slate-900 px-7 py-3 text-base font-bold text-white transition hover:bg-slate-800"
+            >
+              {isHindi ? 'Download Now' : 'Download Now'}
+            </a>
+          ) : (
+            <p className="mt-6 text-sm font-semibold text-slate-700">
+              {isHindi
+                ? 'डेस्कटॉप/कियोस्क पर APK डाउनलोड बटन छिपा है। QR स्कैन करके Android फोन पर इंस्टॉल करें।'
+                : 'Direct APK download is disabled on desktop/kiosk. Scan the QR code on an Android phone to install.'}
+            </p>
+          )}
         </div>
 
         <div className="mx-auto w-full max-w-[320px] rounded-[2.2rem] border-4 border-slate-800 bg-white p-5 shadow-[0_20px_45px_rgba(15,23,42,0.2)] lg:mx-0">

@@ -20,6 +20,7 @@ import AppointmentNotification from './components/AppointmentNotification.jsx';
 import ReminderNotification from './components/ReminderNotification.jsx';
 import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
 import { ProtectedRoute } from './components/ProtectedRoute.jsx';
+import { stopAllTTS } from './utils/tts';
 
 // Create Language Context
 export const LanguageContext = createContext('english');
@@ -36,11 +37,29 @@ function AppWrapper() {
       return undefined;
     }
 
-    const originalSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
-    window.speechSynthesis.speak = () => {};
+    const stopSpeechOnInteraction = () => {
+      stopAllTTS();
+    };
+
+    const windowEvents = ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'input', 'change', 'focusin', 'scroll', 'blur'];
+    const documentEvents = ['visibilitychange'];
+
+    windowEvents.forEach((eventName) => {
+      window.addEventListener(eventName, stopSpeechOnInteraction, true);
+    });
+
+    documentEvents.forEach((eventName) => {
+      document.addEventListener(eventName, stopSpeechOnInteraction, true);
+    });
 
     return () => {
-      window.speechSynthesis.speak = originalSpeak;
+      windowEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, stopSpeechOnInteraction, true);
+      });
+
+      documentEvents.forEach((eventName) => {
+        document.removeEventListener(eventName, stopSpeechOnInteraction, true);
+      });
     };
   }, []);
 
