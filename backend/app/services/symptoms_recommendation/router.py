@@ -261,8 +261,14 @@ async def medical_qa(
         raise HTTPException(status_code=400, detail="Question is required")
     
     try:
+        enforced_question = (
+            f"{question}\n\n"
+            f"IMPORTANT: Respond ONLY in {request_language} language. "
+            "Do not switch to any other language unless the user changes language preference in the app."
+        )
+
         # Answer in the requested language if supported
-        answer = service.answer_medical_question(question, language=request_language)
+        answer = service.answer_medical_question(enforced_question, language=request_language)
         logger.info("✅ Medical QA response generated: %d chars", len(answer) if answer else 0)
         
         # Save to database if user_id is provided

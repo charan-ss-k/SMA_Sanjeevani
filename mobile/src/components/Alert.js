@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, Animated } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../utils/theme';
 
 export const Alert = ({
@@ -28,10 +29,10 @@ export const Alert = ({
   }, [dismissAfter, onDismiss]);
 
   const typeStyles = {
-    info: { bg: '#E0F2FE', text: '#0C4A6E', icon: 'ℹ' },
-    success: { bg: '#DCFCE7', text: '#14532D', icon: '✓' },
-    error: { bg: '#FEE2E2', text: '#7F1D1D', icon: '✕' },
-    warning: { bg: '#FEF3C7', text: '#78350F', icon: '⚠' },
+    info: { bg: '#E0F2FE', text: '#0C4A6E', icon: 'information-outline' },
+    success: { bg: '#DCFCE7', text: '#14532D', icon: 'check-circle-outline' },
+    error: { bg: '#FEE2E2', text: '#7F1D1D', icon: 'close-circle-outline' },
+    warning: { bg: '#FEF3C7', text: '#78350F', icon: 'alert-outline' },
   };
 
   const typeStyle = typeStyles[type];
@@ -49,15 +50,12 @@ export const Alert = ({
         flexDirection: 'row',
       }}
     >
-      <Text
-        style={{
-          fontSize: 20,
-          marginRight: spacing.md,
-          color: typeStyle.text,
-        }}
-      >
-        {typeStyle.icon}
-      </Text>
+      <MaterialCommunityIcons
+        name={typeStyle.icon}
+        size={20}
+        color={typeStyle.text}
+        style={{ marginRight: spacing.md, marginTop: 1 }}
+      />
       <View style={{ flex: 1 }}>
         {title && (
           <Text

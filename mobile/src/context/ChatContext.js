@@ -8,15 +8,17 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../api/client';
 import { ENABLE_DEBUG as DEBUG } from '../config/environment';
+import { useLanguage } from './LanguageContext';
 
 const ChatContext = createContext({});
 
 export const ChatProvider = ({ children }) => {
+  const { language, t } = useLanguage();
   const [chatHistory, setChatHistory] = useState([
     {
       id: 0,
       sender: 'ai',
-      text: '🏥 Hello! I\'m Sanjeevani AI, your 24/7 medical assistant. I can help you with health questions, symptoms, medications, and general medical advice. What would you like to know today?',
+      text: t('chatbotWelcome'),
       timestamp: new Date(),
     }
   ]);
@@ -35,6 +37,7 @@ export const ChatProvider = ({ children }) => {
       sender,
       text: String(message || ''), // Ensure text is always a string
       timestamp: new Date(),
+      ...(sender === 'ai' ? { language } : {}),
     };
 
     setChatHistory((prevMessages) => {
@@ -47,7 +50,7 @@ export const ChatProvider = ({ children }) => {
       return updated;
     });
     return newMessage;
-  }, []);
+  }, [language]);
 
   /**
    * Load chat history from backend - matches frontend /api/qa-history endpoint exactly
@@ -71,7 +74,7 @@ export const ChatProvider = ({ children }) => {
             {
               id: 0,
               sender: 'ai',
-              text: '🏥 Hello! I\'m Sanjeevani AI, your 24/7 medical assistant. I can help you with health questions, symptoms, medications, and general medical advice. What would you like to know today?',
+              text: t('chatbotWelcome'),
               timestamp: new Date(),
             },
             ...cachedHistory
@@ -99,7 +102,8 @@ export const ChatProvider = ({ children }) => {
             id: `ai-${qa.id}`,
             sender: 'ai', 
             text: qa.answer,
-            timestamp: new Date(qa.created_at)
+            timestamp: new Date(qa.created_at),
+            language: qa.language || null,
           }
         ]);
         
@@ -108,7 +112,7 @@ export const ChatProvider = ({ children }) => {
           {
             id: 0,
             sender: 'ai',
-            text: '🏥 Hello! I\'m Sanjeevani AI, your 24/7 medical assistant. I can help you with health questions, symptoms, medications, and general medical advice. What would you like to know today?',
+            text: t('chatbotWelcome'),
             timestamp: new Date(),
           },
           ...historyMessages
@@ -124,13 +128,26 @@ export const ChatProvider = ({ children }) => {
       return true;
     } catch (err) {
       if (DEBUG) console.error('[Chat] History fetch error:', err);
-      setError('Failed to load chat history');
+      setError(t('failedToLoadChatHistory'));
       setHistoryLoaded(true);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [historyLoaded]);
+  }, [historyLoaded, t]);
+
+  useEffect(() => {
+    setChatHistory((prevMessages) =>
+      prevMessages.map((message) =>
+        message.id === 0
+          ? {
+              ...message,
+              text: t('chatbotWelcome'),
+            }
+          : message
+      )
+    );
+  }, [t]);
 
   /**
    * Send message using /api/medical-qa endpoint - matches frontend ChatWidget exactly
@@ -150,18 +167,19 @@ export const ChatProvider = ({ children }) => {
         abortController = new AbortController();
         
         // Call medical QA API - exactly matches frontend ChatWidget
-        const response = await fetch(`${apiClient.baseURL}/medical-qa`, {
+        const response = await fetch(apiClient.buildUrl('/medical-qa'), {
           method: 'POST',
           headers: await apiClient.buildHeaders(),
           body: JSON.stringify({
             question: message,
-            language: 'english', // Matches frontend default
+            language,
           }),
           signal: abortController.signal,
         });
 
         if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
+          const errorPayload = await response.json().catch(() => ({}));
+          throw new Error(errorPayload.detail || `Server error: ${response.status}`);
         }
 
         const data = await response.json();
@@ -186,6 +204,7 @@ export const ChatProvider = ({ children }) => {
           sender: 'ai',
           text: String(aiResponse || ''),
           timestamp: new Date(),
+          language,
         };
 
         setChatHistory((prevMessages) => {
@@ -210,7 +229,7 @@ export const ChatProvider = ({ children }) => {
           const cancelledMessage = {
             id: Date.now(),
             sender: 'ai',
-            text: '⏹️ Request stopped. Feel free to ask another question!',
+            text: `${t('requestStoppedShort')}`,
             timestamp: new Date(),
           };
           addMessage(cancelledMessage.text, 'ai');
@@ -226,7 +245,7 @@ export const ChatProvider = ({ children }) => {
           const errorMessage = {
             id: Date.now(),
             sender: 'ai',
-            text: '⚠️ I encountered an error while processing your question. Please check if the backend is running and try again.',
+            text: `${t('thereWasError')}`,
             timestamp: new Date(),
           };
           addMessage(errorMessage.text, 'ai');
@@ -239,7 +258,7 @@ export const ChatProvider = ({ children }) => {
         setIsLoading(false);
       }
     },
-    [addMessage]
+    [addMessage, language]
   );
 
   /**
@@ -251,7 +270,7 @@ export const ChatProvider = ({ children }) => {
         {
           id: 0,
           sender: 'ai',
-          text: '🏥 Hello! I\'m Sanjeevani AI, your 24/7 medical assistant. I can help you with health questions, symptoms, medications, and general medical advice. What would you like to know today?',
+          text: t('chatbotWelcome'),
           timestamp: new Date(),
         }
       ]);
@@ -261,7 +280,7 @@ export const ChatProvider = ({ children }) => {
     } catch (err) {
       if (DEBUG) console.error('[Chat] Clear error:', err);
     }
-  }, []);
+  }, [t]);
 
   /**
    * Delete specific message

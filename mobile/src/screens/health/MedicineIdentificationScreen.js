@@ -3,7 +3,7 @@
  * Capture or select medicine image for identification
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,15 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useHealth } from '../../context/HealthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Button, Card, Alert, Loading } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
+import ttsService from '../../services/ttsService';
 
-const MedicineResultCard = ({ medicine }) => (
+const MedicineResultCard = ({ medicine, onSpeak, isSpeaking, isProcessing }) => (
   <Card variant="elevated" padding="md">
     <View
       style={{
@@ -78,6 +82,32 @@ const MedicineResultCard = ({ medicine }) => (
           >
             {medicine.confidence}% Match
           </Text>
+          <Pressable
+            onPress={onSpeak}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isSpeaking ? '#FEE2E2' : '#E0F2FE',
+              borderColor: isSpeaking ? '#FCA5A5' : '#BAE6FD',
+              borderWidth: 1,
+              borderRadius: 8,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: 4,
+            }}
+          >
+            {isProcessing ? (
+              <ActivityIndicator size="small" color="#0369A1" />
+            ) : (
+              <MaterialCommunityIcons
+                name={isSpeaking ? 'stop-circle-outline' : 'volume-high'}
+                size={14}
+                color="#0369A1"
+              />
+            )}
+            <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: '700', color: '#0F172A' }}>
+              {isProcessing ? 'Processing...' : isSpeaking ? 'Stop' : 'Speak'}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -168,10 +198,56 @@ const MedicineResultCard = ({ medicine }) => (
 
 export default function MedicineIdentificationScreen() {
   const { identifyMedicineFromImage, isLoading } = useHealth();
+  const { language } = useLanguage();
   const [selectedImage, setSelectedImage] = useState(null);
   const [identifiedMedicines, setIdentifiedMedicines] = useState([]);
   const [error, setError] = useState(null);
   const [isIdentifying, setIsIdentifying] = useState(false);
+  const [activeTtsKey, setActiveTtsKey] = useState(null);
+  const [isTtsProcessing, setIsTtsProcessing] = useState(false);
+
+  const stopTTSPlayback = useCallback(async () => {
+    try {
+      await ttsService.stop();
+    } catch (_) {
+      // noop
+    }
+    setActiveTtsKey(null);
+    setIsTtsProcessing(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopTTSPlayback();
+        setSelectedImage(null);
+        setIdentifiedMedicines([]);
+        setError(null);
+        setIsIdentifying(false);
+      };
+    }, [stopTTSPlayback])
+  );
+
+  const handleSpeakMedicine = async (index, medicine) => {
+    const key = `identified-${index}`;
+    if (activeTtsKey === key) {
+      await stopTTSPlayback();
+      return;
+    }
+
+    const text = `${medicine.name || 'Medicine'}. Composition: ${medicine.composition || 'Not available'}. Indication: ${medicine.indication || ''}. Dosage: ${medicine.dosage || ''}. Side effects: ${medicine.sideEffects || ''}`;
+
+    try {
+      setActiveTtsKey(key);
+      setIsTtsProcessing(true);
+      await ttsService.synthesizeAndPlay(text, language);
+    } catch (err) {
+      setError('Unable to play audio for this medicine');
+    } finally {
+      setActiveTtsKey(null);
+      setIsTtsProcessing(false);
+    }
+  };
 
   const handleIdentify = async () => {
     if (!selectedImage) {
@@ -196,6 +272,7 @@ export default function MedicineIdentificationScreen() {
           }));
 
       setIdentifiedMedicines(normalized);
+      stopTTSPlayback();
     } catch (err) {
       setError(err.message || 'Failed to identify medicine');
       setIdentifiedMedicines([]);
@@ -233,7 +310,7 @@ export default function MedicineIdentificationScreen() {
           },
         ]}
       >
-        🔍 Medicine Identification
+        Medicine Identification
       </Text>
       <Card variant="outlined" padding="md" style={{ marginBottom: spacing.lg }}>
         <Text
@@ -253,12 +330,12 @@ export default function MedicineIdentificationScreen() {
       {!selectedImage ? (
         <View style={{ gap: spacing.md, marginBottom: spacing.lg }}>
           <Button
-            title="📸 Capture Photo"
+            title="Capture Photo"
             onPress={handleCaptureImage}
             fullWidth
           />
           <Button
-            title="🖼️ Select Image"
+            title="Select Image"
             onPress={handleSelectImage}
             variant="secondary"
             fullWidth
@@ -325,34 +402,23 @@ export default function MedicineIdentificationScreen() {
               onPress={() => {
                 setSelectedImage(null);
                 setIdentifiedMedicines([]);
+                stopTTSPlayback();
               }}
               variant="ghost"
               size="sm"
             />
           </View>
 
-          {identifiedMedicines.map((medicine, index) => (
-            <View key={index} style={{ marginBottom: spacing.md }}>
-              <MedicineResultCard medicine={medicine} />
-            </View>
+          {identifiedMedicines.map((medicine, idx) => (
+            <MedicineResultCard
+              key={idx}
+              medicine={medicine}
+              onSpeak={() => handleSpeakMedicine(idx, medicine)}
+              isSpeaking={activeTtsKey === `identified-${idx}`}
+              isProcessing={activeTtsKey === `identified-${idx}` && isTtsProcessing}
+            />
           ))}
         </>
-      )}
-      {identifiedMedicines.length === 0 && selectedImage === null && (
-        <Card variant="outlined" padding="md">
-          <Text
-            style={[
-              typography.caption,
-              {
-                color: colors.textSecondary,
-                textAlign: 'center',
-              },
-            ]}
-          >
-            No medicines identified yet. Start by capturing or selecting an
-            image.
-          </Text>
-        </Card>
       )}
     </ScrollView>
   );

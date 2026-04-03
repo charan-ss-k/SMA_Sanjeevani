@@ -133,12 +133,14 @@ class HealthDataService {
    */
   static async syncHealthData(healthData) {
     try {
-      const response = await apiClient.post('/api/health/sync', {
+      // No matching /api/health/sync route in current backend.
+      // Return a soft result so UI does not fail with 404.
+      return {
+        success: false,
+        reason: 'health-sync-endpoint-not-available',
+        timestamp: new Date().toISOString(),
         data: healthData,
-        timestamp: new Date(),
-      });
-
-      return response.data;
+      };
     } catch (error) {
       console.error('Failed to sync health data:', error);
       throw error;

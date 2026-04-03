@@ -8,7 +8,7 @@
  * - View upcoming appointments/reminders
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -30,6 +31,7 @@ import { Button, Card, Loading } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL, API_ROOT_URL } from '../../config/environment';
+import { useFocusEffect } from '@react-navigation/native';
 
 const ConsultDoctorScreen = ({ navigation }) => {
   // Get authenticated user data
@@ -182,9 +184,9 @@ const ConsultDoctorScreen = ({ navigation }) => {
       }
       
       setNotificationEnabledAppointments(enabledAppointments);
-      console.log('✅ Loaded notification states:', enabledAppointments.size);
+      console.log('Loaded notification states:', enabledAppointments.size);
     } catch (error) {
-      console.error('❌ Error loading notification states:', error);
+      console.error('Error loading notification states:', error);
     }
   };
 
@@ -199,34 +201,34 @@ const ConsultDoctorScreen = ({ navigation }) => {
       }
       
       if (finalStatus !== 'granted') {
-        console.warn('❌ Notification permissions not granted');
+        console.warn('Notification permissions not granted');
       } else {
-        console.log('✅ Notification permissions granted');
+        console.log('Notification permissions granted');
       }
     } catch (error) {
-      console.error('❌ Error requesting notification permissions:', error);
+      console.error('Error requesting notification permissions:', error);
     }
   };
 
   const loadSearchOptions = async () => {
     try {
       const apiBase = API_ROOT_URL;
-      console.log('📍 Fetching search options from:', `${apiBase}/api/appointments/search/options`);
+      console.log('Fetching search options from:', `${apiBase}/api/appointments/search/options`);
       const response = await fetch(`${apiBase}/api/appointments/search/options`);
       
-      console.log('📊 Response status:', response.status);
+      console.log('Response status:', response.status);
       if (!response.ok) {
         throw new Error(`Failed to load search options: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('✅ Search options loaded:', data);
+      console.log('Search options loaded:', data);
       if (data.success) {
         setSearchOptions(data.options);
-        console.log('✅ Search options set in state:', data.options);
+        console.log('Search options set in state:', data.options);
       }
     } catch (err) {
-      console.error('❌ Error loading search options:', err);
+      console.error('Error loading search options:', err);
       setError('Failed to load doctor information');
     }
   };
@@ -237,7 +239,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       const baseURL = API_BASE_URL;
       
       // Fetch all appointments (history)
-      const allResponse = await fetch(`${baseURL}/my-appointments`, {
+      const allResponse = await fetch(`${baseURL}/appointments/my-appointments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -246,13 +248,13 @@ const ConsultDoctorScreen = ({ navigation }) => {
       
       const allData = await allResponse.json();
       if (allData.success && allData.appointments) {
-        console.log(`📜 Received ${allData.appointments.length} appointments from backend`);
+        console.log(`Received ${allData.appointments.length} appointments from backend`);
         setAppointmentHistory(allData.appointments);
         await AsyncStorage.setItem('appointmentHistory', JSON.stringify(allData.appointments));
       }
 
       // Fetch upcoming appointments
-      const upcomingResponse = await fetch(`${baseURL}/upcoming-appointments`, {
+      const upcomingResponse = await fetch(`${baseURL}/appointments/upcoming-appointments`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -261,7 +263,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       
       const upcomingData = await upcomingResponse.json();
       if (upcomingData.success && upcomingData.appointments) {
-        console.log(`✅ Received ${upcomingData.appointments.length} upcoming appointments from backend`);
+        console.log(`Received ${upcomingData.appointments.length} upcoming appointments from backend`);
         setUpcomingAppointments(upcomingData.appointments);
         await AsyncStorage.setItem('upcomingAppointments', JSON.stringify(upcomingData.appointments));
       }
@@ -275,30 +277,30 @@ const ConsultDoctorScreen = ({ navigation }) => {
         if (savedHistory) {
           const history = JSON.parse(savedHistory);
           setAppointmentHistory(history);
-          console.log('📦 Loaded appointment history from cache');
+          console.log('Loaded appointment history from cache');
           hasCache = true;
         }
         
         if (savedUpcoming) {
           const upcoming = JSON.parse(savedUpcoming);
           setUpcomingAppointments(upcoming);
-          console.log('📦 Loaded upcoming appointments from cache');
+          console.log('Loaded upcoming appointments from cache');
           hasCache = true;
         }
       } catch (storageErr) {
-        console.error('❌ Error loading from storage:', storageErr);
+        console.error('Error loading from storage:', storageErr);
       }
       
       // Set appropriate message and logging based on whether we have cached data
       if (hasCache) {
         // If we have cached data, show a less alarming message
-        console.log('ℹ️ Using cached data - backend temporarily unavailable');
+        console.log('Using cached data - backend temporarily unavailable');
         setError(''); // Clear any previous errors since we have data
       } else {
         // Only show error if no cached data is available
-        console.error('❌ Error loading appointments:', err);
+        console.error('Error loading appointments:', err);
         if (err.message && err.message.includes('Network request failed')) {
-          setError('⚠️ Cannot connect to backend server\n\nPlease check if the server is running and try again.');
+          setError('Cannot connect to backend server\n\nPlease check if the server is running and try again.');
         } else {
           setError('Failed to load appointments: ' + (err.message || 'Unknown error'));
         }
@@ -319,13 +321,13 @@ const ConsultDoctorScreen = ({ navigation }) => {
       });
 
       const data = await response.json();
-      console.log('📋 Upcoming appointments response:', data);
+      console.log('Upcoming appointments response:', data);
 
       if (data.success) {
         setUpcomingAppointments(data.appointments || []);
         setError(''); // Clear any previous errors
       } else {
-        console.warn('⚠️ Failed to load upcoming appointments:', data.message);
+        console.warn('Failed to load upcoming appointments:', data.message);
         setUpcomingAppointments([]);
       }
     } catch (error) {
@@ -336,20 +338,20 @@ const ConsultDoctorScreen = ({ navigation }) => {
         if (savedUpcoming) {
           const upcoming = JSON.parse(savedUpcoming);
           setUpcomingAppointments(upcoming);
-          console.log('📦 Loaded upcoming appointments from cache');
+          console.log('Loaded upcoming appointments from cache');
           hasCache = true;
           setError(''); // Don't show error if we have cached data
         } else {
           setUpcomingAppointments([]);
         }
       } catch (cacheError) {
-        console.error('❌ Error loading cached data:', cacheError);
+        console.error('Error loading cached data:', cacheError);
         setUpcomingAppointments([]);
       }
       
       // Only log error if no cached data available
       if (!hasCache) {
-        console.error('❌ Error loading upcoming appointments:', error);
+        console.error('Error loading upcoming appointments:', error);
       }
     } finally {
       setLoading(false);
@@ -369,7 +371,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       });
 
       const data = await response.json();
-      console.log('📋 Appointment history response:', data);
+      console.log('Appointment history response:', data);
 
       if (data.success) {
         // Filter for past appointments only (appointments that have already passed)
@@ -377,15 +379,15 @@ const ConsultDoctorScreen = ({ navigation }) => {
         const pastAppointments = (data.appointments || []).filter(appointment => {
           const appointmentDate = new Date(appointment.appointment_date);
           const isPast = appointmentDate <= now;
-          console.log(`🔍 Appointment ${appointment.id}: ${appointmentDate.toISOString()} <= ${now.toISOString()} = ${isPast}`);
+          console.log(`Appointment ${appointment.id}: ${appointmentDate.toISOString()} <= ${now.toISOString()} = ${isPast}`);
           return isPast;
         });
         
-        console.log(`📊 Filtered ${pastAppointments.length} past appointments from ${data.appointments?.length || 0} total`);
+        console.log(`Filtered ${pastAppointments.length} past appointments from ${data.appointments?.length || 0} total`);
         setAppointmentHistory(pastAppointments);
         setError(''); // Clear any previous errors
       } else {
-        console.warn('⚠️ Failed to load appointment history:', data.message);
+        console.warn('Failed to load appointment history:', data.message);
         setAppointmentHistory([]);
       }
     } catch (error) {
@@ -402,25 +404,50 @@ const ConsultDoctorScreen = ({ navigation }) => {
             return appointmentDate <= now;
           });
           setAppointmentHistory(pastHistory);
-          console.log('📦 Loaded appointment history from cache');
+          console.log('Loaded appointment history from cache');
           hasCache = true;
           setError(''); // Don't show error if we have cached data
         } else {
           setAppointmentHistory([]);
         }
       } catch (cacheError) {
-        console.error('❌ Error loading cached data:', cacheError);
+        console.error('Error loading cached data:', cacheError);
         setAppointmentHistory([]);
       }
       
       // Only log error if no cached data available
       if (!hasCache) {
-        console.error('❌ Error loading appointment history:', error);
+        console.error('Error loading appointment history:', error);
       }
     } finally {
       setLoading(false);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      const refreshOnFocus = async () => {
+        setError('');
+        await loadNotificationStates();
+
+        if (activeTab === 'history') {
+          await loadAppointmentHistory();
+          return;
+        }
+
+        if (activeTab === 'reminders') {
+          await loadUpcomingAppointments();
+          return;
+        }
+
+        await loadAppointments();
+      };
+
+      refreshOnFocus();
+
+      return () => {};
+    }, [activeTab])
+  );
 
   const handleSearchChange = (name, value) => {
     setSearchForm((prev) => ({ ...prev, [name]: value }));
@@ -497,7 +524,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const formattedDate = `${year}-${month}-${day}`; // YYYY-MM-DD in local timezone
-      console.log(`📅 Date selected (local): ${formattedDate}`);
+      console.log(`Date selected (local): ${formattedDate}`);
       handleBookingChange('appointment_date', formattedDate);
     }
   };
@@ -553,7 +580,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
         notes: bookingForm.notes || null,
       };
 
-      console.log('📤 Sending appointment booking (Local IST):', payload);
+      console.log('Sending appointment booking (Local IST):', payload);
 
       const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/appointments/book`, {
@@ -566,10 +593,10 @@ const ConsultDoctorScreen = ({ navigation }) => {
       });
       
       const data = await response.json();
-      console.log('📋 Booking response:', data);
+      console.log('Booking response:', data);
 
       if (data.success) {
-        setMessage(`✅ Appointment booked successfully! ID: ${data.appointment_id}`);
+        setMessage(`Appointment booked successfully! ID: ${data.appointment_id}`);
 
         // Save to history
         await saveAppointmentToHistory({
@@ -617,9 +644,9 @@ const ConsultDoctorScreen = ({ navigation }) => {
       const history = saved ? JSON.parse(saved) : [];
       history.push(appointment);
       await AsyncStorage.setItem('appointmentHistory', JSON.stringify(history));
-      console.log('✅ Appointment saved to history');
+      console.log('Appointment saved to history');
     } catch (err) {
-      console.error('❌ Error saving to history:', err);
+      console.error('Error saving to history:', err);
     }
   };
 
@@ -646,12 +673,12 @@ const ConsultDoctorScreen = ({ navigation }) => {
               
               const data = await response.json();
               if (response.success) {
-                setMessage(`✅ ${response.message}`);
+                setMessage(`${response.message}`);
                 await loadAppointments();
                 setTimeout(() => setMessage(''), 2000);
               }
             } catch (error) {
-              console.error('❌ Error cancelling appointment:', error);
+              console.error('Error cancelling appointment:', error);
               setError(`Failed to cancel: ${error.message}`);
             } finally {
               setLoading(false);
@@ -696,7 +723,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const formattedDate = `${year}-${month}-${day}`;
-      console.log(`📅 Edit date selected (local): ${formattedDate}`);
+      console.log(`Edit date selected (local): ${formattedDate}`);
       setEditForm(prev => ({ ...prev, appointment_date: formattedDate }));
     }
   };
@@ -728,7 +755,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
         notes: editForm.notes || null,
       };
 
-      console.log('📤 Updating appointment (Local IST):', payload);
+      console.log('Updating appointment (Local IST):', payload);
 
       const token = await AsyncStorage.getItem('authToken');
       await fetch(`${API_BASE_URL}/appointments/appointment/${editingAppointment.id}`, {
@@ -757,7 +784,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       const appointmentDate = new Date(appointment.appointment_date);
       const isNotificationEnabled = notificationEnabledAppointments.has(appointment.id);
       
-      console.log('🔔 Toggling notification for:', appointmentDate.toISOString());
+      console.log('Toggling notification for:', appointmentDate.toISOString());
 
       // Check if appointment is in the future
       if (appointmentDate <= new Date()) {
@@ -771,7 +798,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
         const newSet = new Set(notificationEnabledAppointments);
         newSet.delete(appointment.id);
         setNotificationEnabledAppointments(newSet);
-        Alert.alert('🔕 Notification Disabled', 'Appointment reminder has been turned off.');
+        Alert.alert('Notification Disabled', 'Appointment reminder has been turned off.');
       } else {
         // Enable notification (30 seconds before)
         await setReminder(appointment, appointmentDate, 0.5, '30 seconds'); // 0.5 minutes = 30 seconds
@@ -780,7 +807,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
         setNotificationEnabledAppointments(newSet);
       }
     } catch (error) {
-      console.error('❌ Error in toggleNotification:', error);
+      console.error('Error in toggleNotification:', error);
       Alert.alert('Error', 'Failed to set reminder. Please try again.');
     }
   };
@@ -792,10 +819,10 @@ const ConsultDoctorScreen = ({ navigation }) => {
         const notificationData = JSON.parse(storedNotification);
         await Notifications.cancelScheduledNotificationAsync(notificationData.notificationId);
         await AsyncStorage.removeItem(`notification_${appointmentId}`);
-        console.log('✅ Notification cancelled for appointment:', appointmentId);
+        console.log('Notification cancelled for appointment:', appointmentId);
       }
     } catch (error) {
-      console.error('❌ Error cancelling notification:', error);
+      console.error('Error cancelling notification:', error);
     }
   };
 
@@ -815,7 +842,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
 
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🏥 Appointment Reminder',
+          title: 'Appointment Reminder',
           body: `Your appointment with Dr. ${appointment.doctor_name} is in ${displayText} at ${appointment.appointment_time}`,
           data: { appointmentId: appointment.id },
           sound: true,
@@ -836,14 +863,14 @@ const ConsultDoctorScreen = ({ navigation }) => {
       );
 
       Alert.alert(
-        '🔔 Notification Enabled!',
+        'Notification Enabled',
         `You will receive a notification ${displayText} before your appointment.`,
         [{ text: 'OK' }]
       );
 
-      console.log('✅ Notification scheduled:', notificationId);
+      console.log('Notification scheduled:', notificationId);
     } catch (error) {
-      console.error('❌ Error scheduling notification:', error);
+      console.error('Error scheduling notification:', error);
       Alert.alert('Error', 'Failed to set reminder. Please check notification permissions.');
     }
   };
@@ -889,7 +916,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           minHeight: 54,
         }}
       >
-        <Text style={{ fontSize: 14, marginBottom: 2 }}>📅</Text>
+        <MaterialCommunityIcons name="calendar-month-outline" size={14} color={activeTab === 'book' ? '#059669' : '#6B7280'} style={{ marginBottom: 2 }} />
         <Text style={{
           fontSize: 11,
           fontWeight: '700',
@@ -922,7 +949,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           minHeight: 54,
         }}
       >
-        <Text style={{ fontSize: 14, marginBottom: 2 }}>📋</Text>
+        <MaterialCommunityIcons name="clipboard-text-outline" size={14} color={activeTab === 'history' ? '#059669' : '#6B7280'} style={{ marginBottom: 2 }} />
         <Text style={{
           fontSize: 11,
           fontWeight: '700',
@@ -955,7 +982,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           minHeight: 54,
         }}
       >
-        <Text style={{ fontSize: 14, marginBottom: 2 }}>⏰</Text>
+        <MaterialCommunityIcons name="clock-outline" size={14} color={activeTab === 'reminders' ? '#059669' : '#6B7280'} style={{ marginBottom: 2 }} />
         <Text style={{
           fontSize: 11,
           fontWeight: '700',
@@ -991,7 +1018,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           justifyContent: 'center',
           marginRight: spacing.sm,
         }}>
-          <Text style={{ fontSize: 22 }}>🔍</Text>
+          <MaterialCommunityIcons name="magnify" size={22} color="#059669" />
         </View>
         <View>
           <Text style={{ fontSize: 18, fontWeight: '700', color: '#1F2937' }}>
@@ -1004,7 +1031,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       </View>
 
       <SearchableDropdown
-        label="🗺️ State"
+        label="State"
         items={searchOptions.states}
         selectedValue={searchForm.state}
         onValueChange={(value) => handleSearchChange('state', value)}
@@ -1012,7 +1039,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       />
 
       <SearchableDropdown
-        label="🏙️ City"
+        label="City"
         items={searchOptions.cities}
         selectedValue={searchForm.city}
         onValueChange={(value) => handleSearchChange('city', value)}
@@ -1020,7 +1047,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       />
 
       <SearchableDropdown
-        label="📍 Locality"
+        label="Locality"
         items={searchOptions.localities}
         selectedValue={searchForm.locality}
         onValueChange={(value) => handleSearchChange('locality', value)}
@@ -1028,7 +1055,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       />
 
       <SearchableDropdown
-        label="👨‍⚕️ Specialization"
+        label="Specialization"
         items={searchOptions.specializations}
         selectedValue={searchForm.specialization}
         onValueChange={(value) => handleSearchChange('specialization', value)}
@@ -1036,7 +1063,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       />
 
       <SearchableDropdown
-        label="🗣️ Doctor's Native Language"
+        label="Doctor's Native Language"
         items={searchOptions.native_languages}
         selectedValue={searchForm.native_language}
         onValueChange={(value) => handleSearchChange('native_language', value)}
@@ -1044,7 +1071,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
       />
 
       <SearchableDropdown
-        label="💬 Languages Doctor Speaks"
+        label="Languages Doctor Speaks"
         items={searchOptions.languages}
         selectedValue={searchForm.languages_known}
         onValueChange={(value) => handleSearchChange('languages_known', value)}
@@ -1073,7 +1100,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           fontWeight: '700', 
           textAlign: 'center',
         }}>
-          {loading ? `Searching${'.'.repeat((searchAnimationStep % 3) + 1)}` : '🔍 Search Doctors'}
+          {loading ? `Searching${'.'.repeat((searchAnimationStep % 3) + 1)}` : 'Search Doctors'}
         </Text>
       </Pressable>
     </View>
@@ -1107,7 +1134,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
             justifyContent: 'center',
             marginRight: spacing.sm,
           }}>
-            <Text style={{ fontSize: 18 }}>👨‍⚕️</Text>
+            <MaterialCommunityIcons name="doctor" size={18} color="#059669" />
           </View>
           <View>
             <Text style={{ fontSize: 16, fontWeight: '700', color: '#1F2937' }}>
@@ -1260,12 +1287,12 @@ const ConsultDoctorScreen = ({ navigation }) => {
           {/* Doctor Info */}
           <View style={{ marginBottom: spacing.md }}>
             {[
-              { icon: '🏥', label: 'Hospital', value: doctor.hospital },
-              { icon: '📍', label: 'Location', value: `${doctor.locality || ''}, ${doctor.city || ''}` },
-              { icon: '🗺️', label: 'State', value: doctor.state },
-              { icon: '📞', label: 'Phone', value: doctor.phone },
-              { icon: '📧', label: 'Email', value: doctor.email },
-              { icon: '🗣️', label: 'Native', value: doctor.native_language },
+              { iconName: 'hospital-building', label: 'Hospital', value: doctor.hospital },
+              { iconName: 'map-marker-outline', label: 'Location', value: `${doctor.locality || ''}, ${doctor.city || ''}` },
+              { iconName: 'map-outline', label: 'State', value: doctor.state },
+              { iconName: 'phone-outline', label: 'Phone', value: doctor.phone },
+              { iconName: 'email-outline', label: 'Email', value: doctor.email },
+              { iconName: 'account-voice', label: 'Native', value: doctor.native_language },
             ].map((item, i) => (
               <View key={i} style={{ 
                 flexDirection: 'row', 
@@ -1274,7 +1301,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                 borderBottomWidth: i < 5 ? 1 : 0,
                 borderBottomColor: '#F3F4F6',
               }}>
-                <Text style={{ fontSize: 14, width: 24 }}>{item.icon}</Text>
+                <MaterialCommunityIcons name={item.iconName} size={14} color="#6B7280" style={{ width: 24 }} />
                 <Text style={{ fontSize: 13, color: '#6B7280', width: 70 }}>{item.label}</Text>
                 <Text style={{ fontSize: 13, color: '#1F2937', fontWeight: '500', flex: 1 }}>
                   {String(item.value || 'N/A')}
@@ -1290,7 +1317,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
             padding: spacing.sm,
             marginBottom: spacing.md,
           }}>
-            <Text style={{ fontSize: 13, color: '#6B7280', marginBottom: 8 }}>💬 Languages Spoken:</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', marginBottom: 8 }}>Languages Spoken:</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {(doctor.languages_known && Array.isArray(doctor.languages_known) ? doctor.languages_known : []).map((lang, i) => (
                 <View 
@@ -1323,7 +1350,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
             }}
           >
             <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700', textAlign: 'center' }}>
-              📅 Book Appointment
+              Book Appointment
             </Text>
           </Pressable>
         </View>
@@ -1355,7 +1382,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           justifyContent: 'center',
           marginRight: spacing.sm,
         }}>
-          <Text style={{ fontSize: 22 }}>📅</Text>
+          <MaterialCommunityIcons name="calendar-plus" size={22} color="#059669" />
         </View>
         <View>
           <Text style={{ fontSize: 18, fontWeight: '700', color: '#1F2937' }}>
@@ -1381,7 +1408,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           {String(selectedDoctor.specialization || 'General')} at {String(selectedDoctor.hospital || 'Unknown Hospital')}
         </Text>
         <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
-          📍 {String(selectedDoctor.locality || '')}, {String(selectedDoctor.city || '')}
+          {String(selectedDoctor.locality || '')}, {String(selectedDoctor.city || '')}
         </Text>
       </View>
 
@@ -1451,13 +1478,13 @@ const ConsultDoctorScreen = ({ navigation }) => {
         >
           <Text style={styles.dateTimeButtonText}>
             {bookingForm.appointment_date
-              ? `📅 ${new Date(bookingForm.appointment_date).toLocaleDateString('en-US', {
+              ? `${new Date(bookingForm.appointment_date).toLocaleDateString('en-US', {
                   weekday: 'short',
                   year: 'numeric',
                   month: 'short',
                   day: 'numeric',
                 })}`
-              : '📅 Select Date'}
+              : 'Select Date'}
           </Text>
         </Pressable>
         {showDatePicker && (
@@ -1479,8 +1506,8 @@ const ConsultDoctorScreen = ({ navigation }) => {
         >
           <Text style={styles.dateTimeButtonText}>
             {bookingForm.appointment_time
-              ? `⏰ ${bookingForm.appointment_time}`
-              : '⏰ Select Time'}
+              ? `${bookingForm.appointment_time}`
+              : 'Select Time'}
           </Text>
         </Pressable>
         {showTimePicker && (
@@ -1549,7 +1576,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
             justifyContent: 'center',
             marginRight: spacing.sm,
           }}>
-            <Text style={{ fontSize: 22 }}>📋</Text>
+              <MaterialCommunityIcons name="clipboard-text-outline" size={22} color="#B45309" />
           </View>
           <View>
             <Text style={{ fontSize: 18, fontWeight: '700', color: '#1F2937' }}>
@@ -1569,7 +1596,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           padding: spacing.xl,
           alignItems: 'center',
         }}>
-          <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📅</Text>
+          <MaterialCommunityIcons name="calendar-blank-outline" size={48} color="#9CA3AF" style={{ marginBottom: spacing.md }} />
           <Text style={{ fontSize: 16, fontWeight: '600', color: '#6B7280', marginBottom: 4 }}>
             No appointments yet
           </Text>
@@ -1612,7 +1639,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                   paddingVertical: 6,
                   borderRadius: 8,
                 }}>
-                  <Text style={{ fontSize: 12, marginRight: 4 }}>📅</Text>
+                  <MaterialCommunityIcons name="calendar-month-outline" size={12} color="#6B7280" style={{ marginRight: 4 }} />
                   <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{date}</Text>
                 </View>
                 <View style={{ 
@@ -1623,7 +1650,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                   paddingVertical: 6,
                   borderRadius: 8,
                 }}>
-                  <Text style={{ fontSize: 12, marginRight: 4 }}>⏰</Text>
+                  <MaterialCommunityIcons name="clock-outline" size={12} color="#6B7280" style={{ marginRight: 4 }} />
                   <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{time}</Text>
                 </View>
               </View>
@@ -1634,7 +1661,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                   padding: 10,
                   borderRadius: 10,
                 }}>
-                  <Text style={{ fontSize: 13, color: '#92400E' }}>📝 {appointment.notes}</Text>
+                  <Text style={{ fontSize: 13, color: '#92400E' }}>{appointment.notes}</Text>
                 </View>
               )}
             </View>
@@ -1669,7 +1696,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
             justifyContent: 'center',
             marginRight: spacing.sm,
           }}>
-            <Text style={{ fontSize: 22 }}>⏰</Text>
+              <MaterialCommunityIcons name="clock-outline" size={22} color="#2563EB" />
           </View>
           <View>
             <Text style={{ fontSize: 18, fontWeight: '700', color: '#1F2937' }}>
@@ -1689,7 +1716,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           padding: spacing.xl,
           alignItems: 'center',
         }}>
-          <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📅</Text>
+          <MaterialCommunityIcons name="calendar-blank-outline" size={48} color="#9CA3AF" style={{ marginBottom: spacing.md }} />
           <Text style={{ fontSize: 16, fontWeight: '600', color: '#6B7280', marginBottom: 4 }}>
             No upcoming appointments
           </Text>
@@ -1733,7 +1760,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                   paddingVertical: 6,
                   borderRadius: 8,
                 }}>
-                  <Text style={{ fontSize: 12, marginRight: 4 }}>📅</Text>
+                  <MaterialCommunityIcons name="calendar-month-outline" size={12} color="#059669" style={{ marginRight: 4 }} />
                   <Text style={{ fontSize: 13, color: '#059669', fontWeight: '600' }}>{date}</Text>
                 </View>
                 <View style={{ 
@@ -1744,7 +1771,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                   paddingVertical: 6,
                   borderRadius: 8,
                 }}>
-                  <Text style={{ fontSize: 12, marginRight: 4 }}>⏰</Text>
+                  <MaterialCommunityIcons name="clock-outline" size={12} color="#059669" style={{ marginRight: 4 }} />
                   <Text style={{ fontSize: 13, color: '#059669', fontWeight: '600' }}>{time}</Text>
                 </View>
               </View>
@@ -1756,7 +1783,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                   padding: 10,
                   borderRadius: 10,
                 }}>
-                  <Text style={{ fontSize: 13, color: '#92400E' }}>📝 {appointment.notes}</Text>
+                  <Text style={{ fontSize: 13, color: '#92400E' }}>{appointment.notes}</Text>
                 </View>
               )}
 
@@ -1773,9 +1800,11 @@ const ConsultDoctorScreen = ({ navigation }) => {
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ fontSize: 20 }}>
-                    {notificationEnabledAppointments.has(appointment.id) ? '🔔' : '🔕'}
-                  </Text>
+                  <MaterialCommunityIcons
+                    name={notificationEnabledAppointments.has(appointment.id) ? 'bell-ring' : 'bell-off-outline'}
+                    size={20}
+                    color={notificationEnabledAppointments.has(appointment.id) ? '#FFFFFF' : '#6B7280'}
+                  />
                 </Pressable>
                 <Pressable
                   onPress={() => handleEditAppointment(appointment)}
@@ -1787,7 +1816,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#4B5563' }}>✏️ Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#4B5563' }}>Edit</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => cancelAppointment(appointment)}
@@ -1811,7 +1840,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F0FDF4' }}>
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.lg + 92 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.lg + 84 }}>
         {/* Header Card */}
         <View style={{ 
           marginBottom: spacing.lg,
@@ -1836,7 +1865,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
               justifyContent: 'center',
               marginRight: spacing.sm,
             }}>
-              <Text style={{ fontSize: 24 }}>🏥</Text>
+              <MaterialCommunityIcons name="hospital-building" size={24} color="#166534" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ 
@@ -1881,7 +1910,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
             borderRadius: 12,
             marginBottom: spacing.lg,
           }}>
-            <Text style={{ color: '#991B1B', fontWeight: '500', fontSize: 14 }}>⚠️ {String(error || '')}</Text>
+            <Text style={{ color: '#991B1B', fontWeight: '500', fontSize: 14 }}>{String(error || '')}</Text>
           </View>
         )}
 
@@ -1933,7 +1962,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                   justifyContent: 'center',
                   marginRight: spacing.sm,
                 }}>
-                  <Text style={{ fontSize: 22 }}>✏️</Text>
+                  <MaterialCommunityIcons name="pencil-outline" size={22} color="#2563EB" />
                 </View>
                 <View>
                   <Text style={{ fontSize: 18, fontWeight: '700', color: '#1F2937' }}>
@@ -1978,13 +2007,13 @@ const ConsultDoctorScreen = ({ navigation }) => {
                 >
                   <Text style={{ fontSize: 14, color: '#1F2937' }}>
                     {editForm.appointment_date
-                      ? `📅 ${new Date(editForm.appointment_date).toLocaleDateString('en-US', {
+                      ? `${new Date(editForm.appointment_date).toLocaleDateString('en-US', {
                           weekday: 'short',
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',
                         })}`
-                      : '📅 Select Date'}
+                      : 'Select Date'}
                   </Text>
                 </Pressable>
                 {editShowDatePicker && (
@@ -2015,8 +2044,8 @@ const ConsultDoctorScreen = ({ navigation }) => {
                 >
                   <Text style={{ fontSize: 14, color: '#1F2937' }}>
                     {editForm.appointment_time
-                      ? `⏰ ${editForm.appointment_time}`
-                      : '⏰ Select Time'}
+                      ? `${editForm.appointment_time}`
+                      : 'Select Time'}
                   </Text>
                 </Pressable>
                 {editShowTimePicker && (
@@ -2064,7 +2093,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
                   borderRadius: 12,
                   marginBottom: spacing.md,
                 }}>
-                  <Text style={{ color: '#991B1B', fontWeight: '500', fontSize: 14 }}>⚠️ {error}</Text>
+                  <Text style={{ color: '#991B1B', fontWeight: '500', fontSize: 14 }}>{error}</Text>
                 </View>
               )}
 

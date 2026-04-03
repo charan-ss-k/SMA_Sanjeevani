@@ -9,6 +9,7 @@ import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ChatProvider } from './src/context/ChatContext';
 import { HealthProvider } from './src/context/HealthContext';
+import { LanguageProvider } from './src/context/LanguageContext';
 import { AppHeader } from './src/components';
 import ttsService from './src/services/ttsService';
 import { colors } from './src/utils/theme';
@@ -264,13 +265,15 @@ export default function App() {
   return (
     <NavigationContainer>
       <SafeAreaProvider>
-        <AuthProvider>
-          <ChatProvider>
-            <HealthProvider>
-              <RootNavigator />
-            </HealthProvider>
-          </ChatProvider>
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ChatProvider>
+              <HealthProvider>
+                <RootNavigator />
+              </HealthProvider>
+            </ChatProvider>
+          </AuthProvider>
+        </LanguageProvider>
       </SafeAreaProvider>
     </NavigationContainer>
   );

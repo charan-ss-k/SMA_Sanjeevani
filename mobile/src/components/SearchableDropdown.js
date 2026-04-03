@@ -13,6 +13,7 @@ import {
   FlatList,
   StyleSheet,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../utils/theme';
 
 const SearchableDropdown = ({
@@ -78,7 +79,7 @@ const SearchableDropdown = ({
         >
           {selectedValue || placeholder}
         </Text>
-        <Text style={styles.arrow}>▼</Text>
+        <MaterialCommunityIcons name="chevron-down" size={14} color={colors.textSecondary} style={styles.arrow} />
       </Pressable>
       {selectedValue && (
         <Pressable 
@@ -88,7 +89,7 @@ const SearchableDropdown = ({
           ]} 
           onPress={handleClear}
         >
-          <Text style={styles.clearText}>✕</Text>
+          <MaterialCommunityIcons name="close" size={12} color={colors.white} />
         </Pressable>
       )}
       <Modal
@@ -111,11 +112,11 @@ const SearchableDropdown = ({
                 onPress={() => setIsVisible(false)}
                 style={styles.closeButton}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <MaterialCommunityIcons name="close" size={18} color={colors.text} />
               </Pressable>
             </View>
             <View style={styles.searchContainer}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <MaterialCommunityIcons name="magnify" size={16} color={colors.textLight} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 value={searchText}
@@ -132,7 +133,7 @@ const SearchableDropdown = ({
                   }}
                   style={styles.searchClear}
                 >
-                  <Text style={styles.searchClearText}>✕</Text>
+                  <MaterialCommunityIcons name="close" size={12} color={colors.text} />
                 </Pressable>
               )}
             </View>
@@ -156,7 +157,7 @@ const SearchableDropdown = ({
                     {item}
                   </Text>
                   {item === selectedValue && (
-                    <Text style={styles.checkmark}>✓</Text>
+                    <MaterialCommunityIcons name="check" size={18} color={colors.secondary} style={styles.checkmark} />
                   )}
                 </Pressable>
               )}
@@ -207,8 +208,6 @@ const styles = StyleSheet.create({
     color: colors.textLight,
   },
   arrow: {
-    fontSize: 12,
-    color: colors.textSecondary,
     marginLeft: spacing.sm,
   },
   clearButton: {
@@ -279,7 +278,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   searchIcon: {
-    fontSize: 16,
     marginRight: spacing.sm,
   },
   searchInput: {
@@ -326,9 +324,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   checkmark: {
-    fontSize: 18,
-    color: colors.secondary,
-    fontWeight: '700',
+    marginLeft: spacing.sm,
   },
   emptyContainer: {
     paddingVertical: spacing.xl,

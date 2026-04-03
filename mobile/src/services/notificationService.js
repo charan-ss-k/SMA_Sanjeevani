@@ -61,7 +61,9 @@ class NotificationService {
    */
   async registerDeviceToken(token) {
     try {
-      await apiClient.post('/api/notifications/register', { token });
+      // No matching /api/notifications/register route in backend.
+      // Keep token local to prevent noisy 404s.
+      return { success: false, reason: 'notifications-endpoint-not-available', token };
     } catch (error) {
       console.error('Failed to register device token:', error);
     }
@@ -122,7 +124,7 @@ class NotificationService {
       const reminderTime = new Date(time);
       
       await this.scheduleNotification(
-        '💊 Medicine Reminder',
+        'Medicine Reminder',
         `Time to take ${medicine.name} - ${medicine.dosage}`,
         reminderTime,
         {
@@ -148,7 +150,7 @@ class NotificationService {
       );
 
       await this.scheduleNotification(
-        '📅 Appointment Reminder',
+        'Appointment Reminder',
         `Appointment with Dr. ${appointment.doctorName} in ${minutesBefore} minutes`,
         reminderTime,
         {

@@ -345,30 +345,52 @@ class APIClient {
    * Text-to-Speech Endpoints
    * Handles TTS audio generation and streaming
    */
-  async generateTTS(text, language = 'en', voiceId = 'default') {
+  async generateTTS(text, language = 'english', voiceId = 'default') {
     try {
       const headers = await this.buildHeaders();
-      const response = await this.fetchWithTimeout(this.buildUrl('/tts/generate'), {
+      const primaryResponse = await this.fetchWithTimeout(this.buildUrl('/tts'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
           text,
           language,
-          voice_id: voiceId,
+          provider: 'bhashini',
         }),
       });
 
-      if (!response.ok) {
+      if (!primaryResponse.ok) {
         throw new Error('TTS generation failed');
       }
 
-      return await response.json();
+      const primaryData = await primaryResponse.json();
+      if (primaryData?.audio) {
+        return primaryData;
+      }
+
+      if (DEBUG) console.warn('[TTS] Primary /api/tts returned no audio, trying /api/tts/parler fallback');
+
+      const fallbackResponse = await this.fetchWithTimeout(this.buildUrl('/tts/parler'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          text,
+          language,
+          provider: 'bhashini',
+        }),
+      });
+
+      if (!fallbackResponse.ok) {
+        return primaryData;
+      }
+
+      const fallbackData = await fallbackResponse.json();
+      return fallbackData?.audio ? fallbackData : primaryData;
     } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  async streamTTS(text, language = 'en', voiceId = 'default') {
+  async streamTTS(text, language = 'english', voiceId = 'default') {
     try {
       const token = await this.getAuthToken();
       const headers = {
@@ -385,7 +407,7 @@ class APIClient {
         body: JSON.stringify({
           text,
           language,
-          voice_id: voiceId,
+          provider: 'bhashini',
         }),
       });
 
@@ -463,7 +485,34 @@ class APIClient {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || 'Prescription analysis failed');
+          const detail = String(errorData.detail || 'Prescription analysis failed');
+
+          // Mobile-only graceful fallback: if OCR service key is missing,
+          // fall back to medicine identification endpoint so users still get useful output.
+          if (detail.includes('GOOGLE_CLOUD_VISION_API_KEY')) {
+            if (DEBUG) console.warn('[API] Vision OCR not configured, falling back to /medicine-identification/analyze');
+
+            const fallback = await this.identifyMedicineFromImage(imageUri);
+            const medicineName = fallback?.medicine_name || fallback?.name || 'Unknown medicine';
+
+            return {
+              status: 'success',
+              fallback_mode: 'medicine-identification',
+              note: 'Prescription OCR is not configured on backend. Showing medicine-identification result instead.',
+              medicines: [{
+                medicine_name: medicineName,
+                name: medicineName,
+                dosage: fallback?.dosage || 'As prescribed',
+                frequency: fallback?.frequency || 'As prescribed',
+                duration: fallback?.duration || 'As prescribed',
+                confidence: 'medium',
+              }],
+              ocr_text: fallback?.full_information || '',
+              analysis: fallback,
+            };
+          }
+
+          throw new Error(detail);
         }
 
         return await response.json();

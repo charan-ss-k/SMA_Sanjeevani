@@ -12,6 +12,7 @@ import {
   Pressable,
   Dimensions,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../components';
 import { colors, spacing, typography, borderRadius } from '../../utils/theme';
 
@@ -23,26 +24,26 @@ const features = [
     title: 'AI Health Assistant',
     description:
       'Get instant health advice powered by advanced AI models',
-    icon: '🤖',
+    icon: 'robot-outline',
   },
   {
     id: 2,
     title: 'Medicine Identification',
     description: 'Identify medicines by taking a photo with your phone',
-    icon: '💊',
+    icon: 'pill',
   },
   {
     id: 3,
     title: 'Prescription Analysis',
     description: 'Analyze prescriptions and get detailed medicine information',
-    icon: '📋',
+    icon: 'file-document-outline',
   },
   {
     id: 4,
     title: 'Audio Guidance',
     description:
       'Listen to health advice with our text-to-speech feature',
-    icon: '🔊',
+    icon: 'volume-high',
   },
 ];
 
@@ -79,14 +80,19 @@ export default function OnboardingScreen({ navigation }) {
         </Pressable>
       </View>
       <View style={{ alignItems: 'center', marginVertical: spacing.xl }}>
-        <Text
+        <View
           style={{
-            fontSize: 80,
+            width: 108,
+            height: 108,
+            borderRadius: 24,
+            backgroundColor: colors.primary + '12',
+            alignItems: 'center',
+            justifyContent: 'center',
             marginBottom: spacing.lg,
           }}
         >
-          {feature.icon}
-        </Text>
+          <MaterialCommunityIcons name={feature.icon} size={54} color={colors.primary} />
+        </View>
         <Text
           style={[
             typography.h2,

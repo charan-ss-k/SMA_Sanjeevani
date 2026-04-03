@@ -32,6 +32,7 @@
     "expo-linear-gradient": "~12.7.2",
     "expo-notifications": "~0.27.0",
     "expo-secure-store": "^15.0.8",
+    "expo-speech": "~11.7.0",
     "expo-task-manager": "~11.4.0",
     "lodash.debounce": "^4.0.8",
     "moment": "^2.29.4",

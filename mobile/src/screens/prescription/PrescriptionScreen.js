@@ -19,14 +19,18 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Button, Card, Alert } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
 import apiClient from '../../api/client';
+import ttsService from '../../services/ttsService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const FREQUENCY_OPTIONS = [
   { label: 'Select Frequency', value: '' },
@@ -39,7 +43,7 @@ const FREQUENCY_OPTIONS = [
   { label: 'As needed', value: 'As needed' },
 ];
 
-const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
+const MedicineCard = ({ med, onDelete, onEdit, onSpeak, isSpeaking, isProcessing }) => (
   <View style={{ 
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -64,7 +68,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
         alignItems: 'center',
         marginRight: spacing.md,
       }}>
-        <Text style={{ fontSize: 26 }}>💊</Text>
+        <MaterialCommunityIcons name="pill" size={26} color="#1D4ED8" />
       </View>
       
       {/* Medicine Info */}
@@ -88,14 +92,22 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
               style={{ 
                 width: 36, 
                 height: 36, 
-                backgroundColor: '#FEF3C7', 
+                backgroundColor: isSpeaking ? '#FEE2E2' : '#FEF3C7', 
                 borderRadius: 10,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 6,
               }}
             >
-              <Text style={{ fontSize: 16 }}>🔊</Text>
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#92400E" />
+              ) : (
+                <MaterialCommunityIcons
+                  name={isSpeaking ? 'stop-circle-outline' : 'volume-high'}
+                  size={16}
+                  color="#92400E"
+                />
+              )}
             </Pressable>
             <Pressable 
               onPress={onEdit} 
@@ -109,7 +121,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
                 marginRight: 6,
               }}
             >
-              <Text style={{ fontSize: 16 }}>✏️</Text>
+              <MaterialCommunityIcons name="pencil-outline" size={16} color="#2563EB" />
             </Pressable>
             <Pressable 
               onPress={onDelete} 
@@ -122,7 +134,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 16 }}>🗑️</Text>
+              <MaterialCommunityIcons name="delete-outline" size={16} color="#DC2626" />
             </Pressable>
           </View>
         </View>
@@ -139,7 +151,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             marginRight: 8,
             marginBottom: 8,
           }}>
-            <Text style={{ fontSize: 12, marginRight: 4 }}>💉</Text>
+            <MaterialCommunityIcons name="medical-bag" size={12} color="#6B7280" style={{ marginRight: 4 }} />
             <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{String(med.dosage || '-')}</Text>
           </View>
           <View style={{ 
@@ -152,7 +164,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             marginRight: 8,
             marginBottom: 8,
           }}>
-            <Text style={{ fontSize: 12, marginRight: 4 }}>📅</Text>
+            <MaterialCommunityIcons name="calendar-month-outline" size={12} color="#6B7280" style={{ marginRight: 4 }} />
             <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{String(med.frequency || '-')}</Text>
           </View>
           <View style={{ 
@@ -165,7 +177,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             marginRight: 8,
             marginBottom: 8,
           }}>
-            <Text style={{ fontSize: 12, marginRight: 4 }}>⏳</Text>
+            <MaterialCommunityIcons name="timer-outline" size={12} color="#6B7280" style={{ marginRight: 4 }} />
             <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{String(med.duration || '-')}</Text>
           </View>
           <View style={{ 
@@ -178,7 +190,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             marginRight: 8,
             marginBottom: 8,
           }}>
-            <Text style={{ fontSize: 12, marginRight: 4 }}>📦</Text>
+            <MaterialCommunityIcons name="package-variant-closed" size={12} color="#6B7280" style={{ marginRight: 4 }} />
             <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{String(med.quantity || 0)} units</Text>
           </View>
         </View>
@@ -192,7 +204,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             marginBottom: 10,
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={{ fontSize: 14, marginRight: 6 }}>⏰</Text>
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#065F46" style={{ marginRight: 6 }} />
               <Text style={{ 
                 fontSize: 13, 
                 fontWeight: '600', 
@@ -236,7 +248,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             padding: 10,
             borderRadius: 10,
           }}>
-            <Text style={{ fontSize: 14, marginRight: 6 }}>📝</Text>
+            <MaterialCommunityIcons name="note-text-outline" size={14} color="#92400E" style={{ marginRight: 6 }} />
             <Text style={{ 
               fontSize: 13, 
               color: '#92400E', 
@@ -252,7 +264,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
   </View>
 );
 
-const StatCard = ({ title, value, gradient, icon }) => (
+const StatCard = ({ title, value, gradient, iconName }) => (
   <View style={{
     flex: 1,
     backgroundColor: gradient === 'blue' ? '#3B82F6' : '#22C55E',
@@ -286,7 +298,12 @@ const StatCard = ({ title, value, gradient, icon }) => (
     }} />
     
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-      <Text style={{ fontSize: 20, marginRight: 6 }}>{icon || (gradient === 'blue' ? '💊' : '📄')}</Text>
+      <MaterialCommunityIcons
+        name={iconName || (gradient === 'blue' ? 'pill' : 'file-document-outline')}
+        size={20}
+        color="#FFFFFF"
+        style={{ marginRight: 6 }}
+      />
       <Text style={{ 
         fontSize: 12, 
         fontWeight: '600', 
@@ -309,7 +326,12 @@ const StatCard = ({ title, value, gradient, icon }) => (
 );
 
 export default function PrescriptionScreen({ navigation }) {
+  const { language } = useLanguage();
   const { user, isAuthenticated } = useAuth();
+  const [activeMedicineTtsId, setActiveMedicineTtsId] = useState(null);
+  const [isMedicineTtsProcessing, setIsMedicineTtsProcessing] = useState(false);
+  const [activeSectionTtsKey, setActiveSectionTtsKey] = useState(null);
+  const [isSectionTtsProcessing, setIsSectionTtsProcessing] = useState(false);
   
   // Medicines state (local)
   const [medicines, setMedicines] = useState([]);
@@ -341,6 +363,7 @@ export default function PrescriptionScreen({ navigation }) {
   const [reportAnalyzing, setReportAnalyzing] = useState(false);
   const [reportAnalysisResult, setReportAnalysisResult] = useState(null);
   const [reportAnalysisError, setReportAnalysisError] = useState('');
+  const reportAnalysisCancelledRef = useRef(false);
   const [savingReport, setSavingReport] = useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = useState(null);
   
@@ -380,6 +403,86 @@ export default function PrescriptionScreen({ navigation }) {
     saveMedicines();
   }, [medicines]);
 
+  useEffect(() => {
+    return () => {
+      ttsService.stop();
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        ttsService.stop();
+        setActiveMedicineTtsId(null);
+        setIsMedicineTtsProcessing(false);
+        setActiveSectionTtsKey(null);
+        setIsSectionTtsProcessing(false);
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    if (activeMedicineTtsId || isMedicineTtsProcessing) {
+      ttsService.stop();
+      setActiveMedicineTtsId(null);
+      setIsMedicineTtsProcessing(false);
+      setActiveSectionTtsKey(null);
+      setIsSectionTtsProcessing(false);
+    }
+  }, [formData.name, formData.dosage, formData.frequency, formData.duration, formData.quantity, formData.notes]);
+
+  const resetImageAnalysisState = useCallback(() => {
+    analysisCancelledRef.current = true;
+    ttsService.stop();
+    setActiveMedicineTtsId(null);
+    setIsMedicineTtsProcessing(false);
+    setActiveSectionTtsKey(null);
+    setIsSectionTtsProcessing(false);
+    setAnalyzing(false);
+    setImageUri(null);
+    setAnalysisResult(null);
+    setAnalysisError('');
+  }, []);
+
+  const resetReportAnalysisState = useCallback(() => {
+    reportAnalysisCancelledRef.current = true;
+    ttsService.stop();
+    setActiveMedicineTtsId(null);
+    setIsMedicineTtsProcessing(false);
+    setActiveSectionTtsKey(null);
+    setIsSectionTtsProcessing(false);
+    setReportAnalyzing(false);
+    setReportImageUri(null);
+    setReportAnalysisResult(null);
+    setReportAnalysisError('');
+  }, []);
+
+  const handleTabChange = useCallback((nextTab) => {
+    if (nextTab === activeTab) return;
+
+    if (activeTab === 'analyze') {
+      resetImageAnalysisState();
+    }
+
+    if (activeTab === 'report') {
+      resetReportAnalysisState();
+    }
+
+    ttsService.stop();
+    setActiveMedicineTtsId(null);
+    setIsMedicineTtsProcessing(false);
+    setActiveSectionTtsKey(null);
+    setIsSectionTtsProcessing(false);
+    setActiveTab(nextTab);
+  }, [activeTab, resetImageAnalysisState, resetReportAnalysisState]);
+
+  const handleIdentifyModeChange = useCallback((nextMode) => {
+    if (nextMode === identifyMode) return;
+
+    resetImageAnalysisState();
+    setIdentifyMode(nextMode);
+  }, [identifyMode, resetImageAnalysisState]);
+
   // Configure how notifications are displayed
   const configureNotifications = () => {
     Notifications.setNotificationHandler({
@@ -403,12 +506,12 @@ export default function PrescriptionScreen({ navigation }) {
       }
       
       if (finalStatus !== 'granted') {
-        console.warn('❌ Notification permissions not granted');
+        console.warn('Notification permissions not granted');
       } else {
-        console.log('✅ Notification permissions granted');
+        console.log('Notification permissions granted');
       }
     } catch (error) {
-      console.error('❌ Error requesting notification permissions:', error);
+      console.error('Error requesting notification permissions:', error);
     }
   };
 
@@ -420,7 +523,7 @@ export default function PrescriptionScreen({ navigation }) {
       // Schedule daily recurring notification
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: '💊 Medicine Reminder',
+          title: 'Medicine Reminder',
           body: `Time to take ${medicineName} - ${dosage}`,
           data: { medicineId, time: timeString },
           sound: true,
@@ -444,10 +547,10 @@ export default function PrescriptionScreen({ navigation }) {
         })
       );
 
-      console.log('✅ Medicine reminder scheduled:', notificationId, 'for', timeString);
+      console.log('Medicine reminder scheduled:', notificationId, 'for', timeString);
       return notificationId;
     } catch (error) {
-      console.error('❌ Error scheduling medicine reminder:', error);
+      console.error('Error scheduling medicine reminder:', error);
       throw error;
     }
   };
@@ -462,10 +565,10 @@ export default function PrescriptionScreen({ navigation }) {
         const { notificationId } = JSON.parse(stored);
         await Notifications.cancelScheduledNotificationAsync(notificationId);
         await AsyncStorage.removeItem(key);
-        console.log('✅ Cancelled reminder:', notificationId);
+        console.log('Cancelled reminder:', notificationId);
       }
     } catch (error) {
-      console.error('❌ Error cancelling reminder:', error);
+      console.error('Error cancelling reminder:', error);
     }
   };
 
@@ -591,7 +694,7 @@ export default function PrescriptionScreen({ navigation }) {
       
       if (scheduledCount > 0) {
         RNAlert.alert(
-          '🔔 Reminders Set!',
+          'Reminders Set',
           `${scheduledCount} daily reminder(s) scheduled for ${formData.name}. You will be notified at the specified times.`,
           [{ text: 'OK' }]
         );
@@ -655,10 +758,83 @@ export default function PrescriptionScreen({ navigation }) {
     );
   };
 
-  const handleSpeakMedicine = (med) => {
-    // TTS functionality - can integrate with expo-speech
+  const handleSpeakMedicine = async (med) => {
+    if (activeMedicineTtsId === med.id) {
+      await ttsService.stop();
+      setActiveMedicineTtsId(null);
+      setIsMedicineTtsProcessing(false);
+      return;
+    }
+
     const text = `${med.name}. Dosage: ${med.dosage}. Frequency: ${med.frequency}. ${med.notes || ''}`;
-    RNAlert.alert('Medicine Info', text);
+    try {
+      setActiveMedicineTtsId(med.id);
+      setIsMedicineTtsProcessing(true);
+      await ttsService.synthesizeAndPlay(text, language);
+    } catch (_) {
+      RNAlert.alert('Medicine Info', text);
+    } finally {
+      setActiveMedicineTtsId(null);
+      setIsMedicineTtsProcessing(false);
+    }
+  };
+
+  const handleSpeakSection = async (key, text) => {
+    const normalizedKey = String(key);
+    const safeText = String(text || '').trim();
+    if (!safeText) return;
+
+    if (activeSectionTtsKey === normalizedKey) {
+      await ttsService.stop();
+      setActiveSectionTtsKey(null);
+      setIsSectionTtsProcessing(false);
+      return;
+    }
+
+    try {
+      setActiveSectionTtsKey(normalizedKey);
+      setIsSectionTtsProcessing(true);
+      await ttsService.synthesizeAndPlay(safeText, language);
+    } catch (_) {
+      // non-fatal
+    } finally {
+      setActiveSectionTtsKey(null);
+      setIsSectionTtsProcessing(false);
+    }
+  };
+
+  const renderTtsActionChip = (key, text) => {
+    const isSpeaking = activeSectionTtsKey === String(key);
+    const isProcessing = isSpeaking && isSectionTtsProcessing;
+
+    return (
+      <Pressable
+        onPress={() => handleSpeakSection(key, text)}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: isSpeaking ? '#FCA5A5' : '#BAE6FD',
+          backgroundColor: isSpeaking ? '#FEE2E2' : '#E0F2FE',
+        }}
+      >
+        {isProcessing ? (
+          <ActivityIndicator size="small" color="#0369A1" />
+        ) : (
+          <MaterialCommunityIcons
+            name={isSpeaking ? 'stop-circle-outline' : 'volume-high'}
+            size={14}
+            color="#0369A1"
+          />
+        )}
+        <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: '700', color: '#0F172A' }}>
+          {isProcessing ? 'Processing...' : isSpeaking ? 'Stop' : 'Speak'}
+        </Text>
+      </Pressable>
+    );
   };
 
   // Handle time picker change
@@ -748,6 +924,7 @@ export default function PrescriptionScreen({ navigation }) {
     try {
       if (identifyMode === 'medicine') {
         const result = await apiClient.identifyMedicineFromImage(imageUri);
+        if (analysisCancelledRef.current) return;
         const hasMedicineData = Boolean(result?.medicine_name || result?.name || result?.dosage || result?.full_information);
         if (hasMedicineData) {
           setAnalysisResult(result);
@@ -756,6 +933,7 @@ export default function PrescriptionScreen({ navigation }) {
         }
       } else {
         const result = await apiClient.analyzePrescriptionImage(imageUri);
+        if (analysisCancelledRef.current) return;
         const hasMedicines = Array.isArray(result?.medicines) && result.medicines.length > 0;
 
         if (result?.status === 'success' || hasMedicines) {
@@ -774,6 +952,11 @@ export default function PrescriptionScreen({ navigation }) {
 
   const handleCancelAnalysis = () => {
     analysisCancelledRef.current = true;
+    ttsService.stop();
+    setActiveMedicineTtsId(null);
+    setIsMedicineTtsProcessing(false);
+    setActiveSectionTtsKey(null);
+    setIsSectionTtsProcessing(false);
     setAnalyzing(false);
     setAnalysisError('Analysis cancelled');
   };
@@ -863,6 +1046,7 @@ export default function PrescriptionScreen({ navigation }) {
     setReportAnalyzing(true);
     setReportAnalysisError('');
     setReportAnalysisResult(null);
+    reportAnalysisCancelledRef.current = false;
 
     try {
       const formData = new FormData();
@@ -875,6 +1059,7 @@ export default function PrescriptionScreen({ navigation }) {
       const result = await apiClient.uploadFile('/api/hospital-reports/analyze', formData, {
       });
 
+      if (reportAnalysisCancelledRef.current) return;
       if (result?.structured_data) {
         setReportAnalysisResult(result);
         setSelectedReport(null);
@@ -1008,7 +1193,7 @@ export default function PrescriptionScreen({ navigation }) {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: '#F0FDF4' }}
-      contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.lg + 92 }}
+      contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.lg + 84 }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -1037,7 +1222,7 @@ export default function PrescriptionScreen({ navigation }) {
             justifyContent: 'center',
             marginRight: spacing.sm,
           }}>
-            <Text style={{ fontSize: 24 }}>💊</Text>
+                  <MaterialCommunityIcons name="history" size={18} color="#4338CA" />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ 
@@ -1075,10 +1260,10 @@ export default function PrescriptionScreen({ navigation }) {
         marginBottom: spacing.xl,
       }}>
         <View style={{ flex: 1, marginRight: spacing.sm }}>
-          <StatCard title="Medicines" value={stats.totalMedicines} gradient="blue" icon="💊" />
+          <StatCard title="Medicines" value={stats.totalMedicines} gradient="blue" iconName="pill" />
         </View>
         <View style={{ flex: 1, marginLeft: spacing.sm }}>
-          <StatCard title="Reports" value={stats.totalPrescriptions} gradient="green" icon="📄" />
+          <StatCard title="Reports" value={stats.totalPrescriptions} gradient="green" iconName="file-document-outline" />
         </View>
       </View>
 
@@ -1098,7 +1283,7 @@ export default function PrescriptionScreen({ navigation }) {
         elevation: 2,
       }}>
         <Pressable
-          onPress={() => setActiveTab('medicines')}
+          onPress={() => handleTabChange('medicines')}
           style={{
             flex: 1,
             flexDirection: 'column',
@@ -1116,7 +1301,12 @@ export default function PrescriptionScreen({ navigation }) {
             minHeight: 58,
           }}
         >
-          <Text style={{ fontSize: 16, marginBottom: 2 }}>💊</Text>
+          <MaterialCommunityIcons
+            name="pill"
+            size={18}
+            color={activeTab === 'medicines' ? '#1F2937' : '#6B7280'}
+            style={{ marginBottom: 2 }}
+          />
           <Text style={{
             fontSize: 12,
             fontWeight: '700',
@@ -1128,7 +1318,7 @@ export default function PrescriptionScreen({ navigation }) {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => setActiveTab('analyze')}
+          onPress={() => handleTabChange('analyze')}
           style={{
             flex: 1,
             flexDirection: 'column',
@@ -1146,7 +1336,12 @@ export default function PrescriptionScreen({ navigation }) {
             minHeight: 58,
           }}
         >
-          <Text style={{ fontSize: 16, marginBottom: 2 }}>🔬</Text>
+          <MaterialCommunityIcons
+            name="flask-outline"
+            size={18}
+            color={activeTab === 'analyze' ? '#1F2937' : '#6B7280'}
+            style={{ marginBottom: 2 }}
+          />
           <Text style={{
             fontSize: 12,
             fontWeight: '700',
@@ -1158,7 +1353,7 @@ export default function PrescriptionScreen({ navigation }) {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => setActiveTab('report')}
+          onPress={() => handleTabChange('report')}
           style={{
             flex: 1,
             flexDirection: 'column',
@@ -1176,7 +1371,12 @@ export default function PrescriptionScreen({ navigation }) {
             minHeight: 58,
           }}
         >
-          <Text style={{ fontSize: 16, marginBottom: 2 }}>📄</Text>
+          <MaterialCommunityIcons
+            name="file-document-outline"
+            size={18}
+            color={activeTab === 'report' ? '#1F2937' : '#6B7280'}
+            style={{ marginBottom: 2 }}
+          />
           <Text style={{
             fontSize: 12,
             fontWeight: '700',
@@ -1209,20 +1409,24 @@ export default function PrescriptionScreen({ navigation }) {
               justifyContent: 'center',
               marginRight: spacing.sm,
             }}>
-              <Text style={{ fontSize: 22 }}>🔬</Text>
+              <MaterialCommunityIcons name="flask-outline" size={22} color="#4338CA" />
             </View>
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ 
                 fontSize: 18, 
                 fontWeight: '700', 
                 color: '#1F2937',
-              }}>
+                flexShrink: 1,
+                lineHeight: 24,
+              }} numberOfLines={2}>
                 {identifyMode === 'medicine' ? 'AI Medicine Identification' : 'Handwritten Prescription Analysis'}
               </Text>
               <Text style={{ 
                 fontSize: 13, 
                 color: '#6B7280',
-              }}>
+                flexShrink: 1,
+                lineHeight: 18,
+              }} numberOfLines={2}>
                 {identifyMode === 'medicine' ? 'Scan to identify medicines' : 'Analyze handwritten prescriptions'}
               </Text>
             </View>
@@ -1237,11 +1441,7 @@ export default function PrescriptionScreen({ navigation }) {
             padding: 4,
           }}>
             <Pressable
-              onPress={() => {
-                setIdentifyMode('medicine');
-                setAnalysisResult(null);
-                setAnalysisError('');
-              }}
+              onPress={() => handleIdentifyModeChange('medicine')}
               style={{
                 flex: 1,
                 alignItems: 'center',
@@ -1260,11 +1460,7 @@ export default function PrescriptionScreen({ navigation }) {
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => {
-                setIdentifyMode('prescription');
-                setAnalysisResult(null);
-                setAnalysisError('');
-              }}
+              onPress={() => handleIdentifyModeChange('prescription')}
               style={{
                 flex: 1,
                 alignItems: 'center',
@@ -1296,15 +1492,15 @@ export default function PrescriptionScreen({ navigation }) {
           }}>
             {!imageUri ? (
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📸</Text>
+                <MaterialCommunityIcons name="image-plus" size={42} color="#2563EB" style={{ marginBottom: spacing.md }} />
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <Button
-                    title="📷 Camera"
+                    title="Camera"
                     onPress={takePhoto}
                     variant="primary"
                   />
                   <Button
-                    title="🖼️ Gallery"
+                    title="Gallery"
                     onPress={pickImage}
                     variant="secondary"
                   />
@@ -1345,7 +1541,7 @@ export default function PrescriptionScreen({ navigation }) {
           {/* Analyze Button */}
           {imageUri && !analyzing && !analysisResult && (
             <Button
-              title={identifyMode === 'medicine' ? '🔍 Identify Medicine' : '🔍 Analyze Prescription'}
+              title={identifyMode === 'medicine' ? 'Identify Medicine' : 'Analyze Prescription'}
               onPress={handleAnalyze}
               variant="primary"
               fullWidth
@@ -1359,7 +1555,7 @@ export default function PrescriptionScreen({ navigation }) {
               <ActivityIndicator size="large" color="#2563EB" />
               <Text style={[typography.body, { color: '#1E40AF', marginTop: spacing.sm }]}>Analyzing... Please wait</Text>
               <Button
-                title="⛔ Cancel"
+                title="Cancel"
                 onPress={handleCancelAnalysis}
                 variant="danger"
                 style={{ marginTop: spacing.md }}
@@ -1377,28 +1573,31 @@ export default function PrescriptionScreen({ navigation }) {
           {/* Analysis Results */}
           {analysisResult && (
             <View style={{ backgroundColor: '#F0FDF4', borderRadius: 12, padding: spacing.md, borderWidth: 2, borderColor: '#86EFAC' }}>
-              <Text style={[typography.h4, { color: colors.text, marginBottom: spacing.md }]}>📋 Analysis Results</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+                <Text style={[typography.h4, { color: colors.text }]}>Analysis Results</Text>
+                {renderTtsActionChip('analysis-summary', JSON.stringify(analysisResult))}
+              </View>
 
               {identifyMode === 'medicine' && (
                 <>
                   {(analysisResult.medicine_name || analysisResult.name) && (
                     <View style={{ backgroundColor: '#FEFCE8', padding: spacing.md, borderRadius: 8, marginBottom: spacing.sm }}>
                       <Text style={[typography.labelSmall, { color: '#166534' }]}>Medicine Name</Text>
-                      <Text style={[typography.h4, { color: '#166534' }]}>💊 {String(analysisResult.medicine_name || analysisResult.name)}</Text>
+                      <Text style={[typography.h4, { color: '#166534' }]}>{String(analysisResult.medicine_name || analysisResult.name)}</Text>
                     </View>
                   )}
 
                   {analysisResult.dosage && (
                     <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#3B82F6', marginBottom: spacing.sm }}>
                       <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>Dosage</Text>
-                      <Text style={[typography.body, { color: colors.text }]}>💉 {String(analysisResult.dosage)}</Text>
+                      <Text style={[typography.body, { color: colors.text }]}>{String(analysisResult.dosage)}</Text>
                     </View>
                   )}
 
                   {analysisResult.category && (
                     <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#9333EA', marginBottom: spacing.sm }}>
                       <Text style={[typography.labelSmall, { color: '#6B21A8' }]}>Category</Text>
-                      <Text style={[typography.body, { color: colors.text }]}>🏷️ {String(analysisResult.category)}</Text>
+                      <Text style={[typography.body, { color: colors.text }]}>{String(analysisResult.category)}</Text>
                     </View>
                   )}
 
@@ -1418,7 +1617,7 @@ export default function PrescriptionScreen({ navigation }) {
 
                   {analysisResult.full_information && (
                     <View style={{ backgroundColor: '#EFF6FF', padding: spacing.sm, borderRadius: 8, borderWidth: 2, borderColor: '#BFDBFE', marginBottom: spacing.md }}>
-                      <Text style={[typography.labelSmall, { color: '#1E40AF', marginBottom: 4 }]}>ℹ️ Additional Information</Text>
+                      <Text style={[typography.labelSmall, { color: '#1E40AF', marginBottom: 4 }]}>Additional Information</Text>
                       <Text style={[typography.caption, { color: colors.text }]}>{String(analysisResult.full_information)}</Text>
                     </View>
                   )}
@@ -1435,10 +1634,16 @@ export default function PrescriptionScreen({ navigation }) {
 
                   {Array.isArray(analysisResult.medicines) && analysisResult.medicines.map((medicine, index) => (
                     <View key={index} style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#3B82F6', marginBottom: spacing.sm }}>
-                      <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>Medicine {index + 1}</Text>
-                      <Text style={[typography.h4, { color: colors.text, marginTop: 4 }]}>💊 {String(medicine.medicine_name || medicine.name || 'Unknown Medicine')}</Text>
-                      <Text style={[typography.body, { color: colors.text, marginTop: 4 }]}>💉 Dosage: {String(medicine.dosage || 'As prescribed')}</Text>
-                      <Text style={[typography.body, { color: colors.text, marginTop: 2 }]}>📅 Frequency: {String(medicine.frequency || 'As per prescription')}</Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>Medicine {index + 1}</Text>
+                        {renderTtsActionChip(
+                          `analysis-medicine-${index}`,
+                          `${medicine.medicine_name || medicine.name || 'Unknown Medicine'}. Dosage ${medicine.dosage || 'As prescribed'}. Frequency ${medicine.frequency || 'As per prescription'}. Duration ${medicine.duration || 'As prescribed'}. ${medicine.instructions || medicine.notes || ''}`
+                        )}
+                      </View>
+                      <Text style={[typography.h4, { color: colors.text, marginTop: 4 }]}>{String(medicine.medicine_name || medicine.name || 'Unknown Medicine')}</Text>
+                      <Text style={[typography.body, { color: colors.text, marginTop: 4 }]}>Dosage: {String(medicine.dosage || 'As prescribed')}</Text>
+                      <Text style={[typography.body, { color: colors.text, marginTop: 2 }]}>Frequency: {String(medicine.frequency || 'As per prescription')}</Text>
                       <Text style={[typography.body, { color: colors.text, marginTop: 2 }]}>⏳ Duration: {String(medicine.duration || 'As prescribed')}</Text>
                       {(medicine.instructions || medicine.notes) && (
                         <Text style={[typography.caption, { color: '#4B5563', marginTop: 6 }]}>
@@ -1451,7 +1656,7 @@ export default function PrescriptionScreen({ navigation }) {
                   {Array.isArray(analysisResult.warnings) && analysisResult.warnings.length > 0 && (
                     <View style={{ backgroundColor: '#FEF3C7', padding: spacing.sm, borderRadius: 8, marginBottom: spacing.md }}>
                       {analysisResult.warnings.map((warning, idx) => (
-                        <Text key={idx} style={[typography.caption, { color: '#92400E' }]}>⚠️ {String(warning)}</Text>
+                        <Text key={idx} style={[typography.caption, { color: '#92400E' }]}>{String(warning)}</Text>
                       ))}
                     </View>
                   )}
@@ -1459,7 +1664,7 @@ export default function PrescriptionScreen({ navigation }) {
               )}
 
               <Button
-                title={identifyMode === 'medicine' ? '✓ Save Medicine to Prescriptions' : '✓ Save to Prescriptions'}
+                title={identifyMode === 'medicine' ? 'Save Medicine to Prescriptions' : 'Save to Prescriptions'}
                 onPress={handleSaveAnalysisResult}
                 variant="primary"
                 fullWidth
@@ -1489,20 +1694,24 @@ export default function PrescriptionScreen({ navigation }) {
               justifyContent: 'center',
               marginRight: spacing.sm,
             }}>
-              <Text style={{ fontSize: 22 }}>📄</Text>
+              <MaterialCommunityIcons name="file-document-outline" size={22} color="#1D4ED8" />
             </View>
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ 
                 fontSize: 18, 
                 fontWeight: '700', 
                 color: '#1F2937',
-              }}>
+                flexShrink: 1,
+                lineHeight: 24,
+              }} numberOfLines={2}>
                 Hospital Report Analyzer
               </Text>
               <Text style={{ 
                 fontSize: 13, 
                 color: '#6B7280',
-              }}>
+                flexShrink: 1,
+                lineHeight: 18,
+              }} numberOfLines={2}>
                 Analyze printed hospital documents and view structured results
               </Text>
             </View>
@@ -1519,10 +1728,10 @@ export default function PrescriptionScreen({ navigation }) {
           }}>
             {!reportImageUri ? (
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 48, marginBottom: spacing.md }}>🏥</Text>
+                <MaterialCommunityIcons name="file-find-outline" size={42} color="#2563EB" style={{ marginBottom: spacing.md }} />
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <Button title="📷 Camera" onPress={takeReportPhoto} variant="primary" />
-                  <Button title="🖼️ Gallery" onPress={pickReportImage} variant="secondary" />
+                  <Button title="Camera" onPress={takeReportPhoto} variant="primary" />
+                  <Button title="Gallery" onPress={pickReportImage} variant="secondary" />
                 </View>
                 <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center' }]}>
                   Upload a printed hospital report image
@@ -1545,7 +1754,7 @@ export default function PrescriptionScreen({ navigation }) {
 
           {reportImageUri && !reportAnalyzing && !reportAnalysisResult && (
             <Button
-              title="🔍 Analyze Report"
+              title="Analyze Report"
               onPress={handleAnalyzeReport}
               variant="primary"
               fullWidth
@@ -1558,7 +1767,7 @@ export default function PrescriptionScreen({ navigation }) {
               <ActivityIndicator size="large" color="#2563EB" />
               <Text style={[typography.body, { color: '#1E40AF', marginTop: spacing.sm }]}>Analyzing report... Please wait</Text>
               <Button
-                title="⛔ Cancel"
+                title="Cancel"
                 onPress={() => setReportAnalyzing(false)}
                 variant="danger"
                 style={{ marginTop: spacing.md }}
@@ -1592,11 +1801,14 @@ export default function PrescriptionScreen({ navigation }) {
 
                 return (
                   <>
-                    <Text style={[typography.h4, { color: colors.text, marginBottom: spacing.sm }]}>📊 Analysis Results</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+                      <Text style={[typography.h4, { color: colors.text }]}>Analysis Results</Text>
+                      {renderTtsActionChip('report-summary', JSON.stringify(data))}
+                    </View>
 
                     {isIncompleteData && (
                       <View style={{ backgroundColor: '#FEF3C7', borderRadius: 8, padding: spacing.sm, marginBottom: spacing.md, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
-                        <Text style={[typography.labelSmall, { color: '#92400E' }]}>⚠️ Incomplete Data Extraction</Text>
+                        <Text style={[typography.labelSmall, { color: '#92400E' }]}>Incomplete Data Extraction</Text>
                         <Text style={[typography.caption, { color: '#78350F', marginTop: 4 }]}>Some details could not be extracted. Please verify with the original report.</Text>
                       </View>
                     )}
@@ -1610,15 +1822,15 @@ export default function PrescriptionScreen({ navigation }) {
                           <Text style={[typography.caption, { color: '#475569', marginTop: 4, textAlign: 'center' }]}>{String(hospital.address)}</Text>
                         ) : null}
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
-                          {hospital.phone ? <Text style={[typography.caption, { color: '#475569', marginHorizontal: 6 }]}>📞 {String(hospital.phone)}</Text> : null}
-                          {hospital.email ? <Text style={[typography.caption, { color: '#475569', marginHorizontal: 6 }]}>✉️ {String(hospital.email)}</Text> : null}
+                          {hospital.phone ? <Text style={[typography.caption, { color: '#475569', marginHorizontal: 6 }]}>Phone: {String(hospital.phone)}</Text> : null}
+                          {hospital.email ? <Text style={[typography.caption, { color: '#475569', marginHorizontal: 6 }]}>Email: {String(hospital.email)}</Text> : null}
                         </View>
                       </View>
                     )}
 
                     {hasDoctorData && (
                       <View style={{ backgroundColor: '#EFF6FF', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#2563EB', marginBottom: spacing.sm }}>
-                        <Text style={[typography.labelSmall, { color: '#1E3A8A', marginBottom: 6 }]}>👨‍⚕️ Doctor Information</Text>
+                        <Text style={[typography.labelSmall, { color: '#1E3A8A', marginBottom: 6 }]}>Doctor Information</Text>
                         {doctor.name ? <Text style={[typography.body, { color: '#111827', fontWeight: '700' }]}>{String(doctor.name)}</Text> : null}
                         {doctor.qualifications ? <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>{String(doctor.qualifications)}</Text> : null}
                         {doctor.specialization ? <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Specialization: {String(doctor.specialization)}</Text> : null}
@@ -1628,7 +1840,7 @@ export default function PrescriptionScreen({ navigation }) {
 
                     {hasPatientData && (
                       <View style={{ backgroundColor: '#ECFDF5', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#16A34A', marginBottom: spacing.sm }}>
-                        <Text style={[typography.labelSmall, { color: '#166534', marginBottom: 6 }]}>🧑 Patient Information</Text>
+                        <Text style={[typography.labelSmall, { color: '#166534', marginBottom: 6 }]}>Patient Information</Text>
                         {patient.name ? <Text style={[typography.body, { color: '#111827', fontWeight: '700' }]}>{String(patient.name)}</Text> : null}
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
                           {patient.patient_id ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>ID: {String(patient.patient_id)}</Text> : null}
@@ -1642,7 +1854,7 @@ export default function PrescriptionScreen({ navigation }) {
 
                     {hasClinicalData && (
                       <View style={{ backgroundColor: '#FFF7ED', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#EA580C', marginBottom: spacing.sm }}>
-                        <Text style={[typography.labelSmall, { color: '#9A3412', marginBottom: 6 }]}>🩺 Clinical Information</Text>
+                        <Text style={[typography.labelSmall, { color: '#9A3412', marginBottom: 6 }]}>Clinical Information</Text>
                         {(clinical.weight_kg || clinical.height_cm || clinical.bmi || clinical.blood_pressure) && (
                           <View style={{ marginBottom: spacing.xs }}>
                             <Text style={[typography.caption, { color: '#9CA3AF', fontWeight: '700' }]}>VITAL SIGNS</Text>
@@ -1675,7 +1887,7 @@ export default function PrescriptionScreen({ navigation }) {
 
                     {medicines.length > 0 && (
                       <View style={{ backgroundColor: '#FEF2F2', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#DC2626', marginBottom: spacing.sm }}>
-                        <Text style={[typography.labelSmall, { color: '#991B1B', marginBottom: spacing.xs }]}>💊 Prescription ({medicines.length})</Text>
+                        <Text style={[typography.labelSmall, { color: '#991B1B', marginBottom: spacing.xs }]}>Prescription ({medicines.length})</Text>
                         {medicines.map((medicine, index) => (
                           <View key={index} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FECACA', borderRadius: 8, padding: spacing.sm, marginBottom: spacing.xs }}>
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
@@ -1683,6 +1895,12 @@ export default function PrescriptionScreen({ navigation }) {
                                 <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>{String(medicine.serial_number || index + 1)}</Text>
                               </View>
                               <View style={{ flex: 1 }}>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                  {renderTtsActionChip(
+                                    `report-medicine-${index}`,
+                                    `${medicine.name || medicine.medicine_name || medicine.medicine || 'Unknown Medicine'}. Strength ${medicine.strength || ''}. Dosage ${medicine.dosage || ''}. Frequency ${medicine.frequency || ''}. Duration ${medicine.duration || ''}. ${medicine.instructions || medicine.note || ''}`
+                                  )}
+                                </View>
                                 <Text style={[typography.body, { color: '#111827', fontWeight: '800' }]}>
                                   {String(medicine.name || medicine.medicine_name || medicine.medicine || 'Unknown Medicine')}
                                   {medicine.strength ? ` (${String(medicine.strength)})` : ''}
@@ -1697,7 +1915,7 @@ export default function PrescriptionScreen({ navigation }) {
                                   </View>
                                 )}
                                 {(medicine.instructions || medicine.note) ? (
-                                  <Text style={[typography.caption, { color: '#6B7280', marginTop: 4 }]}>ℹ️ {String(medicine.instructions || medicine.note)}</Text>
+                                  <Text style={[typography.caption, { color: '#6B7280', marginTop: 4 }]}>{String(medicine.instructions || medicine.note)}</Text>
                                 ) : null}
                               </View>
                             </View>
@@ -1708,7 +1926,7 @@ export default function PrescriptionScreen({ navigation }) {
 
                     {hasAdviceData && (
                       <View style={{ backgroundColor: '#FAF5FF', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#9333EA', marginBottom: spacing.sm }}>
-                        <Text style={[typography.labelSmall, { color: '#6B21A8', marginBottom: 6 }]}>📝 Medical Advice & Instructions</Text>
+                        <Text style={[typography.labelSmall, { color: '#6B21A8', marginBottom: 6 }]}>Medical Advice & Instructions</Text>
                         {Array.isArray(advice.advice) && advice.advice.length > 0 && advice.advice.map((item, idx) => (
                           <Text key={idx} style={[typography.caption, { color: '#4C1D95', marginTop: 2 }]}>• {String(item)}</Text>
                         ))}
@@ -1733,7 +1951,7 @@ export default function PrescriptionScreen({ navigation }) {
               })()}
 
               <Button
-                title={savingReport ? '💾 Saving...' : '💾 Save Report to History'}
+                title={savingReport ? 'Saving...' : 'Save Report to History'}
                 onPress={handleSaveReport}
                 variant="primary"
                 fullWidth
@@ -1756,7 +1974,7 @@ export default function PrescriptionScreen({ navigation }) {
               </View>
             ) : prescriptionHistory.length === 0 ? (
               <View style={{ backgroundColor: '#FFF7ED', padding: spacing.md, borderRadius: 12, alignItems: 'center' }}>
-                <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
+                <MaterialCommunityIcons name="inbox-outline" size={28} color="#9CA3AF" style={{ marginBottom: 8 }} />
                 <Text style={{ color: '#6B7280' }}>No saved reports yet</Text>
               </View>
             ) : (
@@ -1779,35 +1997,35 @@ export default function PrescriptionScreen({ navigation }) {
                     <View style={{ marginTop: spacing.md, gap: 8 }}>
                       {item.structured_data.hospital_details?.name && (
                         <View style={{ backgroundColor: '#EFF6FF', padding: spacing.sm, borderRadius: 8 }}>
-                          <Text style={[typography.labelSmall, { color: '#1E3A8A' }]}>🏥 Hospital Information</Text>
+                          <Text style={[typography.labelSmall, { color: '#1E3A8A' }]}>Hospital Information</Text>
                           <Text style={[typography.caption, { color: '#1E3A8A', marginTop: 2 }]}>{String(item.structured_data.hospital_details.name)}</Text>
                           {item.structured_data.hospital_details.address && <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>{String(item.structured_data.hospital_details.address)}</Text>}
-                          {item.structured_data.hospital_details.phone && <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>📞 {String(item.structured_data.hospital_details.phone)}</Text>}
+                          {item.structured_data.hospital_details.phone && <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Phone: {String(item.structured_data.hospital_details.phone)}</Text>}
                         </View>
                       )}
                       {item.structured_data.doctor_details?.name && (
                         <View style={{ backgroundColor: '#EBF8FF', padding: spacing.sm, borderRadius: 8 }}>
-                          <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>👨‍⚕️ Doctor Information</Text>
+                          <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>Doctor Information</Text>
                           <Text style={[typography.caption, { color: '#1E40AF', marginTop: 2 }]}>{String(item.structured_data.doctor_details.name)}</Text>
                           {item.structured_data.doctor_details.specialization && <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Specialization: {String(item.structured_data.doctor_details.specialization)}</Text>}
                         </View>
                       )}
                       {item.structured_data.patient_details?.name && (
                         <View style={{ backgroundColor: '#ECFDF5', padding: spacing.sm, borderRadius: 8 }}>
-                          <Text style={[typography.labelSmall, { color: '#166534' }]}>🧑 Patient Information</Text>
+                          <Text style={[typography.labelSmall, { color: '#166534' }]}>Patient Information</Text>
                           <Text style={[typography.caption, { color: '#166534', marginTop: 2 }]}>{String(item.structured_data.patient_details.name)}</Text>
                           <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Age: {String(item.structured_data.patient_details.age || 'N/A')}  Gender: {String(item.structured_data.patient_details.gender || 'N/A')}</Text>
                         </View>
                       )}
                       {item.structured_data.clinical_details?.diagnosis && (
                         <View style={{ backgroundColor: '#FFF7ED', padding: spacing.sm, borderRadius: 8 }}>
-                          <Text style={[typography.labelSmall, { color: '#9A3412' }]}>🩺 Clinical Information</Text>
+                          <Text style={[typography.labelSmall, { color: '#9A3412' }]}>Clinical Information</Text>
                           <Text style={[typography.caption, { color: '#9A3412', marginTop: 2 }]}>Diagnosis: {String(item.structured_data.clinical_details.diagnosis)}</Text>
                         </View>
                       )}
                       {Array.isArray(item.structured_data.medicines) && item.structured_data.medicines.length > 0 && (
                         <View style={{ backgroundColor: '#F0FDF4', padding: spacing.sm, borderRadius: 8 }}>
-                          <Text style={[typography.labelSmall, { color: '#166534', marginBottom: 4 }]}>💊 Prescription ({item.structured_data.medicines.length})</Text>
+                          <Text style={[typography.labelSmall, { color: '#166534', marginBottom: 4 }]}>Prescription ({item.structured_data.medicines.length})</Text>
                           {item.structured_data.medicines.slice(0, 3).map((med, medIdx) => (
                             <Text key={medIdx} style={[typography.caption, { color: '#475569' }]}>
                               • {String(med.name || med.medicine_name || med.medicine || 'Unknown')}
@@ -1858,7 +2076,7 @@ export default function PrescriptionScreen({ navigation }) {
                   justifyContent: 'center',
                   marginRight: spacing.sm,
                 }}>
-                  <Text style={{ fontSize: 18 }}>💊</Text>
+                  <MaterialCommunityIcons name="pill" size={18} color="#166534" />
                 </View>
                 <View>
                   <Text style={{ 
@@ -1907,7 +2125,7 @@ export default function PrescriptionScreen({ navigation }) {
                 backgroundColor: '#F9FAFB',
                 borderRadius: 16,
               }}>
-                <Text style={{ fontSize: 48, marginBottom: spacing.sm }}>💊</Text>
+                <MaterialCommunityIcons name="pill" size={48} color="#16A34A" style={{ marginBottom: spacing.sm }} />
                 <Text style={{ 
                   fontSize: 16, 
                   fontWeight: '600', 
@@ -1932,6 +2150,8 @@ export default function PrescriptionScreen({ navigation }) {
                   onDelete={() => handleDeleteMedicine(med.id)}
                   onEdit={() => handleEditMedicine(med)}
                   onSpeak={() => handleSpeakMedicine(med)}
+                  isSpeaking={activeMedicineTtsId === med.id}
+                  isProcessing={activeMedicineTtsId === med.id && isMedicineTtsProcessing}
                 />
               ))
             )}
@@ -1957,7 +2177,7 @@ export default function PrescriptionScreen({ navigation }) {
                   justifyContent: 'center',
                   marginRight: spacing.sm,
                 }}>
-                  <Text style={{ fontSize: 18 }}>📚</Text>
+                  <MaterialCommunityIcons name="history" size={18} color="#92400E" />
                 </View>
                 <View>
                   <Text style={{ fontSize: 16, fontWeight: '700', color: '#1F2937' }}>Medicine History</Text>
@@ -1987,7 +2207,7 @@ export default function PrescriptionScreen({ navigation }) {
                 </View>
               ) : medicineHistory.length === 0 ? (
                 <View style={{ backgroundColor: '#F9FAFB', padding: spacing.lg, borderRadius: 12, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
+                  <MaterialCommunityIcons name="inbox-outline" size={28} color="#9CA3AF" style={{ marginBottom: 8 }} />
                   <Text style={{ color: '#6B7280' }}>No medicine history yet</Text>
                 </View>
               ) : (
@@ -2014,7 +2234,7 @@ export default function PrescriptionScreen({ navigation }) {
                         </Text>
                       </View>
                       <Pressable onPress={() => handleDeleteMedicineHistory(item.id)} style={{ padding: 8 }}>
-                        <Text>🗑️</Text>
+                        <MaterialCommunityIcons name="delete-outline" size={16} color="#DC2626" />
                       </Pressable>
                     </View>
                   </View>
@@ -2036,7 +2256,7 @@ export default function PrescriptionScreen({ navigation }) {
           <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, maxHeight: '90%' }}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[typography.h4, { color: colors.text, marginBottom: spacing.lg }]}>
-                {editingId ? '✏️ Edit Medicine' : '💊 Add Medicine'}
+                {editingId ? 'Edit Medicine' : 'Add Medicine'}
               </Text>
 
               {/* Medicine Name */}
@@ -2153,7 +2373,7 @@ export default function PrescriptionScreen({ navigation }) {
 
               {/* Reminder Times */}
               <View style={{ marginBottom: spacing.md }}>
-                <Text style={[typography.labelSmall, { color: colors.textSecondary, marginBottom: spacing.xs }]}>🔔 Reminder Times (Daily Notifications)</Text>
+                <Text style={[typography.labelSmall, { color: colors.textSecondary, marginBottom: spacing.xs }]}>Reminder Times (Daily Notifications)</Text>
                 
                 {/* Add Reminder Button */}
                 <Pressable
@@ -2170,7 +2390,7 @@ export default function PrescriptionScreen({ navigation }) {
                   }}
                   onPress={() => setShowTimePicker(true)}
                 >
-                  <Text style={{ fontSize: 20, marginRight: 8 }}>⏰</Text>
+                  <MaterialCommunityIcons name="clock-outline" size={20} color="#065F46" style={{ marginRight: 8 }} />
                   <Text style={{ color: '#2563EB', fontWeight: '600', fontSize: 16 }}>
                     Add Reminder Time
                   </Text>
@@ -2210,9 +2430,9 @@ export default function PrescriptionScreen({ navigation }) {
                             borderColor: '#22C55E',
                           }}
                         >
-                          <Text style={{ fontSize: 16 }}>🔔</Text>
+                          <MaterialCommunityIcons name="bell-outline" size={16} color="#166534" />
                           <Text style={{ color: '#166534', fontSize: 14, fontWeight: '600' }}>{String(r)}</Text>
-                          <Text style={{ color: '#EF4444', fontSize: 16, fontWeight: 'bold' }}>✕</Text>
+                          <MaterialCommunityIcons name="close" size={16} color="#EF4444" />
                         </Pressable>
                       ))}
                     </View>

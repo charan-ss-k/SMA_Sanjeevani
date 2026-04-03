@@ -208,21 +208,32 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = useCallback(async (updates) => {
     try {
       setIsLoading(true);
-      const response = await apiClient.put('/auth/profile', updates);
-      setUserProfile(response);
+      // Backend currently exposes GET /api/auth/me but no profile update endpoint.
+      // Keep this action local to avoid 404 noise in mobile.
       setUser((prev) => ({
         ...prev,
         ...updates,
       }));
+      setUserProfile((prev) => ({
+        ...(prev || {}),
+        ...updates,
+      }));
+      await SecureStore.setItemAsync('user', JSON.stringify({
+        ...(user || {}),
+        ...updates,
+      }));
       if (DEBUG) console.log('[Auth] Profile updated');
-      return response;
+      return {
+        success: true,
+        message: 'Profile updated locally',
+      };
     } catch (err) {
       if (DEBUG) console.error('[Auth] Profile update error:', err);
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   /**
    * Refresh authentication token

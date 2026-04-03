@@ -3,7 +3,7 @@
  * Upload and analyze prescription images
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,25 +12,46 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useHealth } from '../../context/HealthContext';
 import { Button, Card, Alert, Loading } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
+import { useLanguage } from '../../context/LanguageContext';
+import ttsService from '../../services/ttsService';
+import { useFocusEffect } from '@react-navigation/native';
 
-const PrescriptionResult = ({ data }) => (
+const PrescriptionResult = ({ data, onSpeak, activeTtsKey, isTtsProcessing }) => (
   <View style={{ gap: spacing.md }}>
     {data.medicines && (
       <Card variant="elevated" padding="md">
-        <Text
-          style={[
-            typography.h4,
-            {
-              color: colors.text,
-              marginBottom: spacing.md,
-            },
-          ]}
-        >
-          💊 Medicines Identified
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+          <Text
+            style={[
+              typography.h4,
+              {
+                color: colors.text,
+              },
+            ]}
+          >
+            Medicines Identified
+          </Text>
+          <Pressable
+            onPress={() => onSpeak('prescription-medicines', data.medicines.map((m) => `${m.name || ''}. Dosage ${m.dosage || ''}. Frequency ${m.frequency || ''}`).join('. '))}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: spacing.sm,
+              paddingVertical: 5,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: activeTtsKey === 'prescription-medicines' ? '#FCA5A5' : '#BAE6FD',
+              backgroundColor: activeTtsKey === 'prescription-medicines' ? '#FEE2E2' : '#E0F2FE',
+            }}
+          >
+            {activeTtsKey === 'prescription-medicines' && isTtsProcessing ? <ActivityIndicator size="small" color="#0369A1" /> : <MaterialCommunityIcons name={activeTtsKey === 'prescription-medicines' ? 'stop-circle-outline' : 'volume-high'} size={14} color="#0369A1" />}
+            <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: '700' }}>{activeTtsKey === 'prescription-medicines' && isTtsProcessing ? 'Processing...' : activeTtsKey === 'prescription-medicines' ? 'Stop' : 'Speak'}</Text>
+          </Pressable>
+        </View>
         {data.medicines.map((medicine, idx) => (
           <View
             key={idx}
@@ -68,17 +89,34 @@ const PrescriptionResult = ({ data }) => (
 
     {data.diagnosis && (
       <Card variant="elevated" padding="md">
-        <Text
-          style={[
-            typography.h4,
-            {
-              color: colors.text,
-              marginBottom: spacing.md,
-            },
-          ]}
-        >
-          🩺 Diagnosis
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+          <Text
+            style={[
+              typography.h4,
+              {
+                color: colors.text,
+              },
+            ]}
+          >
+            Diagnosis
+          </Text>
+          <Pressable
+            onPress={() => onSpeak('prescription-diagnosis', data.diagnosis)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: spacing.sm,
+              paddingVertical: 5,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: activeTtsKey === 'prescription-diagnosis' ? '#FCA5A5' : '#BAE6FD',
+              backgroundColor: activeTtsKey === 'prescription-diagnosis' ? '#FEE2E2' : '#E0F2FE',
+            }}
+          >
+            {activeTtsKey === 'prescription-diagnosis' && isTtsProcessing ? <ActivityIndicator size="small" color="#0369A1" /> : <MaterialCommunityIcons name={activeTtsKey === 'prescription-diagnosis' ? 'stop-circle-outline' : 'volume-high'} size={14} color="#0369A1" />}
+            <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: '700' }}>{activeTtsKey === 'prescription-diagnosis' && isTtsProcessing ? 'Processing...' : activeTtsKey === 'prescription-diagnosis' ? 'Stop' : 'Speak'}</Text>
+          </Pressable>
+        </View>
         <Text
           style={[
             typography.body,
@@ -95,17 +133,34 @@ const PrescriptionResult = ({ data }) => (
 
     {data.notes && (
       <Card variant="elevated" padding="md">
-        <Text
-          style={[
-            typography.h4,
-            {
-              color: colors.text,
-              marginBottom: spacing.md,
-            },
-          ]}
-        >
-          📝 Doctor's Notes
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+          <Text
+            style={[
+              typography.h4,
+              {
+                color: colors.text,
+              },
+            ]}
+          >
+            Doctor's Notes
+          </Text>
+          <Pressable
+            onPress={() => onSpeak('prescription-notes', data.notes)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: spacing.sm,
+              paddingVertical: 5,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: activeTtsKey === 'prescription-notes' ? '#FCA5A5' : '#BAE6FD',
+              backgroundColor: activeTtsKey === 'prescription-notes' ? '#FEE2E2' : '#E0F2FE',
+            }}
+          >
+            {activeTtsKey === 'prescription-notes' && isTtsProcessing ? <ActivityIndicator size="small" color="#0369A1" /> : <MaterialCommunityIcons name={activeTtsKey === 'prescription-notes' ? 'stop-circle-outline' : 'volume-high'} size={14} color="#0369A1" />}
+            <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: '700' }}>{activeTtsKey === 'prescription-notes' && isTtsProcessing ? 'Processing...' : activeTtsKey === 'prescription-notes' ? 'Stop' : 'Speak'}</Text>
+          </Pressable>
+        </View>
         <Text
           style={[
             typography.body,
@@ -123,11 +178,58 @@ const PrescriptionResult = ({ data }) => (
 );
 
 export default function PrescriptionAnalyzerScreen() {
+  const { language } = useLanguage();
   const { uploadPrescription, isLoading } = useHealth();
   const [selectedImage, setSelectedImage] = useState(null);
   const [prescriptionData, setPrescriptionData] = useState(null);
   const [error, setError] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [activeTtsKey, setActiveTtsKey] = useState(null);
+  const [isTtsProcessing, setIsTtsProcessing] = useState(false);
+
+  const stopTTSPlayback = useCallback(async () => {
+    try {
+      await ttsService.stop();
+    } catch (_) {
+      // noop
+    }
+    setActiveTtsKey(null);
+    setIsTtsProcessing(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopTTSPlayback();
+        setSelectedImage(null);
+        setPrescriptionData(null);
+        setError(null);
+        setIsAnalyzing(false);
+      };
+    }, [stopTTSPlayback])
+  );
+
+  const handleSpeak = async (key, text) => {
+    const normalizedKey = String(key);
+    const safeText = String(text || '').trim();
+    if (!safeText) return;
+
+    if (activeTtsKey === normalizedKey) {
+      await stopTTSPlayback();
+      return;
+    }
+
+    try {
+      setActiveTtsKey(normalizedKey);
+      setIsTtsProcessing(true);
+      await ttsService.synthesizeAndPlay(safeText, language);
+    } catch (err) {
+      setError('Unable to play audio for this section');
+    } finally {
+      setActiveTtsKey(null);
+      setIsTtsProcessing(false);
+    }
+  };
 
   const handleAnalyzePrescription = async () => {
     if (!selectedImage) {
@@ -141,7 +243,9 @@ export default function PrescriptionAnalyzerScreen() {
 
     try {
       const result = await uploadPrescription(selectedImage);
+      if (!selectedImage) return;
       setPrescriptionData(result);
+      stopTTSPlayback();
     } catch (err) {
       setError(err.message || 'Failed to analyze prescription');
       setPrescriptionData(null);
@@ -179,7 +283,7 @@ export default function PrescriptionAnalyzerScreen() {
           },
         ]}
       >
-        📋 Prescription Analyzer
+        Prescription Analyzer
       </Text>
       <Card variant="outlined" padding="md" style={{ marginBottom: spacing.lg }}>
         <Text
@@ -198,12 +302,12 @@ export default function PrescriptionAnalyzerScreen() {
       {!selectedImage ? (
         <View style={{ gap: spacing.md, marginBottom: spacing.lg }}>
           <Button
-            title="📸 Capture Prescription"
+            title="Capture Prescription"
             onPress={handleCaptureImage}
             fullWidth
           />
           <Button
-            title="🖼️ Select Image"
+            title="Select Image"
             onPress={handleSelectImage}
             variant="secondary"
             fullWidth
@@ -276,9 +380,14 @@ export default function PrescriptionAnalyzerScreen() {
             />
           </View>
 
-          <PrescriptionResult data={prescriptionData} />
+          <PrescriptionResult
+            data={prescriptionData}
+            onSpeak={handleSpeak}
+            activeTtsKey={activeTtsKey}
+            isTtsProcessing={isTtsProcessing}
+          />
           <Button
-            title="➕ Add Medicines to Reminders"
+            title="Add Medicines to Reminders"
             onPress={() => {
               // TODO: Add medicines to reminders
               console.log('Add to reminders');
@@ -307,7 +416,7 @@ export default function PrescriptionAnalyzerScreen() {
             },
           ]}
         >
-          ⚠️ This tool assists in prescription analysis but does not replace
+          This tool assists in prescription analysis but does not replace
           medical consultation. Always verify information with your doctor.
         </Text>
       </Card>
