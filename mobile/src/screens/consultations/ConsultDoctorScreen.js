@@ -19,6 +19,7 @@ import {
   Platform,
   Switch,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -47,6 +48,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [searchAnimationStep, setSearchAnimationStep] = useState(0);
 
   // Search options and form
   const [searchOptions, setSearchOptions] = useState({
@@ -111,6 +113,19 @@ const ConsultDoctorScreen = ({ navigation }) => {
     configureNotifications();
     loadNotificationStates();
   }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      setSearchAnimationStep(0);
+      return;
+    }
+
+    const animationTimer = setInterval(() => {
+      setSearchAnimationStep((prev) => (prev + 1) % 6);
+    }, 380);
+
+    return () => clearInterval(animationTimer);
+  }, [loading]);
 
   // Auto-refresh upcoming appointments when on reminders tab
   useEffect(() => {
@@ -859,10 +874,10 @@ const ConsultDoctorScreen = ({ navigation }) => {
         }}
         style={{
           flex: 1,
-          flexDirection: 'row',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          paddingVertical: 12,
+          paddingVertical: 10,
           paddingHorizontal: 8,
           borderRadius: 12,
           backgroundColor: activeTab === 'book' ? '#FFFFFF' : 'transparent',
@@ -871,13 +886,15 @@ const ConsultDoctorScreen = ({ navigation }) => {
           shadowOpacity: activeTab === 'book' ? 0.1 : 0,
           shadowRadius: 4,
           elevation: activeTab === 'book' ? 3 : 0,
+          minHeight: 54,
         }}
       >
-        <Text style={{ fontSize: 14, marginRight: 4 }}>📅</Text>
+        <Text style={{ fontSize: 14, marginBottom: 2 }}>📅</Text>
         <Text style={{
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: '700',
           color: activeTab === 'book' ? '#059669' : '#6B7280',
+          textAlign: 'center',
         }}>
           Book
         </Text>
@@ -890,10 +907,10 @@ const ConsultDoctorScreen = ({ navigation }) => {
         }}
         style={{
           flex: 1,
-          flexDirection: 'row',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          paddingVertical: 12,
+          paddingVertical: 10,
           paddingHorizontal: 8,
           borderRadius: 12,
           backgroundColor: activeTab === 'history' ? '#FFFFFF' : 'transparent',
@@ -902,13 +919,15 @@ const ConsultDoctorScreen = ({ navigation }) => {
           shadowOpacity: activeTab === 'history' ? 0.1 : 0,
           shadowRadius: 4,
           elevation: activeTab === 'history' ? 3 : 0,
+          minHeight: 54,
         }}
       >
-        <Text style={{ fontSize: 14, marginRight: 4 }}>📋</Text>
+        <Text style={{ fontSize: 14, marginBottom: 2 }}>📋</Text>
         <Text style={{
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: '700',
           color: activeTab === 'history' ? '#059669' : '#6B7280',
+          textAlign: 'center',
         }}>
           History
         </Text>
@@ -921,10 +940,10 @@ const ConsultDoctorScreen = ({ navigation }) => {
         }}
         style={{
           flex: 1,
-          flexDirection: 'row',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          paddingVertical: 12,
+          paddingVertical: 10,
           paddingHorizontal: 8,
           borderRadius: 12,
           backgroundColor: activeTab === 'reminders' ? '#FFFFFF' : 'transparent',
@@ -933,13 +952,15 @@ const ConsultDoctorScreen = ({ navigation }) => {
           shadowOpacity: activeTab === 'reminders' ? 0.1 : 0,
           shadowRadius: 4,
           elevation: activeTab === 'reminders' ? 3 : 0,
+          minHeight: 54,
         }}
       >
-        <Text style={{ fontSize: 14, marginRight: 4 }}>⏰</Text>
+        <Text style={{ fontSize: 14, marginBottom: 2 }}>⏰</Text>
         <Text style={{
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: '700',
           color: activeTab === 'reminders' ? '#059669' : '#6B7280',
+          textAlign: 'center',
         }}>
           Upcoming
         </Text>
@@ -1052,7 +1073,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
           fontWeight: '700', 
           textAlign: 'center',
         }}>
-          {loading ? '⏳ Searching...' : '🔍 Search Doctors'}
+          {loading ? `Searching${'.'.repeat((searchAnimationStep % 3) + 1)}` : '🔍 Search Doctors'}
         </Text>
       </Pressable>
     </View>
@@ -1116,9 +1137,65 @@ const ConsultDoctorScreen = ({ navigation }) => {
           borderRadius: 16,
           padding: spacing.xl,
           alignItems: 'center',
+          borderWidth: 1,
+          borderColor: '#D1FAE5',
         }}>
-          <Text style={{ fontSize: 48, marginBottom: spacing.md }}>🔍</Text>
-          <Text style={{ fontSize: 15, color: '#6B7280' }}>Searching for doctors...</Text>
+          <View style={{
+            width: 72,
+            height: 72,
+            borderRadius: 36,
+            backgroundColor: '#ECFDF5',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: spacing.md,
+          }}>
+            <ActivityIndicator size="large" color="#10b981" />
+          </View>
+
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#166534', marginBottom: 6 }}>
+            Finding Best Doctors
+          </Text>
+          <Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: spacing.md }}>
+            Matching specialization, location, and language preferences
+          </Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: spacing.md }}>
+            {[0, 1, 2].map((idx) => {
+              const isActive = (searchAnimationStep % 3) === idx;
+              return (
+                <View
+                  key={idx}
+                  style={{
+                    width: 10,
+                    height: isActive ? 18 : 10,
+                    borderRadius: 6,
+                    marginHorizontal: 4,
+                    backgroundColor: isActive ? '#16a34a' : '#BBF7D0',
+                  }}
+                />
+              );
+            })}
+          </View>
+
+          <View style={{ width: '100%' }}>
+            {[0, 1, 2].map((row) => {
+              const activeRow = (searchAnimationStep + row) % 3;
+              const widths = ['88%', '70%', '55%'];
+              return (
+                <View
+                  key={`skeleton-${row}`}
+                  style={{
+                    height: 10,
+                    borderRadius: 6,
+                    backgroundColor: activeRow === 0 ? '#D1FAE5' : '#ECFDF5',
+                    width: widths[(searchAnimationStep + row) % widths.length],
+                    marginBottom: 8,
+                    alignSelf: 'center',
+                  }}
+                />
+              );
+            })}
+          </View>
         </View>
       ) : doctors.length === 0 ? (
         <View style={{
@@ -1739,13 +1816,15 @@ const ConsultDoctorScreen = ({ navigation }) => {
         <View style={{ 
           marginBottom: spacing.lg,
           backgroundColor: '#FFFFFF',
-          borderRadius: 20,
+          borderRadius: 24,
           padding: spacing.lg,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
+          shadowColor: '#0F172A',
+          shadowOffset: { width: 0, height: 8 },
           shadowOpacity: 0.08,
-          shadowRadius: 8,
+          shadowRadius: 16,
           elevation: 3,
+          borderWidth: 1,
+          borderColor: '#BBF7D0',
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={{
@@ -1763,7 +1842,7 @@ const ConsultDoctorScreen = ({ navigation }) => {
               <Text style={{ 
                 fontSize: 22, 
                 fontWeight: '800', 
-                color: '#059669',
+                color: '#166534',
                 letterSpacing: -0.5,
               }}>
                 Doctor Consultation
@@ -2038,24 +2117,31 @@ const styles = {
   tabContainer: {
     flexDirection: 'row',
     marginBottom: spacing.lg,
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    padding: 4,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 14,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
   tabButton: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.xs,
-    borderRadius: 6,
+    borderRadius: 10,
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: colors.secondary,
+    backgroundColor: '#15803d',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
   },
   tabText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: colors.text,
+    fontWeight: '700',
+    color: '#475569',
   },
   tabTextActive: {
     color: colors.white,

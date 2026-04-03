@@ -9,6 +9,8 @@ import { playTTS, stopAllTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
 import { translateData } from '../data/dataTranslations';
 import { API_BASE } from '../config/apiBase';
+import capsuleIcon from '../assets/capsule.png';
+import prescriptionIcon from '../assets/prescription.png';
 
 const MedicineCard = ({ med, onDelete, onEdit, onSpeak, language, translateDefaultValue, getFrequencyLabel }) => (
   <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500 hover:shadow-lg transition">
@@ -388,20 +390,42 @@ const PrescriptionHandling = () => {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-5xl font-bold text-green-800 mb-2">{getPrescriptionText('prescriptionManagement', language)}</h1>
+            <h1 className="text-5xl font-bold text-green-800 mb-2 flex items-center gap-3">
+              <img src={capsuleIcon} alt="Prescription management" className="w-12 h-12 object-contain" />
+              <span>{getPrescriptionText('prescriptionManagement', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</span>
+            </h1>
             <p className="text-xl text-gray-700">{getPrescriptionText('managePrescriptions', language)}</p>
           </div>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{getPrescriptionText('myMedicines', language)}</h3>
-            <p className="text-4xl font-bold mt-2">{stats.totalMedicines}</p>
+        <div className="grid grid-cols-2 gap-4 mb-8 auto-rows-fr items-stretch">
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-emerald-100 p-5 md:p-6 text-center shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+            <div className="absolute left-0 top-0 h-1.5 w-full bg-emerald-500" />
+            <div className="flex w-full flex-1 flex-col items-center justify-center">
+              <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700 leading-tight">
+                {getPrescriptionText('myMedicines', language)}
+              </h3>
+              <div className="mt-3 h-10 w-10 rounded-xl bg-white/80 border border-emerald-200 flex items-center justify-center shadow-sm">
+                <img src={capsuleIcon} alt="My medicines" className="h-5 w-5 object-contain" />
+              </div>
+              <p className="mt-3 text-3xl md:text-4xl font-black tabular-nums text-emerald-900 leading-none">{stats.totalMedicines}</p>
+            </div>
+            <p className="mt-4 text-xs md:text-sm leading-relaxed text-emerald-900/70">Currently in your tracker</p>
           </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{getPrescriptionText('prescriptionHistory', language)}</h3>
-            <p className="text-4xl font-bold mt-2">{stats.totalPrescriptions}</p>
+
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-white via-violet-50 to-violet-100 p-5 md:p-6 text-center shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+            <div className="absolute left-0 top-0 h-1.5 w-full bg-violet-500" />
+            <div className="flex w-full flex-1 flex-col items-center justify-center">
+              <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-violet-700 leading-tight">
+                {getPrescriptionText('prescriptionHistory', language)}
+              </h3>
+              <div className="mt-3 h-10 w-10 rounded-xl bg-white/80 border border-violet-200 flex items-center justify-center shadow-sm">
+                <img src={prescriptionIcon} alt="Prescription history" className="h-5 w-5 object-contain" />
+              </div>
+              <p className="mt-3 text-3xl md:text-4xl font-black tabular-nums text-violet-900 leading-none">{stats.totalPrescriptions}</p>
+            </div>
+            <p className="mt-4 text-xs md:text-sm leading-relaxed text-violet-900/70">Uploaded and saved records</p>
           </div>
         </div>
 
@@ -415,7 +439,10 @@ const PrescriptionHandling = () => {
                 : 'border-b-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
-            📋 {getPrescriptionText('managePrescriptions', language)}
+            <span className="inline-flex items-center gap-2">
+              <img src={prescriptionIcon} alt="Manage prescriptions" className="h-5 w-5 object-contain" />
+              <span>{getPrescriptionText('managePrescriptions', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</span>
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('analyze')}

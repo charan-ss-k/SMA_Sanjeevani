@@ -647,7 +647,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f0fdf4',
   },
   content: {
     paddingHorizontal: spacing.md,
@@ -669,12 +669,14 @@ const styles = StyleSheet.create({
   // Carousel Styles
   carouselContainer: {
     marginBottom: spacing.lg,
-    borderRadius: 24,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 4,
   },
   carouselSlide: {
@@ -791,15 +793,17 @@ const styles = StyleSheet.create({
 
   // Welcome Card
   welcomeCard: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: spacing.xl,
     marginBottom: spacing.lg,
-    shadowColor: '#1e40af',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
   welcomeContent: {
     flexDirection: 'row',
@@ -839,11 +843,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
   },
   sectionHeader: {
     marginBottom: spacing.lg,

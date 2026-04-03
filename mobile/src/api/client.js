@@ -12,11 +12,23 @@ const { API_BASE_URL, API_TIMEOUT, DEBUG } = getEnvVars();
 
 class APIClient {
   constructor() {
-    this.baseURL = API_BASE_URL;
+    this.baseURL = (API_BASE_URL || '').replace(/\/api\/?$/, '') || API_BASE_URL;
     this.timeout = API_TIMEOUT || 30000;
     this.authToken = null;
     this.userId = null;
     this.refreshToken = null;
+  }
+
+  buildUrl(path) {
+    if (!path) return this.baseURL;
+    if (/^https?:\/\//i.test(path)) return path;
+
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    if (normalizedPath.startsWith('/api/')) {
+      return `${this.baseURL}${normalizedPath}`;
+    }
+
+    return `${this.baseURL}/api${normalizedPath}`;
   }
 
   /**
@@ -100,7 +112,7 @@ class APIClient {
   async login(username, password) {
     try {
       const headers = await this.buildHeaders();
-      const response = await this.fetchWithTimeout(`${this.baseURL}/auth/login`, {
+      const response = await this.fetchWithTimeout(this.buildUrl('/auth/login'), {
         method: 'POST',
         headers,
         body: JSON.stringify({ username, password }),
@@ -125,7 +137,7 @@ class APIClient {
   async signup(username, email, password, firstName, lastName, age = null, gender = null) {
     try {
       const headers = await this.buildHeaders();
-      const response = await this.fetchWithTimeout(`${this.baseURL}/auth/signup`, {
+      const response = await this.fetchWithTimeout(this.buildUrl('/auth/signup'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -162,7 +174,7 @@ class APIClient {
       if (!refreshToken) throw new Error('No refresh token available');
 
       const headers = await this.buildHeaders();
-      const response = await this.fetchWithTimeout(`${this.baseURL}/auth/refresh`, {
+      const response = await this.fetchWithTimeout(this.buildUrl('/auth/refresh'), {
         method: 'POST',
         headers,
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -184,7 +196,7 @@ class APIClient {
   async logout() {
     try {
       const headers = await this.buildHeaders();
-      await this.fetchWithTimeout(`${this.baseURL}/auth/logout`, {
+      await this.fetchWithTimeout(this.buildUrl('/auth/logout'), {
         method: 'POST',
         headers,
       });
@@ -210,7 +222,7 @@ class APIClient {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${this.baseURL}/ai/chat/stream`, {
+      const response = await fetch(this.buildUrl('/ai/chat/stream'), {
         method: 'POST',
         headers,
         body: JSON.stringify({ messages }),
@@ -282,7 +294,7 @@ class APIClient {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${this.baseURL}/symptoms/recommend/stream`, {
+      const response = await fetch(this.buildUrl('/symptoms/recommend/stream'), {
         method: 'POST',
         headers,
         body: JSON.stringify({ symptoms }),
@@ -336,7 +348,7 @@ class APIClient {
   async generateTTS(text, language = 'en', voiceId = 'default') {
     try {
       const headers = await this.buildHeaders();
-      const response = await this.fetchWithTimeout(`${this.baseURL}/tts/generate`, {
+      const response = await this.fetchWithTimeout(this.buildUrl('/tts/generate'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -367,7 +379,7 @@ class APIClient {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${this.baseURL}/tts/stream`, {
+      const response = await fetch(this.buildUrl('/tts/stream'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -394,7 +406,7 @@ class APIClient {
   async identifyMedicineFromImage(imageUri, base64Data = null) {
     try {
       const formData = new FormData();
-      formData.append('image', {
+      formData.append('file', {
         uri: imageUri,
         type: 'image/jpeg',
         name: 'medicine.jpg',
@@ -403,7 +415,7 @@ class APIClient {
       const headers = await this.buildHeaders();
       delete headers['Content-Type']; // FormData sets its own Content-Type
 
-      const response = await this.fetchWithTimeout(`${this.baseURL}/medicine/identify`, {
+      const response = await this.fetchWithTimeout(this.buildUrl('/medicine-identification/analyze'), {
         method: 'POST',
         headers,
         body: formData,
@@ -413,7 +425,8 @@ class APIClient {
         throw new Error('Medicine identification failed');
       }
 
-      return await response.json();
+      const data = await response.json();
+      return data.analysis || data;
     } catch (error) {
       throw this.handleError(error);
     }
@@ -440,7 +453,7 @@ class APIClient {
       const timeoutId = setTimeout(() => controller.abort(), extendedTimeout);
 
       try {
-        const response = await fetch(`${this.baseURL}/prescriptions/analyze`, {
+        const response = await fetch(this.buildUrl('/prescriptions/analyze'), {
           method: 'POST',
           headers,
           body: formData,
@@ -472,7 +485,7 @@ class APIClient {
   async get(url, config = {}) {
     try {
       const headers = await this.buildHeaders(config.headers);
-      const response = await this.fetchWithTimeout(`${this.baseURL}${url}`, {
+      const response = await this.fetchWithTimeout(this.buildUrl(url), {
         method: 'GET',
         headers,
       });
@@ -490,7 +503,7 @@ class APIClient {
   async post(url, data, config = {}) {
     try {
       const headers = await this.buildHeaders(config.headers);
-      const response = await this.fetchWithTimeout(`${this.baseURL}${url}`, {
+      const response = await this.fetchWithTimeout(this.buildUrl(url), {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
@@ -515,10 +528,10 @@ class APIClient {
     try {
       const headers = await this.buildHeaders(config.headers);
       
-      if (DEBUG) console.log('[API] Sending POST request (no timeout):', `${this.baseURL}${url}`);
+      if (DEBUG) console.log('[API] Sending POST request (no timeout):', this.buildUrl(url));
       
       // No timeout - let the request complete naturally
-      const response = await fetch(`${this.baseURL}${url}`, {
+      const response = await fetch(this.buildUrl(url), {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
@@ -545,7 +558,7 @@ class APIClient {
   async put(url, data, config = {}) {
     try {
       const headers = await this.buildHeaders(config.headers);
-      const response = await this.fetchWithTimeout(`${this.baseURL}${url}`, {
+      const response = await this.fetchWithTimeout(this.buildUrl(url), {
         method: 'PUT',
         headers,
         body: JSON.stringify(data),
@@ -564,7 +577,7 @@ class APIClient {
   async delete(url, config = {}) {
     try {
       const headers = await this.buildHeaders(config.headers);
-      const response = await this.fetchWithTimeout(`${this.baseURL}${url}`, {
+      const response = await this.fetchWithTimeout(this.buildUrl(url), {
         method: 'DELETE',
         headers,
       });
@@ -588,7 +601,7 @@ class APIClient {
       const headers = await this.buildHeaders(config.headers);
       delete headers['Content-Type']; // FormData sets its own Content-Type
 
-      const response = await this.fetchWithTimeout(`${this.baseURL}${url}`, {
+      const response = await this.fetchWithTimeout(this.buildUrl(url), {
         method: 'POST',
         headers,
         body: formData,
