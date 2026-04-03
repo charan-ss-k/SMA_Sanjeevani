@@ -5,6 +5,8 @@
 
 import Constants from 'expo-constants';
 
+const DEFAULT_API_BASE_URL = 'http://98.70.223.78/api';
+
 const resolveDevApiBaseUrl = () => {
   const configuredUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
@@ -25,7 +27,7 @@ const resolveDevApiBaseUrl = () => {
     }
   }
 
-  return configuredUrl || 'http://localhost:8000/api';
+  return configuredUrl || DEFAULT_API_BASE_URL;
 };
 
 const ENV = {
