@@ -1,6 +1,6 @@
 import React, { useState, useRef, useContext, useEffect } from 'react';
 import { AuthContext, LanguageContext } from '../main';
-import { playTTS, muteTTS, unmuteTTS } from '../utils/tts';
+import { playTTS, stopAllTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
 import { API_BASE } from '../config/apiBase';
 
@@ -13,7 +13,7 @@ const HospitalReportAnalyzer = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState('');
-  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [historyItems, setHistoryItems] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
@@ -21,13 +21,24 @@ const HospitalReportAnalyzer = () => {
   const fileInputRef = useRef(null);
   const abortControllerRef = useRef(null);
 
-  useEffect(() => {
-    if (isMuted) {
-      muteTTS();
-    } else {
-      unmuteTTS();
+  const speakText = async (text) => {
+    if (!text || !text.trim()) return;
+
+    if (isSpeaking) {
+      stopAllTTS();
+      setIsSpeaking(false);
+      return;
     }
-  }, [isMuted]);
+
+    try {
+      setIsSpeaking(true);
+      await playTTS(text, language, { userInitiated: true });
+    } catch (e) {
+      console.error('Report speak error:', e);
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
 
   // Fetch history on component mount and when auth token changes
   useEffect(() => {
@@ -113,8 +124,6 @@ const HospitalReportAnalyzer = () => {
 
       const result = await response.json();
       setAnalysisResult(result);
-      
-      playTTS(getPrescriptionText('analysisComplete', language), language);
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('Analysis was cancelled');
@@ -161,7 +170,7 @@ const HospitalReportAnalyzer = () => {
 
   const speakSection = (text, title) => {
     const announcement = `${title}. ${text}`;
-    playTTS(announcement, language);
+    speakText(announcement);
   };
 
   const saveReport = async () => {
@@ -193,7 +202,6 @@ const HospitalReportAnalyzer = () => {
 
       const saved = await response.json();
       setHistoryItems(prev => [saved, ...prev]);
-      playTTS('Report saved successfully', language);
     } catch (e) {
       console.error('Save report failed:', e);
       setAnalysisError(e.message || getPrescriptionText('failedToSavePrescription', language));
@@ -226,14 +234,6 @@ const HospitalReportAnalyzer = () => {
             <h1 className="text-3xl font-bold text-gray-800">
               🏥 {getPrescriptionText('hospitalReportAnalyzer', language)}
             </h1>
-            <button
-              onClick={() => setIsMuted(prev => !prev)}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                isMuted ? 'bg-gray-200 text-gray-700' : 'bg-green-100 text-green-800'
-              }`}
-            >
-              {isMuted ? `🔇 ${getPrescriptionText('muted', language)}` : `🔊 ${getPrescriptionText('soundOn', language)}`}
-            </button>
           </div>
           <p className="text-gray-600 mt-2">
             {getPrescriptionText('uploadTypedPrintedReport', language)}
@@ -375,6 +375,26 @@ const HospitalReportAnalyzer = () => {
 
                         {/* Action Buttons */}
                         <div className="flex justify-end gap-3 mb-6 no-print">
+                          <button
+                            onClick={() => {
+                              const sd = analysisResult.structured_data || {};
+                              const meds = sd.medicines || [];
+                              const diagnosis = sd.clinical_details?.diagnosis || '';
+                              const doctor = sd.doctor_details?.name || '';
+                              const patient = sd.patient_details?.name || '';
+                              const summary = [
+                                getPrescriptionText('analysisResults', language),
+                                patient ? `Patient ${patient}.` : '',
+                                doctor ? `Doctor ${doctor}.` : '',
+                                diagnosis ? `Diagnosis ${diagnosis}.` : '',
+                                meds.length > 0 ? `Total medicines ${meds.length}.` : 'No medicines extracted.',
+                              ].join(' ');
+                              speakText(summary);
+                            }}
+                            className="px-6 py-3 rounded-lg font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 transition"
+                          >
+                            {isSpeaking ? '⏹️ Stop' : '🔊 Speak'}
+                          </button>
                           <button
                             onClick={saveReport}
                             disabled={savingReport}
@@ -727,6 +747,17 @@ const HospitalReportAnalyzer = () => {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const medsCount = (item.structured_data?.medicines || []).length;
+                          const diagnosis = item.structured_data?.clinical_details?.diagnosis || '';
+                          const title = item.report_title || item.uploaded_file || 'Hospital report';
+                          speakText(`${title}. ${diagnosis ? `Diagnosis: ${diagnosis}.` : ''} ${getPrescriptionText('medicines', language)}: ${medsCount}.`);
+                        }}
+                        className="px-3 py-2 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 text-sm"
+                      >
+                        {isSpeaking ? '⏹️' : '🔊'}
+                      </button>
                       <button
                         onClick={() => setExpandedHistoryId(expandedHistoryId === item.id ? null : item.id)}
                         className="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"

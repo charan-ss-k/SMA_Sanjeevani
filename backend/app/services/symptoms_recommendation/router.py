@@ -27,13 +27,13 @@ except ImportError as e:
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Try enhanced TTS first, fallback to original
+# Use Bashini-only TTS service
 try:
-    from .. import tts_service_enhanced as tts_service
-    logger.info("✅ Using Enhanced TTS Service (Bhashini/gTTS/Google)")
+    from .. import tts_service_bhashini as tts_service
+    logger.info("✅ Using Bashini-only TTS service")
 except ImportError:
-    logger.warning("⚠️ Enhanced TTS not available, using original TTS service")
-    from .. import tts_service
+    logger.warning("⚠️ Bashini-only service unavailable, falling back to enhanced TTS service")
+    from .. import tts_service_enhanced as tts_service
 
 
 @router.get("/api/symptoms/status")
@@ -292,7 +292,7 @@ async def medical_qa(
 
 @router.post("/api/tts")
 async def generate_tts(data: dict):
-    """Generate speech audio from text using Enhanced TTS (Bhashini/gTTS/Google/Coqui)"""
+    """Generate speech audio from text using Bashini TTS"""
     logger.info("=== ENDPOINT HIT: /api/tts ===")
     
     text = data.get("text", "").strip()

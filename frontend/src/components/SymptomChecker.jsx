@@ -3,7 +3,6 @@ import assessmentIcon from '../assets/assessment.png';
 import rashIcon from '../assets/rash.png';
 import capsuleIcon from '../assets/capsule.png';
 import medicalReportIcon from '../assets/medical-report (1).png';
-import { playTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
 import SearchableInput from './SearchableInput';
 import { t } from '../utils/translations';
@@ -22,8 +21,6 @@ const SymptomChecker = ({ onResult }) => {
   const [pregnant, setPregnant] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showAllSymptoms, setShowAllSymptoms] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const abortControllerRef = React.useRef(null);
 
   const toggleSymptom = (s) => {
@@ -44,17 +41,6 @@ const SymptomChecker = ({ onResult }) => {
       console.log('[SymptomChecker] Request stopped by user');
     }
     setLoading(false);
-    window.speechSynthesis.cancel();
-  };
-
-  const handleMuteToggle = () => {
-    setIsMuted(!isMuted);
-    if (!isMuted) {
-      window.speechSynthesis.cancel();
-      console.log('[SymptomChecker] TTS muted');
-    } else {
-      console.log('[SymptomChecker] TTS unmuted');
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -74,7 +60,6 @@ const SymptomChecker = ({ onResult }) => {
         const errorMsg = t('pleaseSelectSymptom', language);
         setError(errorMsg);
         setLoading(false);
-        playTTS(errorMsg, language);
         return;
       }
 
@@ -92,9 +77,6 @@ const SymptomChecker = ({ onResult }) => {
       
       console.log('[SymptomChecker] Sending POST to:', url);
       console.log('[SymptomChecker] Payload:', payload);
-      
-      // Play processing message and wait for it to complete
-      await playTTS(t('processingSymptoms', language), language);
 
       // Create abort controller for this request
       abortControllerRef.current = new AbortController();
@@ -128,23 +110,13 @@ const SymptomChecker = ({ onResult }) => {
         },
         result: data,
       });
-      
-      // Play analysis complete and wait for it to finish
-      await playTTS(t('analysisComplete', language), language);
-
-      // Speak the TTS payload (only if not muted) - will be queued after analysis complete finishes
-      if (data.tts_payload && !isMuted) {
-        await playTTS(data.tts_payload, language);
-      }
     } catch (err) {
       console.error('[SymptomChecker] Full error:', err);
       if (err.name === 'AbortError') {
         const errorMsg = t('requestStoppedShort', language);
         setError(errorMsg);
-        await playTTS(errorMsg, language);
       } else {
         setError(err.message || t('networkError', language));
-        await playTTS(t('thereWasError', language), language);
       }
     } finally {
       setLoading(false);
@@ -199,13 +171,6 @@ const SymptomChecker = ({ onResult }) => {
             <img src={rashIcon} alt="Symptoms" className="h-8 w-8" />
             {t('symptomsSearchSelect', language)}
           </h3>
-          <button
-            type="button"
-            onClick={() => playTTS(t('selectSymptomsExperiencing', language), language)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-lg font-semibold"
-          >
-            {t('help', language)}
-          </button>
         </div>
         <SearchableInput
           items={getSymptomsList(language)}
@@ -295,20 +260,6 @@ const SymptomChecker = ({ onResult }) => {
 
       {/* Submit Buttons */}
       <div className="flex flex-col md:flex-row gap-4 pt-6 border-t-4 border-green-300">
-        {/* Mute Button */}
-        <button
-          type="button"
-          onClick={handleMuteToggle}
-          title={isMuted ? t('unmute', language) : t('mute', language)}
-          className={`px-6 py-4 rounded-xl font-bold text-lg transition shadow-lg ${
-            isMuted
-              ? 'bg-red-500 text-white hover:bg-red-600'
-              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-          }`}
-        >
-          {isMuted ? `🔇 ${t('unmute', language)}` : `🔊 ${t('mute', language)}`}
-        </button>
-
         {/* Submit/Stop Button */}
         <button
           type={loading ? 'button' : 'submit'}
@@ -330,19 +281,6 @@ const SymptomChecker = ({ onResult }) => {
               {t('getRecommendation', language)}
             </span>
           )}
-        </button>
-
-        {/* Instructions Button */}
-        <button
-          type="button"
-          onClick={() => {
-            if (!isMuted) {
-              playTTS(t('readyToHelp', language), language);
-            }
-          }}
-          className="px-6 py-4 bg-amber-500 text-white rounded-xl font-bold text-lg hover:bg-amber-600 transition shadow-lg"
-        >
-          {t('help', language)}
         </button>
       </div>
     </form>

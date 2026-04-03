@@ -2,7 +2,7 @@ import React, { useState, useRef, useContext } from 'react';
 import { AuthContext } from '../main';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
-import { playTTS } from '../utils/tts';
+import { playTTS, stopAllTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
 import { API_BASE } from '../config/apiBase';
 
@@ -119,7 +119,26 @@ const PrescriptionAnalyzer = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState('');
-  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const speakText = async (text) => {
+    if (!text || !text.trim()) return;
+
+    if (isSpeaking) {
+      stopAllTTS();
+      setIsSpeaking(false);
+      return;
+    }
+
+    try {
+      setIsSpeaking(true);
+      await playTTS(text, language, { userInitiated: true });
+    } catch (error) {
+      console.error('Prescription analyzer speak error:', error);
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
 
   // Handle file selection
   const handleFileSelect = (e) => {
@@ -225,10 +244,6 @@ const PrescriptionAnalyzer = () => {
 
       const result = await response.json();
       setAnalysisResult(result);
-      
-      if (!isMuted && result.status === 'success') {
-        playTTS(getPrescriptionText('analysisComplete', language), language);
-      }
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
@@ -263,9 +278,8 @@ const PrescriptionAnalyzer = () => {
 
   // Speak medicine info
   const speakMedicineInfo = (medicine) => {
-    if (isMuted) return;
     const text = `${medicine.medicine_name}, ${medicine.dosage}, ${medicine.frequency}`;
-    playTTS(text, language);
+    speakText(text);
   };
 
   const iconButtonClass = 'inline-flex items-center justify-center gap-2';
@@ -432,16 +446,6 @@ const PrescriptionAnalyzer = () => {
             {getPrescriptionText('clear', language)}
           </button>
         )}
-        <button
-          onClick={() => setIsMuted(!isMuted)}
-          className={`font-semibold py-3 px-6 rounded-lg transition ${iconButtonClass} ${
-            isMuted
-              ? 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              : 'bg-amber-500 text-white hover:bg-amber-600'
-          }`}
-        >
-          {isMuted ? <MuteIcon className="h-5 w-5" /> : <SpeakerIcon className="h-5 w-5" />}
-        </button>
       </div>
 
       {/* Loading State */}
@@ -462,15 +466,31 @@ const PrescriptionAnalyzer = () => {
           {/* Status Alert */}
           {analysisResult.status === 'success' && (
             <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
-              <p className="text-green-800 font-semibold inline-flex items-center gap-2">
-                <CheckIcon className="h-5 w-5 text-green-700" />
-                {getPrescriptionText('analysisComplete', language)}
-              </p>
-              <p className="text-green-700 text-sm">
-                {analysisResult.medicines?.length > 0
-                  ? `${getPrescriptionText('found', language)} ${analysisResult.medicines.length} ${getPrescriptionText('medicines', language)}`
-                  : 'OCR text extracted successfully. Medicine parsing may require manual review.'}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-green-800 font-semibold inline-flex items-center gap-2">
+                    <CheckIcon className="h-5 w-5 text-green-700" />
+                    {getPrescriptionText('analysisComplete', language)}
+                  </p>
+                  <p className="text-green-700 text-sm">
+                    {analysisResult.medicines?.length > 0
+                      ? `${getPrescriptionText('found', language)} ${analysisResult.medicines.length} ${getPrescriptionText('medicines', language)}`
+                      : 'OCR text extracted successfully. Medicine parsing may require manual review.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const summaryText = analysisResult.medicines?.length > 0
+                      ? `${getPrescriptionText('analysisComplete', language)}. ${getPrescriptionText('found', language)} ${analysisResult.medicines.length} ${getPrescriptionText('medicines', language)}.`
+                      : getPrescriptionText('analysisComplete', language);
+                    speakText(summaryText);
+                  }}
+                  className="px-3 py-2 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-sm font-semibold"
+                >
+                  {isSpeaking ? t('stop', language) : t('readAloud', language)}
+                </button>
+              </div>
             </div>
           )}
 

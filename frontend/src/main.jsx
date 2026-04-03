@@ -30,6 +30,19 @@ function AppWrapper() {
     return localStorage.getItem('selectedLanguage') || 'english';
   });
 
+  useEffect(() => {
+    if (!window.speechSynthesis || typeof window.speechSynthesis.speak !== 'function') {
+      return undefined;
+    }
+
+    const originalSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
+    window.speechSynthesis.speak = () => {};
+
+    return () => {
+      window.speechSynthesis.speak = originalSpeak;
+    };
+  }, []);
+
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
     localStorage.setItem('selectedLanguage', newLanguage);

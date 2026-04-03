@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { playTTS } from '../utils/tts';
+import { playTTS, stopAllTTS } from '../utils/tts';
 import { formatMedicalResponse } from '../utils/formatMedicalResponse';
 import { LanguageContext } from '../main';
 import { AuthContext } from '../context/AuthContext.jsx';
@@ -51,15 +51,7 @@ const CloseIcon = () => (
     </svg>
 );
 
-// Mute icon (speaker off)
-const MuteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M13.5 4.06c0-1.336-1.616-2.318-2.674-1.338l-5.383 4.267A2 2 0 003 10v4a2 2 0 001.439 1.905l5.383 4.267c1.058.98 2.674.002 2.674-1.338V4.061z" />
-    <path d="M15.932 7.757a.75.75 0 011.061 1.061M18.286 10.5a.75.75 0 11-1.061-1.061M15.932 16.243a.75.75 0 011.061 1.061M18.286 13.5a.75.75 0 11-1.061-1.061M19.5 6.75a.75.75 0 00-1.061 1.061M20.25 10a.75.75 0 01-1.061-1.061M19.5 17.25a.75.75 0 001.061-1.061M20.25 14a.75.75 0 01-1.061-1.061" />
-  </svg>
-);
-
-// Unmute icon (speaker on)
+// Speak icon
 const UnmuteIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
     <path d="M13.5 4.06c0-1.336-1.616-2.318-2.674-1.338l-5.383 4.267A2 2 0 003 10v4a2 2 0 001.439 1.905l5.383 4.267c1.058.98 2.674.002 2.674-1.338V4.061z" />
@@ -88,7 +80,7 @@ const ChatbotWindow = () => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -250,17 +242,25 @@ const ChatbotWindow = () => {
       console.log('[ChatWidget] Request stopped by user');
     }
     setIsTyping(false);
-    window.speechSynthesis.cancel();
+    stopAllTTS();
   };
 
-  // Function to toggle mute
-  const handleMuteToggle = () => {
-    setIsMuted(!isMuted);
-    if (!isMuted) {
-      window.speechSynthesis.cancel();
-      console.log('[ChatWidget] TTS muted');
-    } else {
-      console.log('[ChatWidget] TTS unmuted');
+  const handleSpeakMessage = async (text) => {
+    if (!text || !text.trim()) return;
+
+    if (isSpeaking) {
+      stopAllTTS();
+      setIsSpeaking(false);
+      return;
+    }
+
+    try {
+      setIsSpeaking(true);
+      await playTTS(text, language, { userInitiated: true });
+    } catch (ttsErr) {
+      console.warn('[ChatWidget] TTS error (non-fatal):', ttsErr);
+    } finally {
+      setIsSpeaking(false);
     }
   };
 
@@ -339,17 +339,6 @@ const ChatbotWindow = () => {
       
       // Note: Q&A is automatically saved to database by backend if user is authenticated
       console.log('[ChatWidget] Response received and displayed. Saved to database:', isAuthenticated);
-      
-      // Speak the response using TTS in the selected language (only if not muted)
-      if (!isMuted) {
-        try {
-          // Use the current language for TTS
-          playTTS(botResponseText, language);
-          console.log(`[ChatWidget] Playing TTS in ${language} language`);
-        } catch (ttsErr) {
-          console.warn('[ChatWidget] TTS error (non-fatal):', ttsErr);
-        }
-      }
     } catch (err) {
       // Check if error is due to abort
       if (err.name === 'AbortError') {
@@ -423,12 +412,22 @@ const ChatbotWindow = () => {
                 }`}
               >
                 {message.sender === 'bot' ? (
-                  <div
-                    className="medical-response prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{
-                      __html: formatMedicalResponse(message.text),
-                    }}
-                  />
+                  <>
+                    <div
+                      className="medical-response prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{
+                        __html: formatMedicalResponse(message.text),
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSpeakMessage(message.text)}
+                      className="mt-2 px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold inline-flex items-center gap-1"
+                    >
+                      <UnmuteIcon />
+                      {isSpeaking ? t('stop', language) : t('readAloud', language)}
+                    </button>
+                  </>
                 ) : (
                   message.text
                 )}
@@ -464,15 +463,6 @@ const ChatbotWindow = () => {
             className="flex-1 border-none outline-none text-sm p-3 rounded-lg bg-gray-100 focus:ring-2 focus:ring-green-500 transition-all disabled:bg-gray-200 disabled:cursor-not-allowed"
             disabled={isTyping}
           />
-          
-          {/* Mute Button */}
-          <button
-            onClick={handleMuteToggle}
-            title={isMuted ? t('unmute', language) : t('mute', language)}
-            className={`p-3 rounded-lg cursor-pointer transition-colors flex-shrink-0 ${isMuted ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'}`}
-          >
-            {isMuted ? <MuteIcon /> : <UnmuteIcon />}
-          </button>
 
           {/* Stop/Send Button */}
           {isTyping ? (

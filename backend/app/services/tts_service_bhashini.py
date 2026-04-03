@@ -247,22 +247,8 @@ def generate_speech(text: str, language: str = "english") -> Optional[str]:
         except Exception as e:
             logger.error(f"[TTS] Error encoding audio: {e}")
     
-    # Fallback to eSpeak (offline, if Bhashini fails)
-    logger.info("[TTS] → Fallback: Trying eSpeak NG (offline)...")
-    audio_data = generate_speech_espeak(text, lang)
-    
-    if audio_data:
-        try:
-            audio_base64 = base64.b64encode(audio_data).decode("utf-8")
-            logger.info("[TTS] ✅ SUCCESS: eSpeak TTS (offline) working!")
-            return audio_base64
-        except Exception as e:
-            logger.error(f"[TTS] Error encoding audio: {e}")
-    
-    logger.error("[TTS] ❌ All TTS providers failed")
-    logger.error("[TTS] Try:")
-    logger.error("[TTS]   1. Check internet connection for Bhashini")
-    logger.error("[TTS]   2. Install eSpeak: pip install espeak-ng")
+    logger.error("[TTS] ❌ Bhashini TTS failed")
+    logger.error("[TTS] Check internet connectivity and Bhashini availability")
     return None
 
 
@@ -311,7 +297,5 @@ def get_tts_info() -> dict:
             "❌ Indic TTS (deprecated)",
             "❌ gTTS (replaced for better quality)"
         ],
-        "fallback_services": [
-            "eSpeak NG (offline, open-source)"
-        ]
+        "fallback_services": []
     }

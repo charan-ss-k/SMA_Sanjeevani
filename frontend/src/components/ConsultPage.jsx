@@ -115,7 +115,7 @@ const translateMessage = (key, language, replacements = {}) => {
 
 const ConsultPage = () => {
   const { language } = useContext(LanguageContext);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   
   // State management
   const [tab, setTab] = useState('book'); // book, history, reminders
@@ -166,6 +166,25 @@ const ConsultPage = () => {
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
+
+  const speakText = async (text) => {
+    if (!text || !text.trim()) return;
+
+    if (isSpeaking) {
+      stopAllTTS();
+      setIsSpeaking(false);
+      return;
+    }
+
+    try {
+      setIsSpeaking(true);
+      await playTTS(text, language, { userInitiated: true });
+    } catch (err) {
+      console.error('Consult TTS error:', err);
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
   
   // Load search options and appointments on mount
   useEffect(() => {
@@ -262,7 +281,6 @@ const ConsultPage = () => {
       
       if (response.ok) {
         setMessage('✅ Appointment updated successfully');
-        if (!isMuted) playTTS('Appointment updated successfully', language);
         
         // Reload appointments
         await loadAppointments();
@@ -281,7 +299,6 @@ const ConsultPage = () => {
     } catch (error) {
       console.error('❌ Error updating appointment:', error);
       setMessage(`❌ ${error.message}`);
-      if (!isMuted) playTTS(`Error: ${error.message}`, language);
     } finally {
       setLoading(false);
     }
@@ -318,7 +335,6 @@ const ConsultPage = () => {
       
       if (response.ok) {
         setMessage(`✅ ${data.message}`);
-        if (!isMuted) playTTS(data.message, language);
         
         // Reload appointments to refresh the list
         await loadAppointments();
@@ -332,7 +348,6 @@ const ConsultPage = () => {
     } catch (error) {
       console.error('❌ Error cancelling appointment:', error);
       setError(`Failed to cancel: ${error.message}`);
-      if (!isMuted) playTTS(`Error: ${error.message}`, language);
     } finally {
       setLoading(false);
     }
@@ -349,7 +364,6 @@ const ConsultPage = () => {
     // Validate at least one criterion
     if (!Object.values(searchForm).some(val => val)) {
       setError('Please select at least one search criterion');
-      if (!isMuted) playTTS('Please select at least one search criterion', language);
       return;
     }
     
@@ -375,17 +389,14 @@ const ConsultPage = () => {
         setStep('results');
         const message = translateMessage('doctorsFound', language, { count: data.doctors.length });
         setMessage(message);
-        if (!isMuted) playTTS(message, language);
       } else {
         const errorMsg = translateMessage('noDoctorsFound', language);
         setError(errorMsg);
-        if (!isMuted) playTTS(errorMsg, language);
       }
     } catch (err) {
       console.error('Search error:', err);
       const errorMsg = err.message || translateMessage('errorSearching', language);
       setError(errorMsg);
-      if (!isMuted) playTTS(errorMsg, language);
     } finally {
       setLoading(false);
     }
@@ -402,7 +413,6 @@ const ConsultPage = () => {
       appointment_time: '',
       notes: ''
     });
-    if (!isMuted) playTTS(`Booking appointment with ${doctor.name}`, language);
   };
   
   const handleBookingChange = (e) => {
@@ -417,7 +427,6 @@ const ConsultPage = () => {
     if (!bookingForm.patient_name || !bookingForm.patient_email || !bookingForm.patient_phone ||
         !bookingForm.appointment_date || !bookingForm.appointment_time) {
       setError('Please fill all required fields');
-      if (!isMuted) playTTS('Please fill all required fields', language);
       return;
     }
     
@@ -478,7 +487,6 @@ const ConsultPage = () => {
       if (data.success) {
         const successMsg = translateMessage('appointmentBooked', language, { id: data.appointment_id });
         setMessage(successMsg);
-        if (!isMuted) playTTS(successMsg, language);
         
         // Reload appointments
         loadAppointments();
@@ -502,19 +510,8 @@ const ConsultPage = () => {
     } catch (err) {
       console.error('Booking error:', err);
       setError(err.message || 'Error booking appointment');
-      if (!isMuted) playTTS('Error booking appointment', language);
     } finally {
       setLoading(false);
-    }
-  };
-  
-  const handleMuteToggle = () => {
-    if (!isMuted) {
-      stopAllTTS();
-    }
-    setIsMuted(!isMuted);
-    if (isMuted) {
-      playTTS('Voice enabled', language);
     }
   };
   
@@ -526,13 +523,6 @@ const ConsultPage = () => {
           <h1>{t('doctorConsultation', language)}</h1>
           <p>{t('bookAppointmentsManageConsultations', language)}</p>
         </div>
-        <button
-          onClick={handleMuteToggle}
-          className={`mute-btn ${isMuted ? 'muted' : ''}`}
-          title={isMuted ? 'Unmute' : 'Mute'}
-        >
-          {isMuted ? '🔇' : '🔊'}
-        </button>
       </div>
       
       {/* Tabs */}
@@ -576,11 +566,27 @@ const ConsultPage = () => {
       {message && (
         <div className="message-box success">
           {message}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ marginLeft: '12px' }}
+            onClick={() => speakText(message.replace(/^✅\s*/, ''))}
+          >
+            {isSpeaking ? t('stop', language) : t('readAloud', language)}
+          </button>
         </div>
       )}
       {error && (
         <div className="message-box error">
           ⚠️ {error}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ marginLeft: '12px' }}
+            onClick={() => speakText(error)}
+          >
+            {isSpeaking ? t('stop', language) : t('readAloud', language)}
+          </button>
         </div>
       )}
       
@@ -713,12 +719,27 @@ const ConsultPage = () => {
               <div>
                 <h2>👨‍⚕️ {doctors.length} {t('doctorsFound', language)}</h2>
               </div>
-              <button
-                onClick={() => setStep('search')}
-                className="btn btn-secondary"
-              >
-                ← {t('newSearch', language)}
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const doctorSummary = doctors
+                      .slice(0, 5)
+                      .map((doctor) => `${doctor.name}, ${doctor.specialization}, ${doctor.city}`)
+                      .join('. ');
+                    speakText(`${doctors.length} ${t('doctorsFound', language)}. ${doctorSummary}`);
+                  }}
+                  className="btn btn-secondary"
+                >
+                  {isSpeaking ? t('stop', language) : t('readAloud', language)}
+                </button>
+                <button
+                  onClick={() => setStep('search')}
+                  className="btn btn-secondary"
+                >
+                  ← {t('newSearch', language)}
+                </button>
+              </div>
             </div>
             
             <div className="doctors-grid">
@@ -1022,7 +1043,7 @@ const ConsultPage = () => {
                           ✏️ {t('edit', language)}
                         </button>
                         <button className="btn btn-reminder" onClick={() => {
-                          if (!isMuted) playTTS(`${t('yourAppointmentWithDr', language)} ${apt.doctor_name} ${t('isComingUpIn', language)} ${daysUntil} ${t('daysFormat', language)} ${t('at', language)} ${apt.appointment_time}`, language);
+                          speakText(`${t('yourAppointmentWithDr', language)} ${apt.doctor_name} ${t('isComingUpIn', language)} ${daysUntil} ${t('daysFormat', language)} ${t('at', language)} ${apt.appointment_time}`);
                         }}>
                           🔔 {t('setReminder', language)}
                         </button>

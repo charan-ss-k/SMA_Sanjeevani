@@ -5,7 +5,7 @@ import { LanguageContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import PrescriptionAnalyzer from './PrescriptionAnalyzer';
 import { t } from '../utils/translations';
-import { playTTS } from '../utils/tts';
+import { playTTS, stopAllTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
 import { translateData } from '../data/dataTranslations';
 import { API_BASE } from '../config/apiBase';
@@ -68,7 +68,7 @@ const PrescriptionHandling = () => {
   });
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [activeTab, setActiveTab] = useState('manage'); // 'manage' or 'analyze'
   
   // Image analysis state
@@ -99,6 +99,25 @@ const PrescriptionHandling = () => {
   useEffect(() => {
     localStorage.setItem('prescriptions', JSON.stringify(medicines));
   }, [medicines]);
+
+  const speakText = async (text) => {
+    if (!text || !text.trim()) return;
+
+    if (isSpeaking) {
+      stopAllTTS();
+      setIsSpeaking(false);
+      return;
+    }
+
+    try {
+      setIsSpeaking(true);
+      await playTTS(text, language, { userInitiated: true });
+    } catch (error) {
+      console.error('Prescription handling speak error:', error);
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
 
   const translateDefaultValue = (value) => {
     if (!value) return value;
@@ -143,18 +162,6 @@ const PrescriptionHandling = () => {
     }
   };
 
-  const handleMuteToggle = () => {
-    setIsMuted(!isMuted);
-    if (!isMuted) {
-      window.speechSynthesis.cancel();
-    }
-    if (!isMuted) {
-      playTTS(t('voiceMuted', language), language);
-    } else {
-      playTTS(t('voiceUnmuted', language), language);
-    }
-  };
-
   const handleAddMedicine = () => {
     if (!formData.name || !formData.dosage || !formData.frequency) {
       alert(t('pleaseFillRequired', language));
@@ -187,9 +194,6 @@ const PrescriptionHandling = () => {
       notes: '',
     });
     setShowForm(false);
-    if (!isMuted) {
-      playTTS(editingId ? t('medicineUpdated', language) : t('medicineAdded', language), language);
-    }
   };
 
   const handleEditMedicine = (med) => {
@@ -201,15 +205,12 @@ const PrescriptionHandling = () => {
   const handleDeleteMedicine = (id) => {
     if (confirm(t('deleteThisMedicine', language))) {
       setMedicines(prev => prev.filter(m => m.id !== id));
-      if (!isMuted) {
-        playTTS(t('medicineDeleted', language), language);
-      }
     }
   };
 
   const handleSpeakMedicine = (med) => {
     const text = `${med.name}. ${t('dosage', language)}: ${med.dosage}. ${t('frequency', language)}: ${med.frequency}. ${med.notes}`;
-    playTTS(text, language);
+    speakText(text);
   };
 
   // Image analysis handlers
@@ -226,10 +227,6 @@ const PrescriptionHandling = () => {
         setImagePreview(e.target.result);
       };
       reader.readAsDataURL(selectedFile);
-      
-      if (!isMuted) {
-        playTTS(t('imageSelected', language), language);
-      }
     }
   };
 
@@ -238,9 +235,6 @@ const PrescriptionHandling = () => {
       abortControllerRef.current.abort();
       setAnalyzing(false);
       setAnalysisError(t('analysisCancelled', language));
-      if (!isMuted) {
-        playTTS(t('analysisCancelled', language), language);
-      }
     }
   };
 
@@ -256,10 +250,6 @@ const PrescriptionHandling = () => {
     
     // Create abort controller for cancellation
     abortControllerRef.current = new AbortController();
-    
-    if (!isMuted) {
-      playTTS(t('analyzingImage', language), language);
-    }
 
     try {
       const formData = new FormData();
@@ -283,9 +273,6 @@ const PrescriptionHandling = () => {
 
       if (data.analysis) {
         setAnalysisResult(data.analysis);
-        if (!isMuted) {
-          playTTS(t('analysisComplete', language), language);
-        }
       } else {
         setAnalysisError(getPrescriptionText('noAnalysisData', language));
       }
@@ -295,9 +282,6 @@ const PrescriptionHandling = () => {
       } else {
         console.error('Analysis error:', err);
         setAnalysisError(`${t('analysisFailed', language)}: ${err.message}`);
-        if (!isMuted) {
-          playTTS(t('analysisFailed', language), language);
-        }
       }
     } finally {
       setAnalyzing(false);
@@ -311,7 +295,7 @@ const PrescriptionHandling = () => {
       analysisResult.dosage ? `${t('dosage', language)}: ${analysisResult.dosage}.` : ''
     } ${analysisResult.full_information || ''}`;
     
-    playTTS(text, language);
+    speakText(text);
   };
 
   const handleSaveAnalysisResult = async () => {
@@ -363,16 +347,9 @@ const PrescriptionHandling = () => {
       setAnalysisResult(null);
       setFile(null);
       setImagePreview(null);
-      
-      if (!isMuted) {
-        playTTS(t('prescriptionSaved', language), language);
-      }
     } catch (err) {
       console.error('Save error:', err);
       setAnalysisError(`Failed to save: ${err.message}`);
-      if (!isMuted) {
-        playTTS(t('saveFailed', language), language);
-      }
     }
   };
 
@@ -392,9 +369,6 @@ const PrescriptionHandling = () => {
       }
 
       setPrescriptionHistory(prev => prev.filter(p => p.id !== id));
-      if (!isMuted) {
-        playTTS(t('prescriptionDeleted', language), language);
-      }
     } catch (err) {
       console.error('Delete error:', err);
     }
@@ -417,17 +391,6 @@ const PrescriptionHandling = () => {
             <h1 className="text-5xl font-bold text-green-800 mb-2">{getPrescriptionText('prescriptionManagement', language)}</h1>
             <p className="text-xl text-gray-700">{getPrescriptionText('managePrescriptions', language)}</p>
           </div>
-          <button
-            onClick={handleMuteToggle}
-            title={isMuted ? t('unmute', language) : t('mute', language)}
-            className={`px-6 py-3 rounded-lg font-bold text-lg transition shadow-lg ${
-              isMuted
-                ? 'bg-red-500 text-white hover:bg-red-600'
-                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-            }`}
-          >
-            {isMuted ? `🔇 ${t('unmute', language)}` : `🔊 ${t('mute', language)}`}
-          </button>
         </div>
 
         {/* Quick Stats */}
@@ -569,7 +532,7 @@ const PrescriptionHandling = () => {
                       className="bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-lg transition"
                       title={t('listenToResults', language)}
                     >
-                      🔊
+                      {isSpeaking ? '⏹️' : '🔊'}
                     </button>
                   </div>
                   
@@ -688,13 +651,10 @@ const PrescriptionHandling = () => {
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <button
-                              onClick={() => playTTS(
-                                `${prescription.medicine_name}. ${prescription.dosage}. ${prescription.frequency}. ${prescription.notes}`,
-                                language
-                              )}
+                              onClick={() => speakText(`${prescription.medicine_name}. ${prescription.dosage}. ${prescription.frequency}. ${prescription.notes}`)}
                               className="p-2 bg-amber-50 rounded hover:bg-amber-100"
                             >
-                              🔊
+                              {isSpeaking ? '⏹️' : '🔊'}
                             </button>
                             <button
                               onClick={() => handleDeletePrescription(prescription.id)}
