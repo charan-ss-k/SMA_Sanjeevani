@@ -1,0 +1,7 @@
+# Exclude local caches and build artifacts from EAS upload
+node_modules/
+.expo/
+android/.gradle/
+android/.gradle/**
+android/build/
+android/app/build/

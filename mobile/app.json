@@ -41,7 +41,8 @@
         {
           "microphonePermission": "Allow Sanjeevani to access your microphone."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {
