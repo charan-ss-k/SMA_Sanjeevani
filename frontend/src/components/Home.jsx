@@ -8,6 +8,7 @@ import capsuleIcon from '../assets/capsule.png';
 import remainderIcon from '../assets/remainder.png';
 import DashboardAppointments from './DashboardAppointments';
 import DashboardAnalytics from './DashboardAnalytics';
+import AppDownloadBanner from './AppDownloadBanner';
 
 const Home = () => {
   const { language } = useContext(LanguageContext);
@@ -357,6 +358,8 @@ const Home = () => {
             </div>
           </div>
         </section>
+
+        <AppDownloadBanner />
       </div>
 
       <style>{`

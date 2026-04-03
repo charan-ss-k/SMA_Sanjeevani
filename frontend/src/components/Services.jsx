@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
+import AppDownloadBanner from './AppDownloadBanner';
 
 const Services = () => {
   const { language } = useContext(LanguageContext);
@@ -97,6 +98,10 @@ const Services = () => {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="mt-8 md:mt-10">
+          <AppDownloadBanner />
         </div>
       </div>
     </div>
