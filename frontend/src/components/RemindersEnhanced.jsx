@@ -343,18 +343,18 @@ const RemindersEnhanced = () => {
     <>
       {!isAuthenticated && <FeatureLoginPrompt featureName={t('remindersManagementFeature', language)} />}
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 pt-24 pb-10">
-        <div className="container mx-auto px-4 max-w-7xl">
+        <div className="container mx-auto px-4 max-w-5xl">
           
           {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-5xl font-bold text-green-800 mb-2">⏰ {t('reminders', language)}</h1>
-              <p className="text-xl text-gray-700">{t('manageYourMedicineReminders', language)}</p>
+              <h1 className="text-3xl md:text-4xl font-bold text-green-800 mb-2">⏰ {t('reminders', language)}</h1>
+              <p className="text-base md:text-lg text-gray-700">{t('manageYourMedicineReminders', language)}</p>
             </div>
             <button
               onClick={handleMuteToggle}
               title={isMuted ? t('unmute', language) : t('mute', language)}
-              className={`px-6 py-3 rounded-lg font-bold text-lg transition shadow-lg ${
+              className={`self-start md:self-auto px-5 py-2.5 rounded-lg font-bold text-base transition shadow-lg ${
                 isMuted
                   ? 'bg-red-500 text-white hover:bg-red-600'
                   : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
@@ -380,7 +380,7 @@ const RemindersEnhanced = () => {
             {medicines.length === 0 ? (
               <p className="text-gray-500 text-center py-8">{t('noMedicinesAdded', language)}</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {medicines.map(med => (
                   <div key={med.id} className="p-4 bg-gradient-to-br from-green-50 to-blue-50 rounded-lg border border-green-200">
                     <div className="flex items-start gap-3">
@@ -564,7 +564,7 @@ const RemindersEnhanced = () => {
           </div>
 
           {/* Reminder Stats Dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 gap-4 mb-8">
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
               <h3 className="text-sm font-semibold opacity-90">{t('todaysReminders', language)}</h3>
               <p className="text-4xl font-bold mt-2">{todayReminders}</p>
@@ -612,7 +612,7 @@ const RemindersEnhanced = () => {
           )}
 
           {/* Today's Intake History & Reminder History */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="bg-white rounded-xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-2xl font-bold text-gray-800">✓ {t('todaysIntakeHistory', language)}</h3>
@@ -703,7 +703,7 @@ const RemindersEnhanced = () => {
             {medicines.filter(m => m.reminder_times && m.reminder_times.length > 0).length === 0 ? (
               <p className="text-gray-500 text-center py-8">{t('noRemindersScheduled', language)}</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {medicines
                   .filter(m => m.reminder_times && m.reminder_times.length > 0)
                   .map(med => (

@@ -16,10 +16,10 @@ const Home = () => {
   const { isAuthenticated, user } = useContext(AuthContext);
   
   const slides = [
-    { titleKey: 'scanMedicine', bg: 'bg-gradient-to-r from-green-100 to-green-50' },
-    { titleKey: 'setReminders', bg: 'bg-gradient-to-r from-amber-100 to-amber-50' },
-    { titleKey: 'uploadPrescriptions', bg: 'bg-gradient-to-r from-indigo-100 to-indigo-50' },
-    { titleKey: 'stayUpdated', bg: 'bg-gradient-to-r from-pink-100 to-pink-50' },
+    { titleKey: 'scanMedicine', bg: 'bg-gradient-to-br from-emerald-100 via-white to-teal-100' },
+    { titleKey: 'setReminders', bg: 'bg-gradient-to-br from-amber-100 via-white to-orange-100' },
+    { titleKey: 'uploadPrescriptions', bg: 'bg-gradient-to-br from-indigo-100 via-white to-sky-100' },
+    { titleKey: 'stayUpdated', bg: 'bg-gradient-to-br from-rose-100 via-white to-fuchsia-100' },
   ];
 
   const carouselRef = useRef(null);
@@ -85,11 +85,11 @@ const Home = () => {
   }, [isPaused]); // Add isPaused as a dependency
 
   return (
-    <div className="pt-16 pb-12 bg-gray-50 min-h-screen"> {/* reduced offset for fixed navbar */}
+    <div className="pt-16 pb-12 min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_40%),linear-gradient(180deg,_#f8fffb_0%,_#effcf5_45%,_#f8fafc_100%)]">
       {/* Large Carousel (top) - Only show when NOT authenticated */}
       {!isAuthenticated && (
-      <div className="w-full overflow-hidden">
-        <div className="relative">
+      <div className="w-full overflow-hidden px-4 sm:px-6">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl border border-emerald-100 shadow-[0_24px_70px_rgba(16,185,129,0.18)]">
           <div 
             ref={carouselRef} 
             className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
@@ -98,15 +98,16 @@ const Home = () => {
             {slides.map((s, i) => (
               <div 
                 key={i} 
-                className={`min-w-full snap-start ${s.bg} flex items-center justify-center min-h-[280px] md:min-h-[420px] bg-cover bg-center cursor-pointer`}
+                className={`min-w-full snap-start ${s.bg} flex items-center justify-center min-h-[320px] md:min-h-[440px] bg-cover bg-center cursor-pointer`}
                 onClick={() => setIsPaused(true)}
               >
                 <div className="max-w-4xl px-6 text-center">
-                  <h2 className="text-2xl md:text-4xl font-extrabold text-green-900 mb-3">{t(s.titleKey, language)}</h2>
-                  <p className="text-gray-700 mb-4">{t('bringingHealthcare', language)}</p>
-                  <div className="flex items-center justify-center gap-3">
-                    <a href="/tutorial" className="bg-green-800 text-white px-4 py-2 rounded">{t('tryDemo', language)}</a>
-                    <Link to="/chatbot" className="bg-amber-50 px-4 py-2 rounded">{t('askHealthAssistant', language)}</Link>
+                  <p className="inline-flex rounded-full border border-emerald-300 bg-white/80 px-4 py-1 text-sm font-semibold tracking-wide text-emerald-900">SMA Sanjeevani</p>
+                  <h2 className="mt-4 text-3xl md:text-5xl font-black tracking-tight text-emerald-950 mb-3">{t(s.titleKey, language)}</h2>
+                  <p className="text-slate-700 mb-6 text-lg">{t('bringingHealthcare', language)}</p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <a href="/tutorial" className="rounded-xl bg-emerald-700 text-white px-6 py-3 font-semibold shadow hover:bg-emerald-800 transition">{t('tryDemo', language)}</a>
+                    <Link to="/chatbot" className="rounded-xl border border-emerald-200 bg-white px-6 py-3 font-semibold text-emerald-900 hover:bg-emerald-50 transition">{t('askHealthAssistant', language)}</Link>
                   </div>
                 </div>
               </div>
@@ -120,7 +121,7 @@ const Home = () => {
                 setIsPaused(true);
                 scrollCarousel('prev');
               }} 
-              className="bg-white/80 p-2 rounded-full shadow hover:bg-white"
+              className="bg-white/90 p-2.5 rounded-full shadow-lg hover:bg-white"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -133,7 +134,7 @@ const Home = () => {
                 setIsPaused(true);
                 scrollCarousel('next');
               }} 
-              className="bg-white/80 p-2 rounded-full shadow hover:bg-white"
+              className="bg-white/90 p-2.5 rounded-full shadow-lg hover:bg-white"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -144,7 +145,7 @@ const Home = () => {
           <div className="absolute top-4 right-4 flex items-center">
             <button 
               onClick={() => setIsPaused(!isPaused)} 
-              className="bg-white/80 p-2 rounded-full shadow hover:bg-white"
+              className="bg-white/90 p-2.5 rounded-full shadow-lg hover:bg-white"
               aria-label={isPaused ? "Play slideshow" : "Pause slideshow"}
             >
               {isPaused ? "▶" : "⏸"}
@@ -175,16 +176,16 @@ const Home = () => {
       {/* Quick test panel for symptoms recommend endpoint - Only show when NOT authenticated */}
       {!isAuthenticated && (
       <div className="container mx-auto px-6 mt-6">
-        <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
+        <section className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white rounded-3xl shadow-xl p-8 mb-6 border border-emerald-400/30">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="font-bold text-3xl mb-2">{t('checkSymptoms', language)}</h3>
+              <h3 className="font-black text-3xl mb-2 tracking-tight">{t('checkSymptoms', language)}</h3>
               <p className="text-lg mb-4">
                 {t('getInstantRecommendations', language)}
               </p>
               <Link 
                 to="/medicine-recommendation"
-                className="inline-block bg-amber-400 hover:bg-amber-300 text-green-900 font-bold px-6 py-3 rounded-lg transition"
+                className="inline-block bg-amber-300 hover:bg-amber-200 text-emerald-950 font-bold px-6 py-3 rounded-xl transition"
               >
                 {t('openMedicineRecommendation', language)}
               </Link>
@@ -200,12 +201,12 @@ const Home = () => {
       {/* Intro / Hero below carousel - Only show when NOT authenticated */}
       {!isAuthenticated && (
       <div className="container mx-auto px-6 mt-8">
-        <section className="bg-white rounded-lg shadow p-6 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-green-900">{t('smartMedicineAccess', language)}</h1>
-          <p className="text-gray-700 mt-3 max-w-3xl mx-auto">{t('bringingHealthcare', language)}</p>
+        <section className="bg-white/90 rounded-3xl border border-emerald-100 shadow-[0_14px_40px_rgba(15,23,42,0.09)] p-8 text-center">
+          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-emerald-950">{t('smartMedicineAccess', language)}</h1>
+          <p className="text-slate-600 mt-3 max-w-3xl mx-auto text-lg">{t('bringingHealthcare', language)}</p>
           <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="/tutorial" className="bg-green-800 text-white px-5 py-3 rounded">{t('tryDemo', language)}</a>
-            <Link to="/chatbot" className="bg-amber-50 px-5 py-3 rounded">{t('askHealthAssistant', language)}</Link>
+            <a href="/tutorial" className="rounded-xl bg-emerald-700 text-white px-6 py-3 font-semibold hover:bg-emerald-800 transition">{t('tryDemo', language)}</a>
+            <Link to="/chatbot" className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-3 font-semibold text-emerald-900 hover:bg-emerald-100 transition">{t('askHealthAssistant', language)}</Link>
           </div>
         </section>
       </div>
@@ -216,7 +217,7 @@ const Home = () => {
         {isAuthenticated ? (
           <>
             {/* Welcome Section with User Info */}
-            <section className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow p-6 mb-6">
+            <section className="bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-3xl border border-blue-100 shadow-lg p-6 mb-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-3xl font-bold text-blue-900 mb-2">
@@ -256,14 +257,14 @@ const Home = () => {
         ) : (
           <>
             {/* Not Authenticated - Show Call to Action */}
-            <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
+            <section className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white rounded-3xl shadow-xl p-8 mb-6 border border-emerald-400/30">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <h3 className="font-bold text-3xl mb-2">{t('getStartedWithYourHealthJourney', language)}</h3>
                   <p className="text-lg mb-4">
 {t('getStartedDesc', language)}
                   </p>
-                  <button onClick={() => window.location.href = '#'} className="inline-block bg-amber-400 hover:bg-amber-300 text-green-900 font-bold px-6 py-3 rounded-lg transition">
+                  <button onClick={() => window.location.href = '#'} className="inline-block bg-amber-300 hover:bg-amber-200 text-emerald-950 font-bold px-6 py-3 rounded-xl transition">
                     🔐 {t('loginToContinue', language)}
                   </button>
                 </div>
@@ -273,17 +274,17 @@ const Home = () => {
 
             {/* Quick Stats */}
             <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="bg-blue-50 rounded-lg shadow p-6 text-center hover:shadow-xl transition-shadow">
+              <div className="bg-gradient-to-br from-blue-50 to-sky-100 rounded-2xl border border-blue-100 shadow p-6 text-center hover:shadow-xl transition-shadow">
                 <div className="text-4xl mb-2">👨‍⚕️</div>
                 <h3 className="font-bold text-xl text-blue-900">{t('expertDoctors', language)}</h3>
                 <p className="text-gray-700">{t('expertDoctorsDesc', language)}</p>
               </div>
-              <div className="bg-green-50 rounded-lg shadow p-6 text-center hover:shadow-xl transition-shadow">
+              <div className="bg-gradient-to-br from-emerald-50 to-lime-100 rounded-2xl border border-emerald-100 shadow p-6 text-center hover:shadow-xl transition-shadow">
                 <div className="text-4xl mb-2"><img src={calendarIcon} alt="Calendar" className="h-12 w-12 inline-block" /></div>
                 <h3 className="font-bold text-xl text-green-900">{t('easyBooking', language)}</h3>
                 <p className="text-gray-700">{t('easyBookingDesc', language)}</p>
               </div>
-              <div className="bg-purple-50 rounded-lg shadow p-6 text-center hover:shadow-xl transition-shadow">
+              <div className="bg-gradient-to-br from-violet-50 to-fuchsia-100 rounded-2xl border border-violet-100 shadow p-6 text-center hover:shadow-xl transition-shadow">
                 <div className="text-4xl mb-2">📊</div>
                 <h3 className="font-bold text-xl text-purple-900">{t('analytics', language)}</h3>
                 <p className="text-gray-700">{t('healthTrackDesc', language)}</p>
@@ -340,7 +341,7 @@ const Home = () => {
         )}
 
         {/* Features Section - Always Show */}
-        <section className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-lg p-8 mb-6">
+        <section className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 text-white rounded-3xl shadow-xl p-8 mb-6 border border-emerald-400/30">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="font-bold text-3xl mb-2 flex items-center gap-2">
@@ -352,7 +353,7 @@ const Home = () => {
               </p>
               <Link 
                 to="/medicine-recommendation"
-                className="inline-block bg-amber-400 hover:bg-amber-300 text-green-900 font-bold px-6 py-3 rounded-lg transition"
+                className="inline-block bg-amber-300 hover:bg-amber-200 text-emerald-950 font-bold px-6 py-3 rounded-xl transition"
               >
                 {t('openMedicineRecommendation', language).replace('💊 ', '')}
               </Link>

@@ -342,6 +342,7 @@ const Dashboard = () => {
   const { isAuthenticated } = useContext(AuthContext);
   const { language } = useContext(LanguageContext);
   const [searchHistory, setSearchHistory] = useState([]);
+  const [showAllRecentSearches, setShowAllRecentSearches] = useState(false);
   const [stats, setStats] = useState({
     totalSearches: 0,
     mostCommonSymptoms: [],
@@ -450,6 +451,8 @@ const Dashboard = () => {
   };
 
   const colors = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444'];
+  const recentSearchLimit = 5;
+  const visibleSearchHistory = showAllRecentSearches ? searchHistory : searchHistory.slice(0, recentSearchLimit);
 
   // Transform chart data to include translated names
   const translateChartData = (data, category) => {
@@ -540,18 +543,18 @@ const Dashboard = () => {
         {/* Charts Section */}
         <div className="grid grid-cols-2 gap-6 mb-8">
           {/* Symptom Frequency */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="bg-white rounded-2xl shadow-lg p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <img src={rashIcon} alt="Symptoms" className="h-7 w-7 object-contain" />
               <span>{mostCommonSymptomsTitle}</span>
             </h2>
             {stats.mostCommonSymptoms.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={translateChartData(stats.mostCommonSymptoms, 'symptom')}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="displayName" angle={-45} textAnchor="end" height={100} />
+              <ResponsiveContainer width="100%" height={340}>
+                <BarChart data={translateChartData(stats.mostCommonSymptoms, 'symptom')} barCategoryGap="22%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="displayName" angle={-25} textAnchor="end" height={90} interval={0} tick={{ fill: '#374151', fontSize: 11 }} />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip cursor={{ fill: '#ecfdf5' }} />
                   <Bar dataKey="count" fill="#10b981" name={getTranslation('frequency', language)} />
                 </BarChart>
               </ResponsiveContainer>
@@ -563,31 +566,46 @@ const Dashboard = () => {
           </div>
 
           {/* Condition Frequency - Pie Chart */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="bg-white rounded-2xl shadow-lg p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <img src={hospitalIcon} alt="Diagnosed Conditions" className="h-7 w-7 object-contain" />
               <span>{getTranslation('diagnosedConditions', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</span>
             </h2>
             {stats.conditionFrequency.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={translateChartData(stats.conditionFrequency, 'condition')}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ displayName, value }) => `${displayName}: ${value}`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {stats.conditionFrequency.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                    <Pie
+                      data={translateChartData(stats.conditionFrequency, 'condition')}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={88}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {stats.conditionFrequency.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {translateChartData(stats.conditionFrequency, 'condition').map((item, index) => (
+                    <div key={`${item.name}-${index}`} className="flex items-center gap-2 rounded-md bg-gray-50 px-2 py-1.5 min-w-0">
+                      <span
+                        className="h-3 w-3 rounded-sm flex-shrink-0"
+                        style={{ backgroundColor: colors[index % colors.length] }}
+                      />
+                      <span className="text-xs text-gray-700 truncate" title={`${item.displayName}: ${item.value}`}>
+                        {item.displayName}: {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="h-[300px] rounded-lg bg-gray-50 flex items-center justify-center text-gray-500">
                 {getTranslation('noConditionsRecorded', language)}
@@ -599,23 +617,33 @@ const Dashboard = () => {
 
         {/* Medicines + Search History Row */}
         <div className="grid grid-cols-2 gap-6 mb-8 items-stretch">
-          <div className="bg-white rounded-xl border border-blue-100 shadow-lg p-6 h-full">
+          <div className="bg-white rounded-2xl border border-blue-100 shadow-lg p-6 h-full">
             <h2 className="text-2xl font-bold text-gray-800 mb-5 flex items-center gap-3">
               <img src={capsuleIcon} alt="Medicines" className="h-8 w-8 object-contain" />
               <span>{topMedicinesTitle}</span>
             </h2>
             {stats.recommendedMedicines.length > 0 ? (
               <div className="rounded-lg bg-blue-50/60 p-2">
-                <ResponsiveContainer width="100%" height={285}>
+                <ResponsiveContainer width="100%" height={340}>
                   <BarChart
                     data={translateChartData(stats.recommendedMedicines, 'medicine')}
                     layout="vertical"
-                    margin={{ top: 6, right: 18, left: 18, bottom: 6 }}
-                    barSize={24}
+                    margin={{ top: 12, right: 26, left: 26, bottom: 12 }}
+                    barSize={16}
+                    barCategoryGap="32%"
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dbeafe" />
                     <XAxis type="number" allowDecimals={false} tick={{ fill: '#1e3a8a', fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <YAxis dataKey="displayName" type="category" width={132} tickMargin={6} fontSize={12} tick={{ fill: '#1f2937' }} axisLine={false} tickLine={false} />
+                    <YAxis
+                      dataKey="displayName"
+                      type="category"
+                      width={178}
+                      tickMargin={10}
+                      fontSize={11}
+                      tick={{ fill: '#1f2937' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <Tooltip cursor={{ fill: '#dbeafe' }} />
                     <Bar dataKey="count" fill="#2563eb" name={getTranslation('recommendations', language)} radius={[0, 10, 10, 0]} />
                   </BarChart>
@@ -628,7 +656,7 @@ const Dashboard = () => {
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6 h-full flex flex-col">
+          <div className="bg-white rounded-2xl shadow-lg p-6 h-full flex flex-col">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                 <img src={clockIcon} alt="Recent Searches" className="h-7 w-7 object-contain" />
@@ -648,7 +676,8 @@ const Dashboard = () => {
                 <p className="text-gray-600 text-lg">{getTranslation('noSearchHistory', language)}</p>
               </div>
             ) : (
-              <div className="overflow-x-auto flex-1">
+              <div className="flex-1">
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-100 border-b-2 border-gray-300">
                     <tr>
@@ -660,7 +689,7 @@ const Dashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {searchHistory.map((entry, idx) => (
+                    {visibleSearchHistory.map((entry, idx) => (
                       <tr key={idx} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-700">
                           {entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : 'N/A'}
@@ -695,6 +724,18 @@ const Dashboard = () => {
                     ))}
                   </tbody>
                 </table>
+                </div>
+                {searchHistory.length > recentSearchLimit && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllRecentSearches((current) => !current)}
+                      className="rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                    >
+                      {showAllRecentSearches ? 'Show less' : `${t('viewMore', language)} (${searchHistory.length - recentSearchLimit})`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -19,6 +19,7 @@ const SearchableInput = ({
 }) => {
   const [searchInput, setSearchInput] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showAllResults, setShowAllResults] = useState(false);
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -35,6 +36,7 @@ const SearchableInput = ({
                           item.toLowerCase().startsWith(searchInput.toLowerCase());
     return matchesSearch && !selectedItems.includes(item);
   });
+  const visibleItems = showAllResults ? filteredItems : filteredItems.slice(0, maxDisplay);
 
   // Handle clicking outside dropdown
   useEffect(() => {
@@ -53,6 +55,7 @@ const SearchableInput = ({
     onSelectionChange([...selectedItems, item]);
     setSearchInput('');
     setShowDropdown(false);
+    setShowAllResults(false);
   };
 
   // Remove item from selection
@@ -64,11 +67,16 @@ const SearchableInput = ({
   const handleInputChange = (e) => {
     setSearchInput(e.target.value);
     setShowDropdown(true);
+    setShowAllResults(false);
   };
 
   // Handle input focus
   const handleInputFocus = () => {
     setShowDropdown(true);
+  };
+
+  const handleToggleShowMore = () => {
+    setShowAllResults((current) => !current);
   };
 
   // Handle keyboard navigation
@@ -122,8 +130,8 @@ const SearchableInput = ({
 
         {/* Dropdown Suggestions */}
         {showDropdown && filteredItems.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
-            {filteredItems.slice(0, maxDisplay).map((item, index) => (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto">
+            {visibleItems.map((item, index) => (
               <button
                 key={item}
                 onClick={() => handleAddItem(item)}
@@ -135,9 +143,13 @@ const SearchableInput = ({
               </button>
             ))}
             {filteredItems.length > maxDisplay && (
-              <div className="px-4 py-2 text-sm text-gray-500 text-center border-t">
-                +{filteredItems.length - maxDisplay} more
-              </div>
+              <button
+                type="button"
+                onClick={handleToggleShowMore}
+                className="w-full border-t px-4 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition"
+              >
+                {showAllResults ? 'Show less' : `Show more (+${filteredItems.length - maxDisplay})`}
+              </button>
             )}
           </div>
         )}

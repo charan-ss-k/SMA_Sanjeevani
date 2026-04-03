@@ -218,18 +218,62 @@ const PrescriptionHandling = () => {
   // Image analysis handlers
   const handleFileSelect = (event) => {
     const selectedFile = event.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      setAnalysisError('');
-      setAnalysisResult(null);
-      
-      // Create image preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target.result);
-      };
-      reader.readAsDataURL(selectedFile);
+    if (!selectedFile) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/tiff'];
+    if (!allowedTypes.includes(selectedFile.type)) {
+      setAnalysisError(`❌ ${getPrescriptionText('invalidFileType', language)}`);
+      return;
     }
+
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setAnalysisError(`❌ ${getPrescriptionText('fileTooLarge', language)}`);
+      return;
+    }
+
+    setFile(selectedFile);
+    setAnalysisError('');
+    setAnalysisResult(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target.result);
+    };
+    reader.readAsDataURL(selectedFile);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const droppedFile = event.dataTransfer.files?.[0];
+    if (!droppedFile) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/tiff'];
+    if (!allowedTypes.includes(droppedFile.type)) {
+      setAnalysisError(`❌ ${getPrescriptionText('invalidFileType', language)}`);
+      return;
+    }
+
+    if (droppedFile.size > 10 * 1024 * 1024) {
+      setAnalysisError(`❌ ${getPrescriptionText('fileTooLarge', language)}`);
+      return;
+    }
+
+    setFile(droppedFile);
+    setAnalysisError('');
+    setAnalysisResult(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target.result);
+    };
+    reader.readAsDataURL(droppedFile);
   };
 
   const handleCancelAnalysis = () => {
@@ -473,25 +517,27 @@ const PrescriptionHandling = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Upload Section */}
             <div>
-              <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 bg-blue-50">
+              <div
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                className="border-2 border-dashed border-blue-300 rounded-xl p-6 bg-[#eaf3ff]"
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept=".jpg,.jpeg,.png,.webp,.bmp,.tiff"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
                 
                 {!imagePreview ? (
-                  <div className="text-center">
-                    <div className="text-6xl mb-4">📸</div>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3 px-6 rounded-lg text-lg font-semibold transition"
-                    >
-                      {t('selectImage', language)}
-                    </button>
-                    <p className="text-sm text-gray-600 mt-3">{t('uploadMedicineImage', language)}</p>
+                  <div
+                    className="text-center cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 text-4xl">📷</div>
+                    <p className="text-2xl font-semibold text-slate-800 mb-2">Drag medicine image here or click to upload</p>
+                    <p className="text-lg text-slate-600">Supported: JPG, PNG, WebP, BMP, TIFF (Max 10MB)</p>
                   </div>
                 ) : (
                   <div>
@@ -522,9 +568,9 @@ const PrescriptionHandling = () => {
               {file && !analyzing && !analysisResult && (
                 <button
                   onClick={handleAnalyze}
-                  className="w-full mt-4 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white py-4 rounded-lg text-lg font-bold transition"
+                  className="w-full mt-4 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white py-4 rounded-lg text-2xl font-bold transition"
                 >
-                  🔍 {t('analyzeNow', language)}
+                  → {t('analyzeNow', language)}
                 </button>
               )}
               
