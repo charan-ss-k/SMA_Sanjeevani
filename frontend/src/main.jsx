@@ -17,6 +17,7 @@ import MedicineRecommendation from './components/MedicineRecommendation.jsx';
 import ConsultPage from './components/ConsultPage.jsx';
 import ChatWidget from './components/Chatwidget.jsx';
 import AppointmentNotification from './components/AppointmentNotification.jsx';
+import ReminderNotification from './components/ReminderNotification.jsx';
 import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
 import { ProtectedRoute } from './components/ProtectedRoute.jsx';
 
@@ -67,6 +68,7 @@ function AppWrapper() {
             <Route path="/tutorial" element={<Tutorial />} />
           </Routes>
           <ChatWidget />
+          <ReminderNotification />
           <AppointmentNotification />
         </Router>
       </LanguageContext.Provider>

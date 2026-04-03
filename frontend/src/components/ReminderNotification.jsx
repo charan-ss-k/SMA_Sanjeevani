@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, LanguageContext } from '../main';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
+import { API_BASE } from '../config/apiBase';
 
 const ReminderNotification = () => {
   const { isAuthenticated, authToken } = useContext(AuthContext);
@@ -61,7 +62,7 @@ const ReminderNotification = () => {
 
     const checkReminders = async () => {
       try {
-        const response = await fetch('/api/reminders/', {
+        const response = await fetch(`${API_BASE}/api/reminders/`, {
           headers: {
             'Authorization': `Bearer ${authToken}`
           }
@@ -88,7 +89,7 @@ const ReminderNotification = () => {
             const message = `${t('timeToTake', language)} ${reminder.medicine_name}, ${t('dosage', language)}: ${reminder.dosage}${qtyText}`;
             
             setTimeout(() => {
-              playTTS(message, language);
+              playTTS(message, language, { allowAuto: true });
             }, 500);
             
             // Show browser notification

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { playTTS } from '../utils/tts';
+import { AuthContext } from '../main';
 import { API_BASE } from '../config/apiBase';
 
 const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
+  const { authToken } = useContext(AuthContext);
   const [bookingData, setBookingData] = useState({
     patient_name: '',
     appointment_date: '',
@@ -33,12 +35,21 @@ const AppointmentBooking = ({ doctor, onComplete, onBack, language }) => {
 
     setLoading(true);
     try {
+      const token = authToken || localStorage.getItem('access_token');
       const response = await fetch(`${API_BASE}/api/appointments/book`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
-          ...bookingData,
-          doctor_id: doctor.employee_id
+          doctor_id: doctor.employee_id,
+          patient_name: bookingData.patient_name,
+          patient_email: bookingData.email,
+          patient_phone: bookingData.phone_number,
+          appointment_date: bookingData.appointment_date,
+          appointment_time: bookingData.appointment_time,
+          notes: bookingData.notes,
         })
       });
 

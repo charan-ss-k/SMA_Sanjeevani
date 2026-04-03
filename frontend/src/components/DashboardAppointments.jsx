@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { playTTS } from '../utils/tts';
-import { LanguageContext } from '../main';
+import { AuthContext, LanguageContext } from '../main';
 import { t } from '../utils/translations';
 import calendarIcon from '../assets/calendar.png';
 import { API_BASE } from '../config/apiBase';
 
 const DashboardAppointments = ({ language = 'en' }) => {
+  const { isAuthenticated, authToken } = useContext(AuthContext);
   const { language: contextLanguage } = useContext(LanguageContext);
   const activeLanguage = contextLanguage || language;
   const [appointments, setAppointments] = useState([]);
@@ -17,46 +18,53 @@ const DashboardAppointments = ({ language = 'en' }) => {
 
   useEffect(() => {
     loadAppointments();
-  }, []);
+  }, [isAuthenticated, authToken]);
+
+  const parseAppointmentDateTime = (appointment) => {
+    if (appointment?.appointment_date) {
+      const parsed = new Date(appointment.appointment_date);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+
+    if (appointment?.appointment_date && appointment?.appointment_time) {
+      const combined = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+      if (!Number.isNaN(combined.getTime())) {
+        return combined;
+      }
+    }
+
+    return null;
+  };
 
   const loadAppointments = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      
-      // Try to fetch from API first
-      const response = await fetch(`${apiBase}/api/appointments/upcoming-appointments`, {
+      const token = authToken || localStorage.getItem('access_token');
+
+      if (!token) {
+        setAppointments([]);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE}/api/appointments/upcoming-appointments`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (response.ok) {
         const data = await response.json();
-        setAppointments(data.appointments || []);
-      } else {
-        // Fallback to localStorage if API fails
-        const savedAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
-        const upcomingAppointments = savedAppointments.filter(apt => {
-          const aptDate = new Date(apt.appointment_date);
-          return aptDate >= new Date();
-        });
-        setAppointments(upcomingAppointments.sort((a, b) => 
-          new Date(a.appointment_date) - new Date(b.appointment_date)
-        ));
+        const sorted = (data.appointments || [])
+          .map((appointment) => ({
+            ...appointment,
+            _appointmentDateTime: parseAppointmentDateTime(appointment),
+          }))
+          .filter((appointment) => appointment._appointmentDateTime)
+          .sort((a, b) => a._appointmentDateTime - b._appointmentDateTime);
+
+        setAppointments(sorted);
       }
     } catch (error) {
       console.error('Error loading appointments:', error);
-      // Fallback to localStorage
-      try {
-        const savedAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
-        const upcomingAppointments = savedAppointments.filter(apt => {
-          const aptDate = new Date(apt.appointment_date);
-          return aptDate >= new Date();
-        });
-        setAppointments(upcomingAppointments.sort((a, b) => 
-          new Date(a.appointment_date) - new Date(b.appointment_date)
-        ));
-      } catch (e) {
-        console.error('Error loading from localStorage:', e);
-      }
     } finally {
       setLoading(false);
     }
@@ -65,11 +73,11 @@ const DashboardAppointments = ({ language = 'en' }) => {
   const cancelAppointment = async (appointment) => {
     if (window.confirm(`Are you sure you want to cancel the appointment with Dr. ${appointment.doctor_name} on ${new Date(appointment.appointment_date).toLocaleDateString()}?`)) {
       try {
-        const token = localStorage.getItem('access_token');
+        const token = authToken || localStorage.getItem('access_token');
         
         console.log('🗑️ Cancelling appointment:', appointment.id);
         
-        const response = await fetch(`${apiBase}/api/appointments/appointment/${appointment.id}`, {
+        const response = await fetch(`${API_BASE}/api/appointments/appointment/${appointment.id}`, {
           method: 'DELETE',
           headers: { 
             'Authorization': `Bearer ${token}`,
@@ -84,11 +92,6 @@ const DashboardAppointments = ({ language = 'en' }) => {
           // Remove from state
           const updated = appointments.filter(apt => apt.id !== appointment.id);
           setAppointments(updated);
-          
-          // Also remove from localStorage if it exists there
-          const allAppointments = JSON.parse(localStorage.getItem('userAppointments') || '[]');
-          const filtered = allAppointments.filter(apt => apt.id !== appointment.id && apt.doctor_id !== appointment.doctor_id);
-          localStorage.setItem('userAppointments', JSON.stringify(filtered));
           
           playTTS(`Appointment with ${appointment.doctor_name} has been cancelled`, language);
           console.log('✅ Appointment cancelled successfully');
@@ -125,11 +128,11 @@ const DashboardAppointments = ({ language = 'en' }) => {
     }
 
     try {
-      const token = localStorage.getItem('access_token');
+      const token = authToken || localStorage.getItem('access_token');
       
       console.log('✏️ Updating appointment:', editingAppointment.id);
       
-      const response = await fetch(`${apiBase}/api/appointments/appointment/${editingAppointment.id}`, {
+      const response = await fetch(`${API_BASE}/api/appointments/appointment/${editingAppointment.id}`, {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -192,7 +195,7 @@ const DashboardAppointments = ({ language = 'en' }) => {
       ) : (
         <div className="appointments-grid">
           {appointments.map((apt, idx) => {
-            const aptDate = new Date(apt.appointment_date);
+            const aptDate = apt._appointmentDateTime || parseAppointmentDateTime(apt) || new Date(apt.appointment_date);
             const daysUntil = Math.ceil((aptDate - new Date()) / (1000 * 60 * 60 * 24));
             
             return (
@@ -212,7 +215,7 @@ const DashboardAppointments = ({ language = 'en' }) => {
                   </div>
                   <div className="apt-item flex items-center">
                     <img src={calendarIcon} alt="Date" className="h-4 w-4 mr-1 flex-shrink-0" />
-                    {new Date(apt.appointment_date).toLocaleDateString()}
+                    {aptDate.toLocaleDateString()} {apt.appointment_time}
                   </div>
                   <div className="apt-item">
                     <span className="apt-label">⏰</span> {apt.appointment_time}

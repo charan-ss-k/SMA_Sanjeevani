@@ -22,7 +22,7 @@ export async function playTTS(text, language = 'english', options = {}) {
     return false;
   }
 
-  if (!options.userInitiated) {
+  if (!options.userInitiated && !options.allowAuto) {
     return false;
   }
 
