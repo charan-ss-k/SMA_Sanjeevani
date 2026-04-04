@@ -58,19 +58,6 @@ const HospitalReportAnalyzer = () => {
     }
   };
 
-  const isTransientProxyError = (message = '') => {
-    const normalized = String(message).toLowerCase();
-    return (
-      normalized.includes('backend call failure') ||
-      normalized.includes('backend proxy failed') ||
-      normalized.includes('failed to fetch') ||
-      normalized.includes('networkerror') ||
-      normalized.includes('network error')
-    );
-  };
-
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
   const speakText = async (text) => {
     if (!text || !text.trim()) return;
 
@@ -156,57 +143,31 @@ const HospitalReportAnalyzer = () => {
     // Create abort controller for cancellation
     abortControllerRef.current = new AbortController();
 
-    const maxTransientRetries = 3;
-    let transientAttempts = 0;
-
     try {
-      while (true) {
-        const formData = new FormData();
-        formData.append('file', file);
+      const formData = new FormData();
+      formData.append('file', file);
 
-        try {
-          const response = await fetch(`${API_BASE}/api/hospital-reports/analyze`, {
-            method: 'POST',
-            body: formData,
-            headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-            signal: abortControllerRef.current.signal,
-          });
+      const response = await fetch(`${API_BASE}/api/hospital-reports/analyze`, {
+        method: 'POST',
+        body: formData,
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        signal: abortControllerRef.current.signal,
+      });
 
-          const result = await parseResponseData(response);
+      const result = await parseResponseData(response);
 
-          if (!response.ok) {
-            throw new Error(result.detail || result.message || 'Analysis failed');
-          }
-
-          setAnalysisResult(result);
-          break;
-        } catch (err) {
-          if (err.name === 'AbortError') {
-            throw err;
-          }
-
-          const message = err?.message || '';
-          if (isTransientProxyError(message) && transientAttempts < maxTransientRetries) {
-            transientAttempts += 1;
-            await wait(1200 * transientAttempts);
-            continue;
-          }
-
-          throw err;
-        }
+      if (!response.ok) {
+        throw new Error(result.detail || result.message || 'Analysis failed');
       }
+
+      setAnalysisResult(result);
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('Analysis was cancelled');
         setAnalysisError(getPrescriptionText('analysisCancelled', language));
       } else {
         console.error('Analysis error:', err);
-        const message = err.message || '';
-        if (isTransientProxyError(message)) {
-          setAnalysisError(getPrescriptionText('failedToAnalyze', language));
-        } else {
-          setAnalysisError(message || getPrescriptionText('failedToAnalyze', language));
-        }
+        setAnalysisError(err.message || getPrescriptionText('failedToAnalyze', language));
       }
     } finally {
       setAnalyzing(false);
