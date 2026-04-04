@@ -1,12 +1,16 @@
 import os
 import json
 import logging
+import time
+import hashlib
+import copy
 from typing import Dict, Callable, Optional, List
 
 import requests
 
 from . import prompt_templates, safety_rules, utils
 from .models import SymptomRequest, SymptomResponse, MedicineRecommendation
+from .medicine_rag_system import rag_system
 from .translation_service import (
     translate_symptoms_to_english,
     translate_response_to_language,
@@ -15,6 +19,51 @@ from .translation_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+_SYMPTOM_REC_CACHE: Dict[str, Dict[str, Any]] = {}
+_SYMPTOM_REC_CACHE_TTL_SEC = int(os.environ.get("SYMPTOM_REC_CACHE_TTL_SEC", "300"))
+_SYMPTOM_REC_CACHE_MAX_ENTRIES = int(os.environ.get("SYMPTOM_REC_CACHE_MAX_ENTRIES", "200"))
+
+
+def _build_recommendation_cache_key(body: Dict[str, Any], language: str) -> str:
+    canonical = {
+        "symptoms": sorted([str(s).strip().lower() for s in body.get("symptoms", []) if str(s).strip()]),
+        "age": body.get("age"),
+        "gender": body.get("gender"),
+        "allergies": sorted([str(x).strip().lower() for x in body.get("allergies", []) if str(x).strip()]),
+        "existing_conditions": sorted([str(x).strip().lower() for x in body.get("existing_conditions", []) if str(x).strip()]),
+        "pregnancy_status": body.get("pregnancy_status"),
+        "language": language,
+        "llm_provider": os.environ.get("LLM_PROVIDER", "ollama").lower().strip(),
+        "llm_model": os.environ.get("OLLAMA_MODEL", "phi4").strip(),
+        "azure_deployment": os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "").strip(),
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _get_cached_recommendation(cache_key: str) -> Optional[Dict[str, Any]]:
+    entry = _SYMPTOM_REC_CACHE.get(cache_key)
+    if not entry:
+        return None
+
+    age_sec = time.time() - entry.get("ts", 0)
+    if age_sec > _SYMPTOM_REC_CACHE_TTL_SEC:
+        _SYMPTOM_REC_CACHE.pop(cache_key, None)
+        return None
+
+    return copy.deepcopy(entry.get("payload"))
+
+
+def _set_cached_recommendation(cache_key: str, payload: Dict[str, Any]) -> None:
+    if len(_SYMPTOM_REC_CACHE) >= _SYMPTOM_REC_CACHE_MAX_ENTRIES:
+        oldest_key = min(_SYMPTOM_REC_CACHE, key=lambda k: _SYMPTOM_REC_CACHE[k].get("ts", 0))
+        _SYMPTOM_REC_CACHE.pop(oldest_key, None)
+
+    _SYMPTOM_REC_CACHE[cache_key] = {
+        "ts": time.time(),
+        "payload": copy.deepcopy(payload),
+    }
 
 
 # Symptom to medicine mapping for intelligent fallback
@@ -218,7 +267,7 @@ def call_llm(prompt: str) -> str:
                 {"role": "user", "content": prompt}
             ],
             "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.2)),
-            "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", 1024)),
+            "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", 700)),
         }
         
         headers = {
@@ -228,7 +277,7 @@ def call_llm(prompt: str) -> str:
         
         try:
             logger.info("Sending request to Azure OpenAI...")
-            resp = requests.post(api_url, json=payload, headers=headers, timeout=600)
+            resp = requests.post(api_url, json=payload, headers=headers, timeout=(20, 120))
             
             if resp.status_code != 200:
                 error_msg = resp.text
@@ -281,12 +330,12 @@ def call_llm(prompt: str) -> str:
             "prompt": prompt,
             "stream": False,
             "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
-            "num_predict": 512,  # Limit to 512 tokens for faster generation
+            "num_predict": int(os.environ.get("OLLAMA_NUM_PREDICT", 384)),
         }
         
         try:
             logger.info("Sending request to Phi-4...")
-            resp = requests.post(api_url, json=payload, timeout=600)
+            resp = requests.post(api_url, json=payload, timeout=(15, 120))
             
             if resp.status_code != 200:
                 error_msg = resp.text
@@ -408,10 +457,25 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
         english_symptoms = translate_symptoms_to_english(original_symptoms, user_language)
         body["symptoms"] = english_symptoms
         logger.info(f"Translated symptoms: {english_symptoms}")
+
+    cache_key = _build_recommendation_cache_key(body, user_language)
+    cached_payload = _get_cached_recommendation(cache_key)
+    if cached_payload:
+        logger.info("⚡ Returning cached recommendation response")
+        meds = [MedicineRecommendation(**m) for m in cached_payload.get("recommended_medicines", [])]
+        return SymptomResponse(
+            predicted_condition=cached_payload.get("predicted_condition", "Unknown"),
+            recommended_medicines=meds,
+            home_care_advice=cached_payload.get("home_care_advice", []),
+            doctor_consultation_advice=cached_payload.get("doctor_consultation_advice", ""),
+            disclaimer=cached_payload.get("disclaimer", ""),
+            tts_payload=cached_payload.get("tts_payload"),
+        )
     
-    # Step 2: Build prompt - Phi-4 will think independently
-    prompt = prompt_templates.build_prompt(body, rag_context="")
-    logger.info("Prompt built - Phi-4 will generate recommendations independently")
+    # Step 2: Build prompt with lightweight RAG context for improved accuracy.
+    rag_context = rag_system.format_for_llm_context(body.get("symptoms", []))
+    prompt = prompt_templates.build_prompt(body, rag_context=rag_context)
+    logger.info("Prompt built with RAG context - generating recommendations")
     
     # Step 3: Call LLM for independent thinking
     try:
@@ -477,6 +541,15 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
             )
         else:
             parsed["disclaimer"] = "This is not a medical diagnosis. Consult a doctor for serious symptoms."
+
+    _set_cached_recommendation(cache_key, {
+        "predicted_condition": parsed.get("predicted_condition", "Unknown"),
+        "recommended_medicines": parsed.get("recommended_medicines", []),
+        "home_care_advice": parsed.get("home_care_advice", []),
+        "doctor_consultation_advice": parsed.get("doctor_consultation_advice", ""),
+        "disclaimer": parsed.get("disclaimer", ""),
+        "tts_payload": parsed.get("tts_payload"),
+    })
 
     # Build Pydantic response
     meds = []

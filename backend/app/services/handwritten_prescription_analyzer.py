@@ -9,6 +9,7 @@ import numpy as np
 import json
 import logging
 import os
+import re
 import requests
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -152,42 +153,66 @@ class HybridHandwrittenPrescriptionAnalyzer:
 
     def _extract_text_with_best_ocr(self, preprocessed_image: np.ndarray) -> Dict[str, Any]:
         """
-        Use Google Vision OCR only (DOCUMENT_TEXT_DETECTION + handwriting language hint).
+        Use Google Vision OCR only for fastest cloud extraction.
         """
         vision_api_key = (os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip() or self.google_vision_api_key)
-
         if not vision_api_key:
             raise RuntimeError("GOOGLE_CLOUD_VISION_API_KEY not found. Google Vision OCR cannot run.")
 
-        self.logger.info("🔍 Using Google Vision OCR (DOCUMENT_TEXT_DETECTION, en-t-i0-handwrit)")
+        self.logger.info("🔍 Using Google Vision OCR only (DOCUMENT_TEXT_DETECTION, en-t-i0-handwrit)")
         vision_result = GoogleVisionOCRService.extract_text_from_image(
             preprocessed_image,
             vision_api_key,
             language_hints=["en-t-i0-handwrit"],
         )
 
-        vision_text = (vision_result.get("text") or "").strip()
+        vision_text = self._normalize_ocr_text(vision_result.get("text") or "")
         if vision_result.get("status") != "success" or len(vision_text) < 5:
             raise RuntimeError(
                 f"Google Vision OCR failed or insufficient text. status={vision_result.get('status')} error={vision_result.get('error')}"
             )
 
-        self.logger.info("✅ Google Vision OCR succeeded")
+        confidence = float(vision_result.get("confidence", 0.0) or 0.0)
         quality_score = self._calculate_text_quality(vision_text)
+        self.logger.info("✅ Google Vision OCR selected. confidence=%.3f quality=%.3f", confidence, quality_score)
+
         return {
             "text": vision_text,
             "methods_used": ["GoogleVision"],
-            "confidence": float(vision_result.get("confidence", 0.0)),
+            "confidence": confidence,
             "quality_score": quality_score,
             "individual_results": {
                 "GoogleVision": {
                     "text": vision_text,
-                    "confidence": float(vision_result.get("confidence", 0.0)),
+                    "confidence": confidence,
+                    "quality_score": quality_score,
                 }
             },
             "hierarchy": vision_result.get("hierarchy", {}),
             "request": vision_result.get("request", {}),
         }
+
+    def _normalize_ocr_text(self, text: str) -> str:
+        """Clean OCR text to improve downstream parsing stability."""
+        cleaned = (text or "").replace("\x0c", " ")
+        kept_lines = []
+        for line in cleaned.splitlines():
+            candidate = " ".join(line.strip().split())
+            if not candidate:
+                continue
+
+            # Drop lines that are only digits/symbols.
+            if re.fullmatch(r"[\d\W_]+", candidate):
+                continue
+
+            # Drop tiny non-text fragments.
+            letters = len(re.findall(r"[A-Za-z]", candidate))
+            if letters == 0 and len(candidate) < 5:
+                continue
+
+            kept_lines.append(candidate)
+
+        return "\n".join(kept_lines).strip()
 
     def _calculate_text_quality(self, text: str) -> float:
         """Lightweight quality estimator used when local OCR stack is not initialized."""
@@ -196,7 +221,8 @@ class HybridHandwrittenPrescriptionAnalyzer:
 
         cleaned = text.strip()
         length_score = min(1.0, len(cleaned) / 250.0)
-        line_count = len([line for line in cleaned.splitlines() if line.strip()])
+        non_empty_lines = [line for line in cleaned.splitlines() if line.strip()]
+        line_count = len(non_empty_lines)
         line_score = min(1.0, line_count / 8.0)
 
         medical_tokens = ["mg", "ml", "tab", "tablet", "capsule", "syp", "syrup", "bd", "od", "tds", "qid"]
@@ -204,7 +230,23 @@ class HybridHandwrittenPrescriptionAnalyzer:
         token_hits = sum(1 for token in medical_tokens if token in lowered)
         token_score = min(1.0, token_hits / 3.0)
 
-        return max(0.0, min(1.0, (0.5 * length_score) + (0.25 * line_score) + (0.25 * token_score)))
+        lexical_tokens = re.findall(r"\b[a-zA-Z][a-zA-Z0-9\-]{2,}\b", cleaned)
+        lexical_score = min(1.0, len(lexical_tokens) / 20.0)
+
+        noise_char_ratio = len(re.findall(r"[^A-Za-z0-9\s.,:/()\-%]", cleaned)) / max(len(cleaned), 1)
+        digit_heavy_lines = 0
+        for line in non_empty_lines:
+            letters = len(re.findall(r"[A-Za-z]", line))
+            digits = len(re.findall(r"\d", line))
+            if digits > max(4, letters * 2):
+                digit_heavy_lines += 1
+        digit_line_penalty = min(0.25, digit_heavy_lines / max(line_count, 1))
+        noise_penalty = min(0.2, noise_char_ratio)
+
+        score = (0.35 * length_score) + (0.2 * line_score) + (0.2 * token_score) + (0.25 * lexical_score)
+        score -= noise_penalty
+        score -= digit_line_penalty
+        return max(0.0, min(1.0, score))
 
     def _normalize_medicines_for_ui(self, medicines):
         normalized = []
