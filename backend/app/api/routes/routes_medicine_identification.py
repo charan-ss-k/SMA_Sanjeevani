@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 import logging
 import os
 import tempfile
-import shutil
+import io
 from typing import Optional
 from sqlalchemy.orm import Session
 import cv2
@@ -87,18 +87,37 @@ async def analyze_medicine_image(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File too small. Please upload a complete image"
             )
-        
-        # Save temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as tmp:
-            tmp.write(file_content)
-            temp_file_path = tmp.name
-        
-        # Verify it's a valid image
-        image = cv2.imread(temp_file_path)
+
+        # Decode image directly from uploaded bytes (more reliable than reading back a .tmp file)
+        image = cv2.imdecode(np.frombuffer(file_content, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+        # Fallback decode path for images OpenCV may fail to decode directly.
+        if image is None:
+            try:
+                from PIL import Image
+
+                pil_image = Image.open(io.BytesIO(file_content)).convert("RGB")
+                image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            except Exception:
+                image = None
+
         if image is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid image file. Please upload a valid image"
+            )
+
+        # Write normalized decoded image to temporary file for downstream service.
+        file_ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'jpg'
+        if file_ext not in ALLOWED_EXTENSIONS:
+            file_ext = 'jpg'
+        fd, temp_file_path = tempfile.mkstemp(suffix=f'.{file_ext}')
+        os.close(fd)
+
+        if not cv2.imwrite(temp_file_path, image):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process uploaded image"
             )
         
         # Process image
