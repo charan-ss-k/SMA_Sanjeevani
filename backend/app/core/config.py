@@ -45,7 +45,7 @@ class Settings(BaseSettings):
         "https://98.70.223.78",
     ]
 
-    CORS_ORIGIN_REGEX: str = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
+    CORS_ORIGIN_REGEX: str = r"^https?://((localhost|127\.0\.0\.1|0\.0\.0\.0)|(.*\.azurestaticapps\.net))(:\d+)?$"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
