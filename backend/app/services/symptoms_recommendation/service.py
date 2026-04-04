@@ -4,7 +4,7 @@ import logging
 import time
 import hashlib
 import copy
-from typing import Dict, Callable, Optional, List
+from typing import Any, Dict, Callable, Optional, List
 
 import requests
 
