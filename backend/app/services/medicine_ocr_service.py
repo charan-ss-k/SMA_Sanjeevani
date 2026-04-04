@@ -1,7 +1,50 @@
 """
 Medicine OCR and Identification Service
-Pipeline: image -> OCR text -> Phi-4 -> structured output.
-Includes graceful fallback paths when external OCR/LLM services are unavailable.
+Uses Google Vision OCR to read medicine packaging and Phi-4 LLM to analyze the medicine.
+"""
+import cv2
+import numpy as np
+import logging
+import os
+from typing import Dict, Any
+
+from app.services.google_vision_ocr import GoogleVisionOCRService
+
+logger = logging.getLogger(__name__)
+
+def extract_text_from_image(image_array: np.ndarray) -> str:
+    """
+    Extract text from medicine packaging using Google Vision OCR only.
+    
+    Args:
+        image_array: numpy array of image
+    
+    Returns:
+        Extracted text from the image
+    """
+    vision_api_key = os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip()
+    if not vision_api_key:
+        raise RuntimeError("GOOGLE_CLOUD_VISION_API_KEY not found. Google Vision OCR cannot run.")
+
+    logger.info("🔍 Using Google Vision OCR for medicine identification")
+    vision_result = GoogleVisionOCRService.extract_text_from_image(
+        image_array,
+        vision_api_key,
+        language_hints=["en"],
+    )
+    vision_text = (vision_result.get("text") or "").strip()
+
+    if vision_result.get("status") != "success" or len(vision_text) < 5:
+        raise RuntimeError(
+            f"Google Vision OCR failed or insufficient text. status={vision_result.get('status')} error={vision_result.get('error')}"
+        )
+
+    logger.info("✅ Google Vision OCR succeeded for medicine identification")
+    return vision_text
+"""
+Medicine OCR and Identification Service
+Pipeline: image -> OCR text -> Phi-4 only -> screen output.
+No dataset lookup or retrieval is used anywhere in this service.
 """
 
 import cv2
@@ -14,61 +57,31 @@ import requests
 from typing import Dict, Any
 
 from app.services.google_vision_ocr import GoogleVisionOCRService
-from app.services.unified_medicine_database import UnifiedMedicineDatabase
-from app.services.medicine_csv_rag import MedicineCSVRAG
-
-try:
-    import easyocr
-    HAVE_EASYOCR = True
-except Exception:
-    HAVE_EASYOCR = False
-
-try:
-    import pytesseract
-    HAVE_TESSERACT = True
-except Exception:
-    HAVE_TESSERACT = False
 
 logger = logging.getLogger(__name__)
-_easyocr_reader = None
 
 
 def extract_text_from_image(image_array: np.ndarray) -> str:
-    """Extract OCR text from image with Google Vision first, then local fallback."""
+    """Extract raw OCR text from an image using Google Vision."""
     vision_api_key = os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip()
+    if not vision_api_key:
+        raise RuntimeError("GOOGLE_CLOUD_VISION_API_KEY not found. Google Vision OCR cannot run.")
 
-    if vision_api_key:
-        try:
-            logger.info("🔍 Running Google Vision OCR for medicine identification")
-            vision_result = GoogleVisionOCRService.extract_text_from_image(
-                image_array,
-                vision_api_key,
-                language_hints=["en"],
-            )
+    logger.info("🔍 Running Google Vision OCR for medicine identification")
+    vision_result = GoogleVisionOCRService.extract_text_from_image(
+        image_array,
+        vision_api_key,
+        language_hints=["en"],
+    )
 
-            vision_text = (vision_result.get("text") or "").strip()
-            if vision_result.get("status") == "success" and len(vision_text) >= 5:
-                logger.info("✅ OCR extraction complete via Google Vision")
-                return vision_text
-
-            logger.warning(
-                "Google Vision OCR insufficient; falling back to local OCR. status=%s error=%s",
-                vision_result.get("status"),
-                vision_result.get("error"),
-            )
-        except Exception as exc:
-            logger.warning("Google Vision OCR failed; falling back to local OCR: %s", exc)
-    else:
-        logger.warning("GOOGLE_CLOUD_VISION_API_KEY missing; using local OCR fallback")
-
-    fallback_text = _extract_text_with_local_ocr(image_array)
-    if len(fallback_text.strip()) < 5:
+    vision_text = (vision_result.get("text") or "").strip()
+    if vision_result.get("status") != "success" or len(vision_text) < 5:
         raise RuntimeError(
-            "OCR failed. Configure GOOGLE_CLOUD_VISION_API_KEY or install local OCR dependencies (easyocr/pytesseract)."
+            f"Google Vision OCR failed or returned insufficient text. status={vision_result.get('status')} error={vision_result.get('error')}"
         )
 
-    logger.info("✅ OCR extraction complete via local fallback")
-    return fallback_text
+    logger.info("✅ OCR extraction complete")
+    return vision_text
 
 
 async def process_medicine_image(image_path: str) -> Dict[str, Any]:
@@ -109,42 +122,14 @@ async def process_medicine_image(image_path: str) -> Dict[str, Any]:
 
 
 def analyze_medicine_with_phi4(ocr_text: str) -> Dict[str, Any]:
-    """Dataset-first medicine analysis with optional Phi-4 enrichment."""
-    display_name = _extract_display_name_from_ocr(ocr_text)
-    observed_strength = _extract_strength_from_ocr(ocr_text)
-
-    dataset_info = _lookup_medicine_from_dataset(display_name)
-    if dataset_info.get("found"):
-        logger.info("✅ Dataset match found for medicine: %s", dataset_info.get("name"))
-        result = _build_dataset_first_analysis(dataset_info, display_name, observed_strength, ocr_text)
-
-        # Optional enrichment from LLM, but do not fail if unavailable.
-        try:
-            raw_model_output = _call_phi4(ocr_text)
-            parsed = _parse_model_output(raw_model_output)
-            for key in ["instructions", "precautions", "side_effects", "who_can_take", "warnings", "full_information", "sections"]:
-                if key in parsed and parsed[key]:
-                    result[key] = parsed[key]
-            result["warnings"] = list(result.get("warnings", []))
-            result["warnings"].insert(0, "Primary details are from medicine dataset; additional notes were AI-enriched.")
-            result["generation_mode"] = "dataset_plus_phi4"
-        except Exception as exc:
-            result["warnings"] = list(result.get("warnings", []))
-            result["warnings"].append(f"LLM enrichment unavailable: {str(exc)}")
-            result["generation_mode"] = "dataset_only"
-
-        return result
-
-    logger.info("Dataset lookup did not find a confident match; using OCR/LLM fallback")
-
-    try:
-        raw_model_output = _call_phi4(ocr_text)
-        parsed = _parse_model_output(raw_model_output)
-    except Exception as exc:
-        logger.warning("Phi-4 unavailable, returning fallback analysis: %s", exc)
-        return _build_fallback_analysis(ocr_text, str(exc))
+    """Send OCR text to Phi-4 and return the structured response."""
+    logger.info(f"🔍 Sending OCR text to Phi-4 only. Length={len(ocr_text)}")
+    raw_model_output = _call_phi4(ocr_text)
+    parsed = _parse_model_output(raw_model_output)
 
     # Brand/display name should come from OCR text, not model memory.
+    display_name = _extract_display_name_from_ocr(ocr_text)
+    observed_strength = _extract_strength_from_ocr(ocr_text)
 
     parsed["medicine_name"] = display_name
     parsed["sections"]["MEDICINE NAME"] = display_name
@@ -162,155 +147,6 @@ def analyze_medicine_with_phi4(ocr_text: str) -> Dict[str, Any]:
 
     logger.info(f"✅ Phi-4 analysis complete: {display_name}")
     return parsed
-
-
-def _lookup_medicine_from_dataset(display_name: str) -> Dict[str, Any]:
-    """Search unified dataset first, then legacy CSV dataset."""
-    try:
-        info = UnifiedMedicineDatabase.get_medicine_info(display_name)
-        if info.get("found"):
-            return info
-    except Exception as exc:
-        logger.warning("Unified dataset lookup failed: %s", exc)
-
-    try:
-        csv_info = MedicineCSVRAG.get_medicine_info(display_name)
-        if csv_info.get("found"):
-            return {
-                "found": True,
-                "name": csv_info.get("name", display_name),
-                "category": csv_info.get("category", "Not specified"),
-                "dosage_form": csv_info.get("dosage_form", "Not specified"),
-                "strength": csv_info.get("strength", "Not specified"),
-                "manufacturer": csv_info.get("manufacturer", "Not specified"),
-                "indication": csv_info.get("indication", "Not specified"),
-                "classification": csv_info.get("classification", "Not specified"),
-                "source": "csv_database",
-                "dataset_version": "legacy_csv",
-            }
-    except Exception as exc:
-        logger.warning("CSV dataset lookup failed: %s", exc)
-
-    return {"found": False}
-
-
-def _build_dataset_first_analysis(dataset_info: Dict[str, Any], display_name: str, observed_strength: str, ocr_text: str) -> Dict[str, Any]:
-    """Build output primarily from dataset search result."""
-    medicine_name = dataset_info.get("name") or display_name or "Unknown"
-    dosage = observed_strength or dataset_info.get("strength") or "Not specified"
-    category = dataset_info.get("category") or dataset_info.get("type") or dataset_info.get("classification") or "Not specified"
-    manufacturer = dataset_info.get("manufacturer") or "Not specified"
-    price = dataset_info.get("price") or "Not specified"
-    indication = dataset_info.get("indication") or "Not specified"
-
-    summary = (
-        f"Medicine matched from dataset: {medicine_name}. "
-        f"Category: {category}. "
-        f"Dosage/Strength: {dosage}. "
-        f"Manufacturer: {manufacturer}. "
-        f"Price: {price}. "
-        f"Indication: {indication}."
-    )
-
-    return {
-        "medicine_name": medicine_name,
-        "type": dataset_info.get("dosage_form") or dataset_info.get("type") or "Not specified",
-        "dosage": dosage,
-        "who_can_take": "As prescribed by doctor",
-        "instructions": "Use only as per prescription or package directions",
-        "precautions": "Consult a qualified doctor before use",
-        "side_effects": "Not specified",
-        "category": category,
-        "manufacturer": manufacturer,
-        "price": price,
-        "full_information": summary,
-        "warnings": [
-            "Information is retrieved from medicine dataset search.",
-            "Always verify with package label and doctor advice.",
-        ],
-        "sections": {
-            "MEDICINE NAME": medicine_name,
-            "TYPE": dataset_info.get("dosage_form") or dataset_info.get("type") or "Not specified",
-            "DOSAGE": dosage,
-            "WHO CAN TAKE & AGE RESTRICTIONS": "As prescribed by doctor",
-            "INSTRUCTIONS": "Use only as per prescription or package directions",
-            "PRECAUTIONS": "Consult a qualified doctor before use",
-            "SIDE EFFECTS": "Not specified",
-        },
-        "source": f"dataset_search ({dataset_info.get('source', 'database')})",
-        "ocr_text": ocr_text,
-        "dataset_version": dataset_info.get("dataset_version", "unknown"),
-    }
-
-
-def _extract_text_with_local_ocr(image_array: np.ndarray) -> str:
-    """Fallback OCR using EasyOCR first and Tesseract second."""
-    texts = []
-
-    if HAVE_EASYOCR:
-        try:
-            global _easyocr_reader
-            if _easyocr_reader is None:
-                _easyocr_reader = easyocr.Reader(['en'], gpu=False)
-
-            results = _easyocr_reader.readtext(image_array)
-            easy_lines = [item[1].strip() for item in results if len(item) >= 2 and item[1].strip()]
-            if easy_lines:
-                texts.append("\n".join(easy_lines))
-        except Exception as exc:
-            logger.warning("EasyOCR fallback failed: %s", exc)
-
-    if HAVE_TESSERACT:
-        try:
-            gray = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (3, 3), 0)
-            tesseract_text = pytesseract.image_to_string(gray, lang='eng', config='--oem 1 --psm 6').strip()
-            if tesseract_text:
-                texts.append(tesseract_text)
-        except Exception as exc:
-            logger.warning("Tesseract fallback failed: %s", exc)
-
-    if not texts:
-        return ""
-
-    return max(texts, key=lambda value: len(value.strip())).strip()
-
-
-def _build_fallback_analysis(ocr_text: str, llm_error: str) -> Dict[str, Any]:
-    """Build a safe response when LLM backend is unavailable."""
-    display_name = _extract_display_name_from_ocr(ocr_text)
-    observed_strength = _extract_strength_from_ocr(ocr_text) or "Not specified"
-    summary = " ".join(ocr_text.split())[:600] if ocr_text else "Not specified"
-
-    return {
-        "medicine_name": display_name,
-        "type": "Not specified",
-        "dosage": observed_strength,
-        "who_can_take": "Not specified",
-        "instructions": "Refer package label or doctor prescription",
-        "precautions": "Consult a qualified doctor before use",
-        "side_effects": "Not specified",
-        "category": "Not specified",
-        "manufacturer": "Not specified",
-        "price": "Not specified",
-        "full_information": summary,
-        "warnings": [
-            "LLM backend was unavailable. Showing OCR-based fallback output.",
-            f"Backend error: {llm_error}",
-        ],
-        "sections": {
-            "MEDICINE NAME": display_name,
-            "TYPE": "Not specified",
-            "DOSAGE": observed_strength,
-            "WHO CAN TAKE & AGE RESTRICTIONS": "Not specified",
-            "INSTRUCTIONS": "Refer package label or doctor prescription",
-            "PRECAUTIONS": "Consult a qualified doctor before use",
-            "SIDE EFFECTS": "Not specified",
-        },
-        "source": "OCR text fallback",
-        "ocr_text": ocr_text,
-        "generation_mode": "fallback_no_llm",
-    }
 
 
 def _call_phi4(ocr_text: str) -> str:

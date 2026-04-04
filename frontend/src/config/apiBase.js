@@ -4,8 +4,7 @@ const resolveApiBase = () => {
     return viteBase.replace(/\/$/, '');
   }
 
-  // Cloud-first fallback: never fall back to localhost in deployed/dev builds.
-  return 'http://98.70.223.78';
+  return 'http://localhost:8000';
 };
 
 export const API_BASE = resolveApiBase();

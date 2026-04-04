@@ -32,7 +32,6 @@ import StopIcon from '@mui/icons-material/Stop';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { API_BASE } from '../config/apiBase';
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -71,7 +70,7 @@ const EnhancedMedicineIdentificationModal = ({ open, onClose, onSave }) => {
 
   const fetchPrescriptionHistory = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/prescriptions/`, {
+      const response = await fetch('/api/prescriptions/', {
         headers: {
           'Authorization': `Bearer ${authToken}`,
         },
@@ -128,7 +127,7 @@ const EnhancedMedicineIdentificationModal = ({ open, onClose, onSave }) => {
 
       console.log('🔍 Uploading medicine image...');
 
-      const response = await fetch(`${API_BASE}/api/medicine-identification/analyze`, {
+      const response = await fetch('/api/medicine-identification/analyze', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -183,7 +182,7 @@ const EnhancedMedicineIdentificationModal = ({ open, onClose, onSave }) => {
         source: analysisResult.source,
       };
 
-      const response = await fetch(`${API_BASE}/api/prescriptions/`, {
+      const response = await fetch('/api/prescriptions/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
