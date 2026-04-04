@@ -121,6 +121,16 @@ const PrescriptionAnalyzer = () => {
   const [analysisError, setAnalysisError] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+  const parseResponseData = async (response) => {
+    const raw = await response.text();
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { detail: raw, message: raw, raw };
+    }
+  };
+
   const speakText = async (text) => {
     if (!text || !text.trim()) return;
 
@@ -217,13 +227,6 @@ const PrescriptionAnalyzer = () => {
     setAnalysisResult(null);
     abortControllerRef.current = new AbortController();
 
-    // Set timeout for prescription analysis (3 minutes for OCR + LLM processing)
-    const timeoutId = setTimeout(() => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    }, 180000); // 3 minutes timeout
-
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -235,25 +238,23 @@ const PrescriptionAnalyzer = () => {
         signal: abortControllerRef.current.signal,
       });
 
-      clearTimeout(timeoutId);
+      const result = await parseResponseData(response);
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Analysis failed' }));
-        throw new Error(error.detail || getPrescriptionText('analysisError', language));
+        throw new Error(result.detail || result.message || getPrescriptionText('analysisError', language));
       }
 
-      const result = await response.json();
       setAnalysisResult(result);
     } catch (error) {
-      clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        setAnalysisError(`❌ Analysis timeout - OCR and AI processing is taking longer than expected. Please try with a clearer image or try again.`);
+        setAnalysisError(`❌ ${getPrescriptionText('analysisCancelled', language)}`);
       } else {
         setAnalysisError(`❌ ${getPrescriptionText('analysisError', language)}: ${error.message}`);
       }
       console.error('Prescription analysis error:', error);
     } finally {
       setAnalyzing(false);
+      abortControllerRef.current = null;
     }
   };
 

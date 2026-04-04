@@ -55,6 +55,16 @@ const EnhancedMedicineIdentificationModal = ({ open, onClose, onSave }) => {
   const fileInputRef = useRef(null);
   const abortControllerRef = useRef(null);
 
+  const parseResponseData = async (response) => {
+    const raw = await response.text();
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { detail: raw, message: raw, raw };
+    }
+  };
+
   // Get auth token from localStorage and fetch prescription history
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -77,7 +87,7 @@ const EnhancedMedicineIdentificationModal = ({ open, onClose, onSave }) => {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseResponseData(response);
         setPrescriptionHistory(data);
       }
     } catch (err) {
@@ -139,11 +149,11 @@ const EnhancedMedicineIdentificationModal = ({ open, onClose, onSave }) => {
       console.log('Response status:', response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to analyze medicine image');
+        const errorData = await parseResponseData(response);
+        throw new Error(errorData.detail || errorData.message || 'Failed to analyze medicine image');
       }
 
-      const data = await response.json();
+      const data = await parseResponseData(response);
       console.log('✅ Analysis result:', data);
 
       if (data.analysis) {
