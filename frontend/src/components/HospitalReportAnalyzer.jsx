@@ -58,6 +58,39 @@ const HospitalReportAnalyzer = () => {
     }
   };
 
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const recoverCompletedAnalysis = async (selectedFile, signal) => {
+    if (!selectedFile) return null;
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      if (signal?.aborted) return null;
+
+      try {
+        const params = new URLSearchParams({
+          filename: selectedFile.name,
+          file_size: String(selectedFile.size)
+        });
+
+        const response = await fetch(`${API_BASE}/api/hospital-reports/analyze-result?${params.toString()}`, {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+          signal
+        });
+
+        const data = await parseResponseData(response);
+        if (response.ok && data?.status === 'success' && data?.result) {
+          return data.result;
+        }
+      } catch (err) {
+        if (err?.name === 'AbortError') return null;
+      }
+
+      await wait(2000);
+    }
+
+    return null;
+  };
+
   const speakText = async (text) => {
     if (!text || !text.trim()) return;
 
@@ -167,7 +200,20 @@ const HospitalReportAnalyzer = () => {
         setAnalysisError(getPrescriptionText('analysisCancelled', language));
       } else {
         console.error('Analysis error:', err);
-        setAnalysisError(err.message || getPrescriptionText('failedToAnalyze', language));
+        const message = String(err.message || '').toLowerCase();
+        const isProxyFailure = message.includes('backend call failure') || message.includes('backend proxy failed');
+
+        if (isProxyFailure) {
+          const recovered = await recoverCompletedAnalysis(file, abortControllerRef.current?.signal);
+          if (recovered) {
+            setAnalysisResult(recovered);
+            setAnalysisError('');
+          } else {
+            setAnalysisError(getPrescriptionText('failedToAnalyze', language));
+          }
+        } else {
+          setAnalysisError(err.message || getPrescriptionText('failedToAnalyze', language));
+        }
       }
     } finally {
       setAnalyzing(false);

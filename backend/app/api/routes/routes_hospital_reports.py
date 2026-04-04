@@ -3,11 +3,12 @@ API Routes for Hospital Report Analysis
 Separate endpoint from handwritten prescription analysis
 """
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, status, Depends
+from fastapi import APIRouter, File, UploadFile, HTTPException, status, Depends, Request
 from typing import Dict, Any
 import logging
 import tempfile
 import cv2
+from datetime import datetime, timezone
 
 from app.core.middleware import get_current_user_optional
 from app.models.models import User
@@ -15,6 +16,9 @@ from app.models.models import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/hospital-reports", tags=["Hospital Reports"])
+
+# Short-lived cache to recover completed analysis when proxy drops connection.
+RECENT_ANALYSIS_RESULTS: Dict[str, Dict[str, Any]] = {}
 
 # File upload constraints
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -26,9 +30,15 @@ def allowed_file(filename: str) -> bool:
     return any(filename.lower().endswith(ext) for ext in ALLOWED_EXTENSIONS)
 
 
+def _result_cache_key(user: User, client_ip: str, filename: str, file_size: int) -> str:
+    user_part = str(user.id) if user and user.id != 0 else "anonymous"
+    return f"{user_part}:{client_ip}:{filename}:{file_size}"
+
+
 @router.post("/analyze", response_model=Dict[str, Any])
 async def analyze_hospital_report(
     file: UploadFile = File(...),
+    request: Request = None,
     user: User = Depends(get_current_user_optional)
 ):
     """
@@ -80,6 +90,9 @@ async def analyze_hospital_report(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File too small. Please upload a complete hospital report image"
             )
+
+        client_ip = request.client.host if request and request.client else "unknown"
+        cache_key = _result_cache_key(user, client_ip, file.filename or "unknown", file_size)
         
         # Save temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as tmp:
@@ -119,6 +132,12 @@ async def analyze_hospital_report(
         # Log success
         medicines_count = len(result.get('structured_data', {}).get('medicines', []))
         logger.info(f"✅ Hospital report analysis completed. Found {medicines_count} medicines")
+
+        # Store for short window to recover from transient proxy/frontend response failures.
+        RECENT_ANALYSIS_RESULTS[cache_key] = {
+            "completed_at": datetime.now(timezone.utc),
+            "result": result
+        }
         
         return result
         
@@ -141,6 +160,32 @@ async def analyze_hospital_report(
                     logger.debug(f"Temporary file cleaned up: {temp_file_path}")
             except Exception as cleanup_err:
                 logger.warning(f"Failed to clean up temporary file: {cleanup_err}")
+
+
+@router.get("/analyze-result", response_model=Dict[str, Any])
+async def get_hospital_report_analysis_result(
+    filename: str,
+    file_size: int,
+    request: Request,
+    user: User = Depends(get_current_user_optional)
+):
+    """Fetch cached result for a just-completed analysis request."""
+    client_ip = request.client.host if request and request.client else "unknown"
+    cache_key = _result_cache_key(user, client_ip, filename, file_size)
+    cached = RECENT_ANALYSIS_RESULTS.get(cache_key)
+
+    if not cached:
+        return {"status": "pending", "message": "Analysis result not ready"}
+
+    age_seconds = (datetime.now(timezone.utc) - cached["completed_at"]).total_seconds()
+    if age_seconds > 900:
+        RECENT_ANALYSIS_RESULTS.pop(cache_key, None)
+        return {"status": "pending", "message": "Analysis result expired"}
+
+    return {
+        "status": "success",
+        "result": cached["result"]
+    }
 
 
 @router.get("/info")
