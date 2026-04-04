@@ -81,7 +81,6 @@ module.exports = async function (context, req) {
       redirect: "manual"
     });
 
-    const responseBuffer = Buffer.from(await response.arrayBuffer());
     const responseHeaders = {};
 
     response.headers.forEach((value, key) => {
@@ -91,6 +90,25 @@ module.exports = async function (context, req) {
       }
       responseHeaders[key] = value;
     });
+
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+    const isTextLike =
+      contentType.includes("application/json") ||
+      contentType.startsWith("text/") ||
+      contentType.includes("application/javascript") ||
+      contentType.includes("application/xml") ||
+      contentType.includes("application/x-www-form-urlencoded");
+
+    if (isTextLike) {
+      const textBody = await response.text();
+      return {
+        status: response.status,
+        headers: responseHeaders,
+        body: textBody,
+      };
+    }
+
+    const responseBuffer = Buffer.from(await response.arrayBuffer());
 
     return {
       status: response.status,
