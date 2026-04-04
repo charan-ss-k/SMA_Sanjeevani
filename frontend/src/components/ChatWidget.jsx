@@ -392,10 +392,13 @@ const ChatbotWindow = ({ containerRef }) => {
   };
 
   return (
-    <div ref={containerRef} className="fixed bottom-24 right-8 z-50 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200" style={{maxWidth: '400px'}}>
-      <div className="flex flex-col h-[70vh] md:h-[600px]">
+    <div
+      ref={containerRef}
+      className="fixed bottom-20 left-3 right-3 z-50 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:bottom-24 sm:left-auto sm:right-6 sm:w-[380px] md:right-8 md:w-[400px]"
+    >
+      <div className="flex flex-col h-[68vh] max-h-[560px] sm:h-[70vh] sm:max-h-[600px]">
         {/* Chat Header */}
-        <div className="p-4 bg-gradient-to-r from-green-600 to-blue-600 text-white flex items-center space-x-3">
+        <div className="p-4 bg-linear-to-r from-green-600 to-blue-600 text-white flex items-center space-x-3">
           <div className="relative">
             <img
               className="w-10 h-10 rounded-full"
@@ -411,7 +414,7 @@ const ChatbotWindow = ({ containerRef }) => {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 p-4 overflow-y-auto bg-gradient-to-b from-green-50 to-blue-50 space-y-4">
+        <div className="flex-1 p-4 overflow-y-auto bg-linear-to-b from-green-50 to-blue-50 space-y-4">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -420,7 +423,7 @@ const ChatbotWindow = ({ containerRef }) => {
               }`}
             >
               <div
-                className={`p-3 px-4 rounded-2xl max-w-[85%] text-sm shadow-sm ${
+                className={`p-3 px-4 rounded-2xl max-w-[92%] sm:max-w-[85%] text-sm shadow-sm ${
                   message.sender === 'user'
                     ? 'bg-green-600 text-white rounded-br-none'
                     : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
@@ -453,7 +456,7 @@ const ChatbotWindow = ({ containerRef }) => {
           {/* Typing Indicator */}
           {isTyping && (
             <div className="flex justify-start">
-              <div className="p-3 px-4 rounded-2xl max-w-[85%] text-sm bg-white text-gray-800 rounded-bl-none border border-gray-200 shadow-sm">
+              <div className="p-3 px-4 rounded-2xl max-w-[92%] sm:max-w-[85%] text-sm bg-white text-gray-800 rounded-bl-none border border-gray-200 shadow-sm">
                 <div className="flex items-center space-x-1">
                   <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                   <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
@@ -484,14 +487,14 @@ const ChatbotWindow = ({ containerRef }) => {
             <button
               onClick={handleStop}
               title={t('stop', language)}
-              className="bg-orange-500 text-white p-3 rounded-lg cursor-pointer hover:bg-orange-600 transition-colors flex-shrink-0"
+              className="bg-orange-500 text-white p-3 rounded-lg cursor-pointer hover:bg-orange-600 transition-colors shrink-0"
             >
               <StopIcon />
             </button>
           ) : (
             <button
               onClick={handleSend}
-              className="bg-green-600 text-white p-3 rounded-lg cursor-pointer hover:bg-green-700 transition-colors disabled:bg-gray-400 flex-shrink-0"
+              className="bg-green-600 text-white p-3 rounded-lg cursor-pointer hover:bg-green-700 transition-colors disabled:bg-gray-400 shrink-0"
               disabled={inputValue.trim() === ''}
               title={t('send', language)}
             >
@@ -556,11 +559,11 @@ const ChatWidget = () => {
       {isOpen && <ChatbotWindow key={reloadKey} containerRef={chatWindowRef} />}
 
       {/* The toggle button, using the icon from ChatbotIcon.jsx */}
-      <div className="fixed bottom-8 right-8 z-50">
+      <div className="fixed bottom-4 right-4 z-50 sm:bottom-8 sm:right-8">
         <button 
           ref={toggleButtonRef}
           onClick={toggleChat} 
-          className="bg-green-500 hover:bg-green-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:shadow-xl transition-all animate-pulse"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition-all hover:bg-green-600 hover:shadow-xl animate-pulse sm:h-16 sm:w-16"
         >
           {/* Change the icon based on the 'isOpen' state */}
           {isOpen ? <CloseIcon /> : <ChatIcon />}
