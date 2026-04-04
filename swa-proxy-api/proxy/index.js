@@ -1,5 +1,52 @@
 const BACKEND_BASE = "http://98.70.223.78";
 
+function resolveRequestBody(req, method, headers) {
+  if (["GET", "HEAD"].includes(method)) {
+    return undefined;
+  }
+
+  const contentType = (headers["content-type"] || headers["Content-Type"] || "").toLowerCase();
+  const expectsBinary =
+    contentType.includes("multipart/form-data") ||
+    contentType.includes("application/octet-stream") ||
+    contentType.startsWith("image/");
+
+  if (Buffer.isBuffer(req.rawBody)) {
+    return req.rawBody;
+  }
+
+  if (Buffer.isBuffer(req.body)) {
+    return req.body;
+  }
+
+  if (req.body instanceof Uint8Array) {
+    return Buffer.from(req.body);
+  }
+
+  if (typeof req.rawBody === "string") {
+    if (expectsBinary) {
+      return Buffer.from(req.rawBody, "binary");
+    }
+    return req.rawBody;
+  }
+
+  if (typeof req.body === "string") {
+    if (expectsBinary) {
+      return Buffer.from(req.body, "binary");
+    }
+    return req.body;
+  }
+
+  if (req.body !== undefined && req.body !== null) {
+    if (!headers["content-type"] && !headers["Content-Type"]) {
+      headers["content-type"] = "application/json";
+    }
+    return JSON.stringify(req.body);
+  }
+
+  return undefined;
+}
+
 module.exports = async function (context, req) {
   const path = (context.bindingData.path || "").replace(/^\/+/, "");
   const incomingUrl = new URL(req.url);
@@ -22,18 +69,9 @@ module.exports = async function (context, req) {
   const outboundHeaders = { ...req.headers };
   delete outboundHeaders.host;
   delete outboundHeaders["content-length"];
+  delete outboundHeaders["transfer-encoding"];
 
-  let body;
-  if (!["GET", "HEAD"].includes(method)) {
-    if (typeof req.rawBody === "string" || req.rawBody instanceof Buffer) {
-      body = req.rawBody;
-    } else if (req.body !== undefined && req.body !== null) {
-      body = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
-      if (!outboundHeaders["content-type"]) {
-        outboundHeaders["content-type"] = "application/json";
-      }
-    }
-  }
+  const body = resolveRequestBody(req, method, outboundHeaders);
 
   try {
     const response = await fetch(targetUrl.toString(), {
