@@ -471,17 +471,17 @@ const Dashboard = () => {
   return (
     <>
       {!isAuthenticated && <FeatureLoginPrompt featureName="the dashboard" />}
-      <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 pt-24 pb-10">
+      <div className="min-h-screen bg-linear-to-b from-green-50 to-blue-50 pt-24 pb-10">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-5xl font-bold text-green-800 mb-2 flex items-center gap-3">
+          <h1 className="mb-2 flex flex-wrap items-center gap-3 text-3xl font-bold text-green-800 md:text-5xl">
             <img src={analyticsIcon} alt="Analytics" className="h-12 w-12 object-contain" />
-            <span>{dashboardTitle}</span>
+            <span className="wrap-break-word">{dashboardTitle}</span>
           </h1>
-          <p className="text-xl text-gray-700">{getTranslation('trackSymptomSearches', language)}</p>
+          <p className="text-base text-gray-700 md:text-xl">{getTranslation('trackSymptomSearches', language)}</p>
           {/* icons for medicine, upcoming, reminders under subtitle */}
-          <div className="mt-4 flex items-center gap-8">
+          <div className="mt-4 flex flex-wrap items-center gap-4 md:gap-8">
             <div className="flex items-center gap-1">
               <img src={capsuleIcon} alt="Medicine" className="h-6 w-6" />
               <span className="text-gray-700">{t('medicine', language)}</span>
@@ -498,8 +498,8 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Stats Cards */}
-        <div className="grid grid-cols-2 gap-4 mb-8 auto-rows-fr items-stretch">
-          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-white via-emerald-50 to-emerald-100 p-5 md:p-6 text-center shadow-lg">
+        <div className="mb-8 grid grid-cols-1 gap-4 auto-rows-fr items-stretch sm:grid-cols-2">
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-linear-to-br from-white via-emerald-50 to-emerald-100 p-5 md:p-6 text-center shadow-lg">
             <div className="absolute left-0 top-0 h-1.5 w-full bg-emerald-500" />
             <div className="flex w-full flex-1 flex-col items-center justify-center">
               <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700 leading-tight">{getTranslation('totalSearches', language)}</h3>
@@ -508,29 +508,29 @@ const Dashboard = () => {
             <p className="mt-4 text-xs md:text-sm leading-relaxed text-emerald-900/70">Overview of all symptom searches recorded so far.</p>
           </div>
 
-          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-sky-100 p-5 md:p-6 text-center shadow-lg">
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-sky-100 bg-linear-to-br from-white via-sky-50 to-sky-100 p-5 md:p-6 text-center shadow-lg">
             <div className="absolute left-0 top-0 h-1.5 w-full bg-sky-500" />
             <div className="flex w-full flex-1 flex-col items-center justify-center">
               <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-sky-700 leading-tight">{getTranslation('mostCommonSymptom', language)}</h3>
-              <p className="mt-3 text-2xl md:text-3xl font-bold leading-tight text-sky-900 capitalize break-words">
+              <p className="mt-3 text-2xl md:text-3xl font-bold leading-tight text-sky-900 capitalize wrap-break-word">
                 {stats.mostCommonSymptoms.length > 0 ? translateData(stats.mostCommonSymptoms[0].name, 'symptom', language) : '—'}
               </p>
             </div>
             <p className="mt-4 text-xs md:text-sm leading-relaxed text-sky-900/70">The symptom appearing most frequently in recent searches.</p>
           </div>
 
-          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-br from-white via-amber-50 to-amber-100 p-5 md:p-6 text-center shadow-lg">
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-amber-100 bg-linear-to-br from-white via-amber-50 to-amber-100 p-5 md:p-6 text-center shadow-lg">
             <div className="absolute left-0 top-0 h-1.5 w-full bg-amber-500" />
             <div className="flex w-full flex-1 flex-col items-center justify-center">
               <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-amber-700 leading-tight">{getTranslation('mostDiagnosed', language)}</h3>
-              <p className="mt-3 text-2xl md:text-3xl font-bold leading-tight text-amber-900 capitalize break-words">
+              <p className="mt-3 text-2xl md:text-3xl font-bold leading-tight text-amber-900 capitalize wrap-break-word">
                 {stats.conditionFrequency.length > 0 ? translateData(stats.conditionFrequency[0].name, 'condition', language) : '—'}
               </p>
             </div>
             <p className="mt-4 text-xs md:text-sm leading-relaxed text-amber-900/70">Most common predicted condition from the current dataset.</p>
           </div>
 
-          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-white via-violet-50 to-violet-100 p-5 md:p-6 text-center shadow-lg">
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-violet-100 bg-linear-to-br from-white via-violet-50 to-violet-100 p-5 md:p-6 text-center shadow-lg">
             <div className="absolute left-0 top-0 h-1.5 w-full bg-violet-500" />
             <div className="flex w-full flex-1 flex-col items-center justify-center">
               <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-violet-700 leading-tight">{getTranslation('medicinesRecommended', language)}</h3>
@@ -541,12 +541,12 @@ const Dashboard = () => {
         </div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
+        <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
           {/* Symptom Frequency */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800 md:text-2xl">
               <img src={rashIcon} alt="Symptoms" className="h-7 w-7 object-contain" />
-              <span>{mostCommonSymptomsTitle}</span>
+              <span className="min-w-0 wrap-break-word">{mostCommonSymptomsTitle}</span>
             </h2>
             {stats.mostCommonSymptoms.length > 0 ? (
               <ResponsiveContainer width="100%" height={340}>
@@ -566,10 +566,10 @@ const Dashboard = () => {
           </div>
 
           {/* Condition Frequency - Pie Chart */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800 md:text-2xl">
               <img src={hospitalIcon} alt="Diagnosed Conditions" className="h-7 w-7 object-contain" />
-              <span>{getTranslation('diagnosedConditions', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</span>
+              <span className="min-w-0 wrap-break-word">{getTranslation('diagnosedConditions', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</span>
             </h2>
             {stats.conditionFrequency.length > 0 ? (
               <>
@@ -596,7 +596,7 @@ const Dashboard = () => {
                   {translateChartData(stats.conditionFrequency, 'condition').map((item, index) => (
                     <div key={`${item.name}-${index}`} className="flex items-center gap-2 rounded-md bg-gray-50 px-2 py-1.5 min-w-0">
                       <span
-                        className="h-3 w-3 rounded-sm flex-shrink-0"
+                        className="h-3 w-3 rounded-sm shrink-0"
                         style={{ backgroundColor: colors[index % colors.length] }}
                       />
                       <span className="text-xs text-gray-700 truncate" title={`${item.displayName}: ${item.value}`}>
@@ -616,11 +616,11 @@ const Dashboard = () => {
         </div>
 
         {/* Medicines + Search History Row */}
-        <div className="grid grid-cols-2 gap-6 mb-8 items-stretch">
-          <div className="bg-white rounded-2xl border border-blue-100 shadow-lg p-6 h-full">
-            <h2 className="text-2xl font-bold text-gray-800 mb-5 flex items-center gap-3">
+        <div className="mb-8 grid grid-cols-1 gap-6 items-stretch xl:grid-cols-2">
+          <div className="h-full rounded-2xl border border-blue-100 bg-white p-4 shadow-lg md:p-6">
+            <h2 className="mb-5 flex items-center gap-3 text-xl font-bold text-gray-800 md:text-2xl">
               <img src={capsuleIcon} alt="Medicines" className="h-8 w-8 object-contain" />
-              <span>{topMedicinesTitle}</span>
+              <span className="min-w-0 wrap-break-word">{topMedicinesTitle}</span>
             </h2>
             {stats.recommendedMedicines.length > 0 ? (
               <div className="rounded-lg bg-blue-50/60 p-2">
@@ -637,7 +637,7 @@ const Dashboard = () => {
                     <YAxis
                       dataKey="displayName"
                       type="category"
-                      width={178}
+                      width={145}
                       tickMargin={10}
                       fontSize={11}
                       tick={{ fill: '#1f2937' }}
@@ -656,18 +656,18 @@ const Dashboard = () => {
             )}
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <div className="flex h-full flex-col rounded-2xl bg-white p-4 shadow-lg md:p-6">
+            <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="flex min-w-0 items-center gap-2 text-xl font-bold text-gray-800 md:text-2xl">
                 <img src={clockIcon} alt="Recent Searches" className="h-7 w-7 object-contain" />
-                <span>{recentSearchesTitle}</span>
+                <span className="wrap-break-word">{recentSearchesTitle}</span>
               </h2>
               <button
                 onClick={clearHistory}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2"
+                className="inline-flex max-w-full items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600 sm:px-4 sm:text-base"
               >
-                <img src={trashIcon} alt="Clear History" className="h-5 w-5 object-contain" />
-                <span>{clearHistoryTitle}</span>
+                <img src={trashIcon} alt="Clear History" className="h-5 w-5 shrink-0 object-contain" />
+                <span className="wrap-break-word">{clearHistoryTitle}</span>
               </button>
             </div>
 
@@ -678,7 +678,7 @@ const Dashboard = () => {
             ) : (
               <div className="flex-1">
                 <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[760px] text-sm">
                   <thead className="bg-gray-100 border-b-2 border-gray-300">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('date', language)}</th>
@@ -709,7 +709,7 @@ const Dashboard = () => {
                         <td className="px-4 py-3 text-gray-700">
                           {entry.input?.age}/{entry.input?.gender?.substring(0, 1).toUpperCase()}
                         </td>
-                        <td className="px-4 py-3 text-gray-700 capitalize font-medium">
+                        <td className="px-4 py-3 text-gray-700 capitalize font-medium wrap-break-word">
                           {translateData(entry.result?.predicted_condition, 'condition', language) || 'N/A'}
                         </td>
                         <td className="px-4 py-3">
@@ -745,14 +745,14 @@ const Dashboard = () => {
         {searchHistory.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Common Conditions */}
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg shadow-lg p-6 border-l-4 border-orange-500">
+            <div className="bg-linear-to-br from-amber-50 to-orange-50 rounded-lg shadow-lg p-6 border-l-4 border-orange-500">
               <h3 className="text-xl font-bold text-orange-900 mb-4">{getTranslation('yourConditionHistory', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</h3>
               {stats.mostCommonConditions.length > 0 ? (
                 <ul className="space-y-2">
                   {stats.mostCommonConditions.map((cond, i) => (
-                    <li key={i} className="flex items-center justify-between">
-                      <span className="text-gray-800 capitalize">{translateData(cond.name, 'condition', language)}</span>
-                      <span className="bg-orange-200 text-orange-900 px-3 py-1 rounded-full text-sm font-semibold">
+                    <li key={i} className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 flex-1 wrap-break-word text-gray-800 capitalize">{translateData(cond.name, 'condition', language)}</span>
+                      <span className="shrink-0 rounded-full bg-orange-200 px-3 py-1 text-sm font-semibold text-orange-900">
                         {cond.count}x
                       </span>
                     </li>
@@ -764,15 +764,15 @@ const Dashboard = () => {
             </div>
 
             {/* Health Tips */}
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-lg p-6 border-l-4 border-green-500">
+            <div className="bg-linear-to-br from-green-50 to-emerald-50 rounded-lg shadow-lg p-6 border-l-4 border-green-500">
               <h3 className="text-xl font-bold text-green-900 mb-4">{getTranslation('wellnessTips', language)}</h3>
               <ul className="space-y-2 text-gray-800">
-                <li>{getTranslation('stayHydratedWater', language)}</li>
-                <li>{getTranslation('getQualitySleep', language)}</li>
-                <li>{getTranslation('exerciseRegularly', language)}</li>
-                <li>{getTranslation('maintainBalancedDiet', language)}</li>
-                <li>{getTranslation('washHandsFrequently', language)}</li>
-                <li>{getTranslation('consultDoctorPersistent', language)}</li>
+                <li className="wrap-break-word">{getTranslation('stayHydratedWater', language)}</li>
+                <li className="wrap-break-word">{getTranslation('getQualitySleep', language)}</li>
+                <li className="wrap-break-word">{getTranslation('exerciseRegularly', language)}</li>
+                <li className="wrap-break-word">{getTranslation('maintainBalancedDiet', language)}</li>
+                <li className="wrap-break-word">{getTranslation('washHandsFrequently', language)}</li>
+                <li className="wrap-break-word">{getTranslation('consultDoctorPersistent', language)}</li>
               </ul>
             </div>
           </div>
