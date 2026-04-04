@@ -13,6 +13,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useHealth } from '../../context/HealthContext';
 import { Button, Card, Alert, Loading, Badge } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
@@ -71,7 +72,11 @@ const ReminderCard = ({ reminder, onEdit, onDelete }) => {
               gap: spacing.sm,
             }}
           >
-            <Text style={{ color: colors.textSecondary }}>⏰</Text>
+            <MaterialCommunityIcons
+              name="clock-outline"
+              size={14}
+              color={colors.textSecondary}
+            />
             <Text
               style={[
                 typography.caption,
@@ -96,8 +101,16 @@ const ReminderCard = ({ reminder, onEdit, onDelete }) => {
           paddingVertical: spacing.sm,
           borderRadius: 6,
           marginBottom: spacing.md,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
         }}
       >
+        <MaterialCommunityIcons
+          name="note-text-outline"
+          size={14}
+          color={colors.textSecondary}
+        />
         <Text
           style={[
             typography.caption,
@@ -106,7 +119,7 @@ const ReminderCard = ({ reminder, onEdit, onDelete }) => {
             },
           ]}
         >
-          📋 {reminder.notes || 'No special notes'}
+          {reminder.notes || 'No special notes'}
         </Text>
       </View>
 
@@ -191,7 +204,11 @@ const AddReminderModal = ({ visible, onClose, onAdd, isLoading }) => {
               Add Reminder
             </Text>
             <Pressable onPress={onClose}>
-              <Text style={{ fontSize: 24, fontWeight: 'bold' }}>✕</Text>
+              <MaterialCommunityIcons
+                name="close"
+                size={24}
+                color={colors.text}
+              />
             </Pressable>
           </View>
           <Text
@@ -436,7 +453,7 @@ export default function RemindersScreen() {
               },
             ]}
           >
-            💊 Medicine Reminders
+            Medicine Reminders
           </Text>
           <Button
             title="+"

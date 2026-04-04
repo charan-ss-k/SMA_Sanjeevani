@@ -3,18 +3,53 @@ Multi-Method Handwritten Text OCR Handler
 Combines EasyOCR, Tesseract, and PaddleOCR for maximum accuracy
 """
 
-import easyocr
-import pytesseract
-import numpy as np
-import logging
-from typing import Dict, List, Tuple, Optional
 import json
+import logging
+import os
+import tempfile
+from typing import Dict, List, Tuple, Optional
+
+import cv2
+import numpy as np
+from PIL import Image
+
+try:
+    import easyocr
+    HAVE_EASYOCR = True
+except ImportError:
+    easyocr = None
+    HAVE_EASYOCR = False
+
+try:
+    import pytesseract
+    HAVE_TESSERACT = True
+except ImportError:
+    pytesseract = None
+    HAVE_TESSERACT = False
 
 try:
     from paddleocr import PaddleOCR
-    PADDLE_AVAILABLE = True
+    HAVE_PADDLEOCR = True
 except ImportError:
-    PADDLE_AVAILABLE = False
+    PaddleOCR = None
+    HAVE_PADDLEOCR = False
+
+try:
+    from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+    import torch
+    HAVE_TROCR = True
+except ImportError:
+    TrOCRProcessor = None
+    VisionEncoderDecoderModel = None
+    torch = None
+    HAVE_TROCR = False
+
+try:
+    import craft_text_detector
+    HAVE_CRAFT = True
+except ImportError:
+    craft_text_detector = None
+    HAVE_CRAFT = False
 
 logger = logging.getLogger(__name__)
 

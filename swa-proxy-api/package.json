@@ -1,0 +1,9 @@
+{
+  "name": "sanjeevani-swa-proxy-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions proxy for HTTP backend VM",
+  "engines": {
+    "node": ">=18"
+  }
+}

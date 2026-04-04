@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { AuthContext } from '../main';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
+import { API_BASE } from '../config/apiBase';
 
 const MedicineIdentificationModal = ({ isOpen, onClose, onSave }) => {
   const { isAuthenticated, authToken } = useContext(AuthContext);
@@ -113,7 +114,7 @@ const MedicineIdentificationModal = ({ isOpen, onClose, onSave }) => {
         };
       }
 
-      const response = await fetch('/api/medicine-identification/analyze', fetchOptions);
+      const response = await fetch(`${API_BASE}/api/medicine-identification/analyze`, fetchOptions);
 
       console.log('📥 Response received:', response.status, response.statusText);
 
@@ -195,7 +196,7 @@ const MedicineIdentificationModal = ({ isOpen, onClose, onSave }) => {
 
       try {
         // Save to backend prescription history
-        const response = await fetch('/api/prescriptions/', {
+        const response = await fetch(`${API_BASE}/api/prescriptions/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

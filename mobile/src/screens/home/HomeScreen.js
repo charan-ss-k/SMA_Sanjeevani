@@ -16,28 +16,30 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { colors, spacing, typography, borderRadius } from '../../utils/theme';
+import { API_BASE_URL } from '../../config/environment';
 
 const { width } = Dimensions.get('window');
-const API_BASE = 'http://192.168.29.195:8000';
+const APPOINTMENT_VIEWPORT_WIDTH = width - (spacing.md * 2) - (spacing.lg * 2) - spacing.sm;
 
 // Feature Slides Data (matching frontend)
 const slides = [
-  { title: 'Scan Medicine', description: 'Identify any medicine instantly', icon: '💊', bg: '#f0fdf4' },
-  { title: 'Set Reminders', description: 'Never miss your medications', icon: '⏰', bg: '#fef3c7' },
-  { title: 'Upload Prescriptions', description: 'Keep all your prescriptions organized', icon: '📋', bg: '#e0e7ff' },
-  { title: 'Stay Updated', description: 'Get health tips and updates', icon: '📱', bg: '#fce7f3' },
+  { title: 'Scan Medicine', description: 'Identify any medicine instantly', iconName: 'pill', bg: '#f0fdf4' },
+  { title: 'Set Reminders', description: 'Never miss your medications', iconName: 'clock-outline', bg: '#fef3c7' },
+  { title: 'Upload Prescriptions', description: 'Keep all your prescriptions organized', iconName: 'file-document-outline', bg: '#e0e7ff' },
+  { title: 'Stay Updated', description: 'Get health tips and updates', iconName: 'cellphone-text', bg: '#fce7f3' },
 ];
 
 // Feature Stat Card Component
-const StatCard = ({ icon, title, description, bgColor = '#eff6ff' }) => (
+const StatCard = ({ iconName, title, description, bgColor = '#eff6ff' }) => (
   <View style={[styles.statCard, { backgroundColor: bgColor }]}>
-    <Text style={styles.statIcon}>{icon}</Text>
+    <MaterialCommunityIcons name={iconName} size={28} color="#166534" style={styles.statIcon} />
     <Text style={styles.statTitle}>{title}</Text>
     <Text style={styles.statDescription}>{description}</Text>
   </View>
@@ -53,9 +55,9 @@ const AppointmentCard = ({ appointment, onCancel, onReschedule }) => {
   const specialization = appointment.specialization || appointment.doctor_specialization || 'Specialist';
   
   const getStatusBadge = () => {
-    if (daysUntil <= 1) return { text: 'URGENT', color: '#dc2626', bg: '#fef2f2', icon: '🔴' };
-    if (daysUntil <= 3) return { text: 'SOON', color: '#f59e0b', bg: '#fef3c7', icon: '🟡' };
-    return { text: 'UPCOMING', color: '#16a34a', bg: '#f0fdf4', icon: '🟢' };
+    if (daysUntil <= 1) return { text: 'URGENT', color: '#dc2626', bg: '#fef2f2', iconName: 'circle' };
+    if (daysUntil <= 3) return { text: 'SOON', color: '#f59e0b', bg: '#fef3c7', iconName: 'circle' };
+    return { text: 'UPCOMING', color: '#16a34a', bg: '#f0fdf4', iconName: 'circle' };
   };
   
   const status = getStatusBadge();
@@ -63,31 +65,31 @@ const AppointmentCard = ({ appointment, onCancel, onReschedule }) => {
   return (
     <View style={styles.appointmentCard}>
       <View style={[styles.appointmentStatusBadge, { backgroundColor: status.bg }]}>
-        <Text style={styles.appointmentStatusIcon}>{status.icon}</Text>
+        <MaterialCommunityIcons name={status.iconName} size={10} color={status.color} style={styles.appointmentStatusIcon} />
         <Text style={[styles.appointmentStatusText, { color: status.color }]}>{status.text}</Text>
       </View>
       
       <View style={styles.appointmentContent}>
         <View style={styles.appointmentHeader}>
-          <Text style={styles.appointmentDoctorIcon}>🩺</Text>
+          <MaterialCommunityIcons name="stethoscope" size={26} color="#2563EB" style={styles.appointmentDoctorIcon} />
           <View style={styles.appointmentDoctorInfo}>
-            <Text style={styles.appointmentDoctorName}>{appointment.doctor_name}</Text>
-            <Text style={styles.appointmentSpecialization}>{specialization}</Text>
+            <Text style={styles.appointmentDoctorName} numberOfLines={1}>{appointment.doctor_name}</Text>
+            <Text style={styles.appointmentSpecialization} numberOfLines={1}>{specialization}</Text>
           </View>
         </View>
         
         <View style={styles.appointmentDetails}>
           <View style={styles.appointmentDetailRow}>
-            <Text style={styles.appointmentDetailIcon}>🏥</Text>
-            <Text style={styles.appointmentDetailText}>{hospitalName}</Text>
+            <MaterialCommunityIcons name="hospital-building" size={14} color="#6B7280" style={styles.appointmentDetailIcon} />
+            <Text style={styles.appointmentDetailText} numberOfLines={1}>{hospitalName}</Text>
           </View>
           <View style={styles.appointmentDetailRow}>
-            <Text style={styles.appointmentDetailIcon}>📅</Text>
-            <Text style={styles.appointmentDetailText}>{aptDate.toLocaleDateString()}</Text>
+            <MaterialCommunityIcons name="calendar-month-outline" size={14} color="#6B7280" style={styles.appointmentDetailIcon} />
+            <Text style={styles.appointmentDetailText} numberOfLines={1}>{aptDate.toLocaleDateString()}</Text>
           </View>
           <View style={styles.appointmentDetailRow}>
-            <Text style={styles.appointmentDetailIcon}>⏰</Text>
-            <Text style={styles.appointmentDetailText}>{appointment.appointment_time}</Text>
+            <MaterialCommunityIcons name="clock-outline" size={14} color="#6B7280" style={styles.appointmentDetailIcon} />
+            <Text style={styles.appointmentDetailText} numberOfLines={1}>{appointment.appointment_time}</Text>
           </View>
         </View>
         
@@ -123,14 +125,12 @@ const ReminderCard = ({ reminder }) => {
   return (
     <View style={[styles.reminderCard, { borderLeftColor: style.borderColor, backgroundColor: style.bg }]}>
       <View style={styles.reminderIcon}>
-        <Text style={styles.reminderIconText}>
-          {reminder.status === 'urgent' ? '🔴' : reminder.status === 'upcoming' ? '🟡' : '🟢'}
-        </Text>
+        <MaterialCommunityIcons name="circle" size={16} color={style.badgeColor} style={styles.reminderIconText} />
       </View>
       <View style={styles.reminderContent}>
         <Text style={styles.reminderTitle}>{reminder.title}</Text>
         <Text style={styles.reminderDescription}>{reminder.description}</Text>
-        <Text style={styles.reminderDate}>📅 {new Date(reminder.date).toLocaleDateString()}</Text>
+        <Text style={styles.reminderDate}>{new Date(reminder.date).toLocaleDateString()}</Text>
       </View>
       <View style={[styles.reminderBadge, { backgroundColor: '#fff' }]}>
         <Text style={[styles.reminderBadgeText, { color: style.badgeColor }]}>
@@ -167,30 +167,30 @@ export default function HomeScreen({ navigation }) {
       const token = await SecureStore.getItemAsync('authToken');
       
       if (!token) {
-        console.log('⚠️ HomeScreen: No auth token found in SecureStore');
+        console.log('HomeScreen: No auth token found in SecureStore');
         setLoadingAppointments(false);
         return;
       }
       
-      console.log('🔄 HomeScreen: Fetching appointments from API with token...');
+      console.log('HomeScreen: Fetching appointments from API with token...');
       
       // Use the same endpoint as ConsultDoctorScreen: /api/appointments/upcoming-appointments
-      const response = await fetch(`${API_BASE}/api/appointments/upcoming-appointments`, {
+      const response = await fetch(`${API_BASE_URL}/appointments/upcoming-appointments`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
-      console.log('📡 HomeScreen: API response status:', response.status);
+      console.log('HomeScreen: API response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('📦 HomeScreen: API response data:', JSON.stringify(data, null, 2));
+        console.log('HomeScreen: API response data:', JSON.stringify(data, null, 2));
         
         // Handle both response formats: { appointments: [...] } or { success: true, appointments: [...] }
         const appointmentsList = data.appointments || [];
-        console.log(`📅 HomeScreen: Loaded ${appointmentsList.length} upcoming appointments from API`);
+        console.log(`HomeScreen: Loaded ${appointmentsList.length} upcoming appointments from API`);
         
         // Filter to ensure only future appointments
         const filteredAppointments = appointmentsList.filter(apt => {
@@ -198,7 +198,7 @@ export default function HomeScreen({ navigation }) {
           return aptDate >= new Date();
         }).sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date));
         
-        console.log(`📅 HomeScreen: ${filteredAppointments.length} appointments after filtering`);
+        console.log(`HomeScreen: ${filteredAppointments.length} appointments after filtering`);
         setAppointments(filteredAppointments);
         generateRemindersFromAppointments(filteredAppointments);
         
@@ -206,11 +206,11 @@ export default function HomeScreen({ navigation }) {
         await AsyncStorage.setItem('upcomingAppointments', JSON.stringify(filteredAppointments));
       } else {
         // Fallback to AsyncStorage - use same key as ConsultDoctorScreen
-        console.log('📦 HomeScreen: API failed with status', response.status, '- loading from cache');
+        console.log('HomeScreen: API failed with status', response.status, '- loading from cache');
         await loadAppointmentsFromCache();
       }
     } catch (error) {
-      console.error('❌ HomeScreen: Error loading appointments:', error);
+      console.error('HomeScreen: Error loading appointments:', error);
       // Fallback to AsyncStorage
       await loadAppointmentsFromCache();
     } finally {
@@ -221,13 +221,13 @@ export default function HomeScreen({ navigation }) {
   // Load appointments from AsyncStorage cache (same keys as ConsultDoctorScreen)
   const loadAppointmentsFromCache = async () => {
     try {
-      console.log('📦 HomeScreen: Attempting to load from cache...');
+      console.log('HomeScreen: Attempting to load from cache...');
       const savedUpcoming = await AsyncStorage.getItem('upcomingAppointments');
-      console.log('📦 HomeScreen: Cache data found:', savedUpcoming ? 'Yes' : 'No');
+      console.log('HomeScreen: Cache data found:', savedUpcoming ? 'Yes' : 'No');
       
       if (savedUpcoming) {
         const upcomingList = JSON.parse(savedUpcoming);
-        console.log(`📦 HomeScreen: Parsed ${upcomingList.length} appointments from cache`);
+        console.log(`HomeScreen: Parsed ${upcomingList.length} appointments from cache`);
         
         // Filter to ensure only future appointments
         const filteredUpcoming = upcomingList.filter(apt => {
@@ -235,16 +235,16 @@ export default function HomeScreen({ navigation }) {
           return aptDate >= new Date();
         }).sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date));
         
-        console.log(`📦 HomeScreen: ${filteredUpcoming.length} appointments after filtering (future only)`);
+        console.log(`HomeScreen: ${filteredUpcoming.length} appointments after filtering (future only)`);
         setAppointments(filteredUpcoming);
         generateRemindersFromAppointments(filteredUpcoming);
       } else {
-        console.log('📦 HomeScreen: No cached appointments found');
+        console.log('HomeScreen: No cached appointments found');
         setAppointments([]);
         setReminders([]);
       }
     } catch (e) {
-      console.error('❌ HomeScreen: Error loading from AsyncStorage:', e);
+      console.error('HomeScreen: Error loading from AsyncStorage:', e);
       setAppointments([]);
       setReminders([]);
     }
@@ -278,7 +278,7 @@ export default function HomeScreen({ navigation }) {
   // Load appointments immediately on mount if authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('🏠 HomeScreen mounted with auth - loading appointments immediately');
+      console.log('HomeScreen mounted with auth - loading appointments immediately');
       loadAppointments();
     }
   }, [isAuthenticated]);
@@ -287,7 +287,7 @@ export default function HomeScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated) {
-        console.log('🏠 HomeScreen focused - loading appointments');
+        console.log('HomeScreen focused - loading appointments');
         loadAppointments();
       }
     }, [isAuthenticated, loadAppointments])
@@ -315,9 +315,9 @@ export default function HomeScreen({ navigation }) {
             try {
               const token = await SecureStore.getItemAsync('authToken');
               
-              console.log('🗑️ Cancelling appointment:', appointment.id);
+              console.log('Cancelling appointment:', appointment.id);
               
-              const response = await fetch(`${API_BASE}/api/appointments/appointment/${appointment.id}`, {
+              const response = await fetch(`${API_BASE_URL}/appointments/appointment/${appointment.id}`, {
                 method: 'DELETE',
                 headers: { 
                   'Authorization': `Bearer ${token}`,
@@ -326,7 +326,7 @@ export default function HomeScreen({ navigation }) {
               });
               
               const data = await response.json();
-              console.log('📤 Cancel response:', response.status, data);
+              console.log('Cancel response:', response.status, data);
               
               if (response.ok || data.success) {
                 // Remove from state
@@ -343,12 +343,12 @@ export default function HomeScreen({ navigation }) {
                 }
                 
                 Alert.alert('Success', `Appointment with ${appointment.doctor_name} has been cancelled`);
-                console.log('✅ Appointment cancelled successfully');
+                console.log('Appointment cancelled successfully');
               } else {
                 throw new Error(data.detail || data.message || 'Failed to cancel appointment');
               }
             } catch (error) {
-              console.error('❌ Error cancelling appointment:', error);
+              console.error('Error cancelling appointment:', error);
               Alert.alert('Error', `Failed to cancel appointment: ${error.message}`);
             }
           }
@@ -399,7 +399,7 @@ export default function HomeScreen({ navigation }) {
       {!isAuthenticated && (
         <View style={styles.carouselContainer}>
           <View style={[styles.carouselSlide, { backgroundColor: slides[activeSlide].bg }]}>
-            <Text style={styles.carouselIcon}>{slides[activeSlide].icon}</Text>
+            <MaterialCommunityIcons name={slides[activeSlide].iconName} size={58} color="#166534" style={styles.carouselIcon} />
             <Text style={styles.carouselTitle}>{slides[activeSlide].title}</Text>
             <Text style={styles.carouselDescription}>{slides[activeSlide].description}</Text>
             <Text style={styles.carouselTagline}>Bringing healthcare to your fingertips</Text>
@@ -428,7 +428,7 @@ export default function HomeScreen({ navigation }) {
       {!isAuthenticated && (
         <View style={styles.ctaCard}>
           <View style={styles.ctaContent}>
-            <Text style={styles.ctaTitle}>💊 Check Your Symptoms</Text>
+            <Text style={styles.ctaTitle}>Check Your Symptoms</Text>
             <Text style={styles.ctaDescription}>
               Get instant AI-powered medicine recommendations based on your symptoms
             </Text>
@@ -453,7 +453,7 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.welcomeSubtitle}>Your health companion dashboard is ready</Text>
             </View>
             <View style={styles.welcomeIconContainer}>
-              <Text style={styles.welcomeIcon}>🏥</Text>
+              <MaterialCommunityIcons name="hospital-building" size={30} color="#1E40AF" style={styles.welcomeIcon} />
             </View>
           </View>
         </View>
@@ -463,7 +463,7 @@ export default function HomeScreen({ navigation }) {
       {isAuthenticated && (
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📅 Your Appointments ({appointments.length})</Text>
+            <Text style={styles.sectionTitle}>Your Appointments ({appointments.length})</Text>
           </View>
           
           {loadingAppointments ? (
@@ -473,12 +473,21 @@ export default function HomeScreen({ navigation }) {
             </View>
           ) : appointments.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateIcon}>📅</Text>
+              <MaterialCommunityIcons name="calendar-blank-outline" size={34} color="#9CA3AF" style={styles.emptyStateIcon} />
               <Text style={styles.emptyStateText}>No upcoming appointments</Text>
               <Text style={styles.emptyStateSubtext}>Book one to get started!</Text>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.appointmentsScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.appointmentsScroll}
+              contentContainerStyle={styles.appointmentsScrollContent}
+              pagingEnabled
+              snapToInterval={APPOINTMENT_VIEWPORT_WIDTH}
+              snapToAlignment="start"
+              decelerationRate="fast"
+            >
               {appointments.map((apt, idx) => (
                 <AppointmentCard 
                   key={apt.id || idx} 
@@ -494,7 +503,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.bookAppointmentBtn}
             onPress={() => navigation.navigate('ConsultTab', { screen: 'ConsultDoctor' })}
           >
-            <Text style={styles.bookAppointmentBtnText}>📅 Book New Appointment</Text>
+            <Text style={styles.bookAppointmentBtnText}>Book New Appointment</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -503,19 +512,19 @@ export default function HomeScreen({ navigation }) {
       {!isAuthenticated && (
         <View style={styles.statsContainer}>
           <StatCard 
-            icon="👨‍⚕️" 
+            iconName="doctor" 
             title="Expert Doctors" 
             description="Consult with qualified healthcare professionals"
             bgColor="#eff6ff"
           />
           <StatCard 
-            icon="📅" 
+            iconName="calendar-check-outline" 
             title="Easy Booking" 
             description="Schedule appointments in just a few taps"
             bgColor="#f0fdf4"
           />
           <StatCard 
-            icon="📊" 
+            iconName="chart-line" 
             title="Health Analytics" 
             description="Track your health journey with insights"
             bgColor="#faf5ff"
@@ -526,7 +535,7 @@ export default function HomeScreen({ navigation }) {
       {/* About Sanjeevani Section - Show when NOT authenticated */}
       {!isAuthenticated && (
         <View style={styles.aboutCard}>
-          <Text style={styles.aboutTitle}>🌟 About Sanjeevani</Text>
+          <Text style={styles.aboutTitle}>About Sanjeevani</Text>
           <Text style={styles.aboutSubtitle}>What We Do</Text>
           <Text style={styles.aboutDescription}>
             Sanjeevani is your comprehensive healthcare companion that brings medicine identification, 
@@ -539,7 +548,7 @@ export default function HomeScreen({ navigation }) {
       {/* How to Use Section - Show when NOT authenticated */}
       {!isAuthenticated && (
         <View style={styles.howToUseSection}>
-          <Text style={styles.howToUseTitle}>🚀 How to Use</Text>
+          <Text style={styles.howToUseTitle}>How to Use</Text>
           <Text style={styles.howToUseSubtitle}>Get started in 4 easy steps</Text>
           
           <View style={styles.stepsGrid}>
@@ -574,7 +583,7 @@ export default function HomeScreen({ navigation }) {
       {/* Medicine Recommendation CTA */}
       <View style={styles.bottomCtaCard}>
         <View style={styles.bottomCtaContent}>
-          <Text style={styles.bottomCtaTitle}>💊 Check Your Symptoms</Text>
+          <Text style={styles.bottomCtaTitle}>Check Your Symptoms</Text>
           <Text style={styles.bottomCtaDescription}>
             Get instant recommendations based on your symptoms
           </Text>
@@ -591,7 +600,7 @@ export default function HomeScreen({ navigation }) {
       {isAuthenticated && recentChats.length > 0 && (
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>💬 Recent Chats</Text>
+            <Text style={styles.sectionTitle}>Recent Chats</Text>
             <TouchableOpacity onPress={() => navigation.navigate('ChatTab')}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
@@ -616,7 +625,7 @@ export default function HomeScreen({ navigation }) {
 
       {/* Health Tip Card */}
       <View style={styles.healthTipCard}>
-        <Text style={styles.healthTipTitle}>💡 Health Tip</Text>
+        <Text style={styles.healthTipTitle}>Health Tip</Text>
         <Text style={styles.healthTipText}>
           Stay hydrated! Drinking enough water helps your body function properly and supports your immune system.
         </Text>
@@ -634,10 +643,10 @@ export default function HomeScreen({ navigation }) {
               style={styles.loginCtaButton}
               onPress={() => navigation.navigate('ProfileTab', { screen: 'Login' })}
             >
-              <Text style={styles.loginCtaButtonText}>🔐 Login to Continue</Text>
+              <Text style={styles.loginCtaButtonText}>Login to Continue</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.loginCtaIcon}>💚</Text>
+          <MaterialCommunityIcons name="heart" size={28} color="#16A34A" style={styles.loginCtaIcon} />
         </View>
       )}
     </ScrollView>
@@ -647,11 +656,11 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f0fdf4',
   },
   content: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg + 92,
+    paddingTop: spacing.lg + 84,
     paddingBottom: spacing.xl * 3,
   },
   loadingContainer: {
@@ -669,12 +678,14 @@ const styles = StyleSheet.create({
   // Carousel Styles
   carouselContainer: {
     marginBottom: spacing.lg,
-    borderRadius: 24,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 4,
   },
   carouselSlide: {
@@ -791,15 +802,17 @@ const styles = StyleSheet.create({
 
   // Welcome Card
   welcomeCard: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: spacing.xl,
     marginBottom: spacing.lg,
-    shadowColor: '#1e40af',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
   welcomeContent: {
     flexDirection: 'row',
@@ -839,11 +852,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
   },
   sectionHeader: {
     marginBottom: spacing.lg,
@@ -910,12 +925,14 @@ const styles = StyleSheet.create({
   appointmentsScroll: {
     marginBottom: spacing.md,
   },
+  appointmentsScrollContent: {
+    paddingHorizontal: 0,
+  },
   appointmentCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: spacing.md,
-    marginRight: spacing.md,
-    width: 300,
+    width: APPOINTMENT_VIEWPORT_WIDTH,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
@@ -958,10 +975,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#1f2937',
+    flexShrink: 1,
   },
   appointmentSpecialization: {
     fontSize: 13,
     color: '#6b7280',
+    flexShrink: 1,
   },
   appointmentDetails: {
     marginBottom: spacing.md,
@@ -979,6 +998,7 @@ const styles = StyleSheet.create({
   appointmentDetailText: {
     fontSize: 14,
     color: '#4b5563',
+    flexShrink: 1,
   },
   appointmentActions: {
     flexDirection: 'row',

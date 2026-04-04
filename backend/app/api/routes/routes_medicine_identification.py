@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 import logging
 import os
 import tempfile
-import shutil
+import io
 from typing import Optional
 from sqlalchemy.orm import Session
 import cv2
@@ -15,7 +15,11 @@ import numpy as np
 from app.core.database import get_db
 from app.core.middleware import get_current_user, get_current_user_optional
 from app.core.rls_context import get_db_with_rls
-from app.services.medicine_ocr_service import process_medicine_image
+from app.services.medicine_ocr_service import (
+    process_medicine_image,
+    extract_text_from_image,
+    analyze_medicine_with_phi4,
+)
 from app.models.models import Prescription, MedicineHistory
 
 logger = logging.getLogger(__name__)
@@ -83,18 +87,37 @@ async def analyze_medicine_image(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File too small. Please upload a complete image"
             )
-        
-        # Save temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as tmp:
-            tmp.write(file_content)
-            temp_file_path = tmp.name
-        
-        # Verify it's a valid image
-        image = cv2.imread(temp_file_path)
+
+        # Decode image directly from uploaded bytes (more reliable than reading back a .tmp file)
+        image = cv2.imdecode(np.frombuffer(file_content, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+        # Fallback decode path for images OpenCV may fail to decode directly.
+        if image is None:
+            try:
+                from PIL import Image
+
+                pil_image = Image.open(io.BytesIO(file_content)).convert("RGB")
+                image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            except Exception:
+                image = None
+
         if image is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid image file. Please upload a valid image"
+            )
+
+        # Write normalized decoded image to temporary file for downstream service.
+        file_ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'jpg'
+        if file_ext not in ALLOWED_EXTENSIONS:
+            file_ext = 'jpg'
+        fd, temp_file_path = tempfile.mkstemp(suffix=f'.{file_ext}')
+        os.close(fd)
+
+        if not cv2.imwrite(temp_file_path, image):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process uploaded image"
             )
         
         # Process image
@@ -207,19 +230,26 @@ async def save_to_prescription(
 
 @router.get("/health")
 async def health_check():
-    """Check if medicine identification service is available"""
+    """Check if medicine identification service is available."""
     try:
-        # Try importing required libraries
-        import cv2
-        import pytesseract
+        vision_api_key = os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip()
+        if not vision_api_key:
+            return {
+                "status": "degraded",
+                "service": "medicine-identification",
+                "error": "GOOGLE_CLOUD_VISION_API_KEY not configured",
+                "components": {
+                    "opencv": "available",
+                    "google_vision": "missing-api-key"
+                }
+            }
         
         return {
             "status": "healthy",
             "service": "medicine-identification",
             "components": {
                 "opencv": "available",
-                "pytesseract": "available",
-                "easyocr": "available (optional)"
+                "google_vision": "configured"
             }
         }
     except Exception as e:

@@ -12,6 +12,7 @@ import {
   FlatList,
   TextInput,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useChat } from '../../context/ChatContext';
 import { Button, Card, Alert, Badge } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
@@ -132,9 +133,16 @@ export default function SymptomCheckerScreen() {
           },
         ]}
       >
-        🩺 Symptom Checker
+        Symptom Checker
       </Text>
       <Card variant="outlined" padding="md" style={{ marginBottom: spacing.lg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+          <MaterialCommunityIcons
+            name="stethoscope"
+            size={18}
+            color={colors.secondary}
+            style={{ marginTop: 2 }}
+          />
         <Text
           style={[
             typography.body,
@@ -147,6 +155,7 @@ export default function SymptomCheckerScreen() {
           Select your symptoms below and get AI-powered health insights. This is
           not a medical diagnosis - please consult a doctor if symptoms persist.
         </Text>
+        </View>
       </Card>
       <Text
         style={[
@@ -254,7 +263,7 @@ export default function SymptomCheckerScreen() {
                 }}
               >
                 <Badge variant="primary">
-                  {symptom} ✕
+                  {symptom} ×
                 </Badge>
               </Pressable>
             ))}
@@ -321,6 +330,13 @@ export default function SymptomCheckerScreen() {
           borderColor: colors.warning,
         }}
       >
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={16}
+            color={colors.warning}
+            style={{ marginTop: 1 }}
+          />
         <Text
           style={[
             typography.caption,
@@ -330,10 +346,11 @@ export default function SymptomCheckerScreen() {
             },
           ]}
         >
-          ⚠️ This tool is for informational purposes only. It does not replace
+          This tool is for informational purposes only. It does not replace
           professional medical advice. Always consult a qualified healthcare
           provider for proper diagnosis and treatment.
         </Text>
+        </View>
       </Card>
     </ScrollView>
   );

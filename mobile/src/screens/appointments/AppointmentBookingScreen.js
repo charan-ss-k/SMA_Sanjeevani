@@ -145,7 +145,7 @@ export default function AppointmentBookingScreen({ route, navigation }) {
           },
         ]}
       >
-        📅 Book Appointment
+        Book Appointment
       </Text>
       <Card variant="elevated" padding="md" style={{ marginBottom: spacing.lg }}>
         <Text
@@ -178,7 +178,7 @@ export default function AppointmentBookingScreen({ route, navigation }) {
             },
           ]}
         >
-          ⭐ {doctor.rating} • Consultation Fee: ₹{doctor.fee}
+          Rating: {doctor.rating} • Consultation Fee: ₹{doctor.fee}
         </Text>
       </Card>
       <Text
@@ -219,7 +219,7 @@ export default function AppointmentBookingScreen({ route, navigation }) {
                 textTransform: 'capitalize',
               }}
             >
-              {type === 'video' ? '📹 Video' : '🏥 Clinic'}
+              {type === 'video' ? 'Video' : 'Clinic'}
             </Text>
           </Pressable>
         ))}

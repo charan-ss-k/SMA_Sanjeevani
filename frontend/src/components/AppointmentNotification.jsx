@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, LanguageContext } from '../main';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
+import { API_BASE } from '../config/apiBase';
 
 const AppointmentNotification = () => {
   const { isAuthenticated, authToken } = useContext(AuthContext);
@@ -67,7 +68,7 @@ const AppointmentNotification = () => {
 
     const checkAppointments = async () => {
       try {
-        const response = await fetch('/api/appointments/my-appointments', {
+        const response = await fetch(`${API_BASE}/api/appointments/my-appointments`, {
           headers: {
             'Authorization': `Bearer ${authToken}`
           }
@@ -130,7 +131,7 @@ const AppointmentNotification = () => {
               }
               
               setTimeout(() => {
-                playTTS(message, language);
+                playTTS(message, language, { allowAuto: true });
               }, 500);
               
               // Show browser notification

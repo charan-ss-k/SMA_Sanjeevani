@@ -1,28 +1,17 @@
 import React, { useState, useContext } from 'react';
 import SymptomChecker from './SymptomChecker';
 import RecommendationResult from './RecommendationResult';
-import { playTTS, stopAllTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
 import { AuthContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
+import capsuleIcon from '../assets/capsule.png';
 
 const MedicineRecommendation = () => {
   const { language } = useContext(LanguageContext);
   const { isAuthenticated } = useContext(AuthContext);
   const [result, setResult] = useState(null);
   const [showForm, setShowForm] = useState(true);
-  const [isMuted, setIsMuted] = useState(false);
-
-  const handleMuteToggle = () => {
-    if (!isMuted) {
-      stopAllTTS();
-    }
-    setIsMuted(!isMuted);
-    if (isMuted) {
-      playTTS(t('voiceUnmuted', language), language);
-    }
-  };
 
   const handleResult = (fullData) => {
     // Save to localStorage for dashboard
@@ -37,13 +26,11 @@ const MedicineRecommendation = () => {
 
     setResult(fullData);
     setShowForm(false);
-    if (!isMuted) playTTS(t('gotRecommendations', language), language);
   };
 
   const handleReset = () => {
     setResult(null);
     setShowForm(true);
-    if (!isMuted) playTTS(t('formCleared', language), language);
   };
 
   return (
@@ -54,24 +41,14 @@ const MedicineRecommendation = () => {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl md:text-5xl font-bold text-green-800 mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-green-800 mb-4 flex items-center gap-2">
+              <img src={capsuleIcon} alt="Medicine" className="h-10 w-10" />
               {t('medicineRecommendation', language)}
             </h1>
             <p className="text-xl text-gray-700">
               {t('tellUsAboutSymptoms', language)}
             </p>
           </div>
-          <button
-            onClick={handleMuteToggle}
-            title={isMuted ? t('unmute', language) : t('mute', language)}
-            className={`px-6 py-3 rounded-lg font-bold text-lg transition shadow-lg ${
-              isMuted
-                ? 'bg-red-500 text-white hover:bg-red-600'
-                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-            }`}
-          >
-            {isMuted ? `🔇 ${t('unmute', language)}` : `🔊 ${t('mute', language)}`}
-          </button>
         </div>
 
         {/* Two Column Layout */}
@@ -82,12 +59,6 @@ const MedicineRecommendation = () => {
               <div className="bg-white rounded-2xl shadow-lg p-8 border-4 border-green-200">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-3xl font-bold text-green-800">{t('tellUsAboutYourself', language)}</h2>
-                  <button
-                    onClick={() => !isMuted && playTTS(t('fillSymptomsInfo', language), language)}
-                    className="bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 flex items-center gap-2 text-lg"
-                  >
-                    {t('readInstructions', language)}
-                  </button>
                 </div>
                 <SymptomChecker onResult={handleResult} />
               </div>
@@ -148,12 +119,12 @@ const MedicineRecommendation = () => {
               <p className="text-lg text-yellow-900 mb-4 leading-relaxed">
                 {t('emergencyText', language)}
               </p>
-              <button
-                onClick={() => !isMuted && playTTS(t('ambulance', language), language)}
-                className="w-full bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold text-lg hover:bg-yellow-700"
+              <a
+                href="tel:108"
+                className="block w-full text-center bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold text-lg hover:bg-yellow-700"
               >
                 {t('ambulance', language)}
-              </button>
+              </a>
             </div>
           </div>
         </div>

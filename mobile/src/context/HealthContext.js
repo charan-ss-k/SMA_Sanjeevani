@@ -23,7 +23,7 @@ export const HealthProvider = ({ children }) => {
   const fetchMedicineHistory = useCallback(async () => {
     try {
       setIsLoading(true);
-      const history = await apiClient.get('/medicine/history');
+      const history = await apiClient.get('/api/medicine-history');
       setMedicineHistory(history);
       return history;
     } catch (err) {
@@ -42,7 +42,7 @@ export const HealthProvider = ({ children }) => {
   const addMedicineRecord = useCallback(async (medicineData) => {
     try {
       setIsLoading(true);
-      const response = await apiClient.post('/medicine/history', medicineData);
+      const response = await apiClient.post('/api/medicine-history', medicineData);
       setMedicineHistory((prev) => [...prev, response]);
       return response;
     } catch (err) {
@@ -191,7 +191,15 @@ export const HealthProvider = ({ children }) => {
   const searchMedicines = useCallback(async (query) => {
     try {
       setIsLoading(true);
-      const results = await apiClient.get(`/medicine/search?q=${query}`);
+      // Frontend does not use a dedicated medicine search endpoint.
+      // Use local filtering from loaded medicine history to avoid backend 404s.
+      const normalizedQuery = String(query || '').trim().toLowerCase();
+      const source = Array.isArray(medicineHistory) ? medicineHistory : [];
+      const results = source.filter((item) => {
+        const name = String(item?.medicine_name || item?.name || '').toLowerCase();
+        const notes = String(item?.notes || '').toLowerCase();
+        return name.includes(normalizedQuery) || notes.includes(normalizedQuery);
+      });
       return results;
     } catch (err) {
       const errorMessage = err.message || 'Failed to search medicines';
@@ -201,7 +209,7 @@ export const HealthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [medicineHistory]);
 
   const value = {
     // State

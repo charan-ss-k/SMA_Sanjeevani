@@ -1,80 +1,151 @@
 /**
- * Coqui TTS Utility with Queue Management for React components
- * Handles text-to-speech with sequential playback (no overlapping voices)
+ * Bashini-only TTS utility.
+ * Audio is played only for explicit user-initiated actions.
  */
 
-// Global TTS Queue and State Management
-const ttsQueue = [];
-let ttsPlaying = false;
+import { API_BASE } from '../config/apiBase';
+
 let currentAudio = null;
-let currentUtterance = null;
+let currentAbortController = null;
 
 /**
- * Add TTS request to queue for sequential playback
+ * Generate and play TTS audio using backend Bashini service.
+ * Returns `true` when playback starts/completes, `false` when skipped.
  * @param {string} text - Text to speak
  * @param {string} language - Language code (default: 'english')
- * @returns {Promise} - Resolves when audio finishes playing
+ * @param {object} options - Playback options
+ * @param {boolean} options.userInitiated - Must be true to allow playback
+ * @returns {Promise<boolean>} - Playback status
  */
-export function playTTS(text, language = 'english') {
+export async function playTTS(text, language = 'english', options = {}) {
   if (!text || text.trim().length === 0) {
-    console.warn('⚠️ Empty text provided to TTS');
-    return Promise.resolve();
+    return false;
   }
 
-  return new Promise((resolve, reject) => {
-    // Add to queue with resolve/reject callbacks
-    ttsQueue.push({
-      text,
-      language,
-      resolve,
-      reject,
-      timestamp: Date.now()
+  if (!options.userInitiated && !options.allowAuto) {
+    return false;
+  }
+
+  stopAllTTS();
+
+  const speakWithBrowser = () => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') {
+      return false;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const langMap = {
+      english: 'en-US',
+      telugu: 'te-IN',
+      hindi: 'hi-IN',
+      marathi: 'mr-IN',
+      bengali: 'bn-IN',
+      tamil: 'ta-IN',
+      kannada: 'kn-IN',
+      malayalam: 'ml-IN',
+      gujarati: 'gu-IN',
+    };
+
+    utterance.lang = langMap[language] || 'en-US';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return true;
+  };
+
+  try {
+    currentAbortController = new AbortController();
+
+    const response = await fetch(`${API_BASE}/api/tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text,
+        language,
+        provider: 'bhashini',
+      }),
+      signal: currentAbortController.signal,
     });
 
-    console.log(`📝 TTS queued: "${text.substring(0, 50)}..." (Queue length: ${ttsQueue.length})`);
+    if (!response.ok) {
+      throw new Error(`TTS request failed with status ${response.status}`);
+    }
 
-    // Process queue if not already playing
-    _processTTSQueue();
-  });
+    const data = await response.json();
+    if (!data?.audio) {
+      throw new Error('Bhashini TTS returned no audio');
+    }
+
+    const binaryString = atob(data.audio);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i += 1) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const blob = new Blob([bytes], { type: data.format === 'mp3' ? 'audio/mpeg' : 'audio/wav' });
+    const audioUrl = URL.createObjectURL(blob);
+
+    await new Promise((resolve, reject) => {
+      const audio = new Audio(audioUrl);
+      currentAudio = audio;
+
+      audio.onended = () => {
+        currentAudio = null;
+        resolve(true);
+      };
+
+      audio.onerror = () => {
+        currentAudio = null;
+        reject(new Error('Audio playback failed'));
+      };
+
+      audio
+        .play()
+        .then(() => {})
+        .catch((error) => {
+          currentAudio = null;
+          reject(error);
+        });
+    });
+    URL.revokeObjectURL(audioUrl);
+    currentAbortController = null;
+    return true;
+  } catch (error) {
+    currentAbortController = null;
+    if (speakWithBrowser()) {
+      return true;
+    }
+    throw error;
+  }
 }
 
 /**
  * Stop all TTS playback and clear queue
  */
 export function stopAllTTS() {
-  console.log('🛑 Stopping all TTS');
-  
-  // Stop Coqui TTS
+  if (typeof window !== 'undefined' && window.speechSynthesis && typeof window.speechSynthesis.cancel === 'function') {
+    window.speechSynthesis.cancel();
+  }
+
   if (currentAudio) {
     currentAudio.pause();
     currentAudio.currentTime = 0;
     currentAudio = null;
   }
 
-  // Stop Web Speech API
-  if (window.speechSynthesis) {
-    window.speechSynthesis.cancel();
+  if (currentAbortController) {
+    currentAbortController.abort();
+    currentAbortController = null;
   }
-  if (currentUtterance) {
-    currentUtterance = null;
-  }
-
-  // Clear queue and reject all pending promises
-  ttsQueue.forEach(item => item.reject(new Error('TTS stopped')));
-  ttsQueue.length = 0;
-  ttsPlaying = false;
 }
 
 /**
  * Mute TTS without clearing queue
  */
 export function muteTTS() {
-  console.log('🔇 Muting TTS');
   if (currentAudio) {
-    currentAudio.volume = 0;
-  }
-  if (window.speechSynthesis && currentUtterance) {
-    currentUtterance.volume = 0;
+    currentAudio.muted = true;
   }
 }
 
@@ -82,244 +153,9 @@ export function muteTTS() {
  * Unmute TTS
  */
 export function unmuteTTS() {
-  console.log('🔊 Unmuting TTS');
   if (currentAudio) {
-    currentAudio.volume = 1;
+    currentAudio.muted = false;
   }
-  if (window.speechSynthesis && currentUtterance) {
-    currentUtterance.volume = 1;
-  }
-}
-
-/**
- * Internal: Process TTS queue sequentially
- */
-async function _processTTSQueue() {
-  // If already playing, wait for current to finish
-  if (ttsPlaying) {
-    console.log('⏳ TTS busy, waiting...');
-    return;
-  }
-
-  // Check if queue is empty
-  if (ttsQueue.length === 0) {
-    ttsPlaying = false;
-    return;
-  }
-
-  // Get next item from queue
-  const item = ttsQueue.shift();
-  ttsPlaying = true;
-
-  console.log(`🔊 Processing TTS: "${item.text.substring(0, 50)}..." (${ttsQueue.length} remaining)`);
-
-  try {
-    // Play the TTS
-    await _playTTSInternal(item.text, item.language);
-    
-    // Resolve the promise
-    item.resolve();
-    
-    console.log(`✅ TTS completed: "${item.text.substring(0, 50)}..."`);
-  } catch (error) {
-    console.error('❌ TTS Error:', error);
-    item.reject(error);
-  }
-
-  // Process next item in queue
-  ttsPlaying = false;
-  
-  if (ttsQueue.length > 0) {
-    // Small delay to ensure clean separation between audio playback
-    await new Promise(resolve => setTimeout(resolve, 300));
-    _processTTSQueue();
-  }
-}
-
-/**
- * Internal: Play TTS using Coqui API or fallback to Web Speech
- * @returns {Promise} - Resolves when audio finishes
- */
-async function _playTTSInternal(text, language) {
-  try {
-    // Try Coqui TTS first
-    console.log(`🎤 Attempting Coqui TTS for ${language}`);
-    await _playCoquiTTS(text, language);
-  } catch (error) {
-    console.warn(`⚠️ Coqui TTS failed: ${error.message}, falling back to Web Speech API`);
-    // Fallback to Web Speech API
-    await _playWebSpeechTTS(text, language);
-  }
-}
-
-/**
- * Internal: Play TTS using Coqui API
- * @returns {Promise} - Resolves when audio finishes playing
- */
-async function _playCoquiTTS(text, language) {
-  return new Promise((resolve, reject) => {
-    try {
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-
-      // Fetch audio from Coqui TTS API
-      fetch(`${apiBase}/api/tts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: text,
-          language: language,
-        }),
-        timeout: 30000,
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (!data.audio) {
-            throw new Error('No audio in response');
-          }
-
-          // Decode base64 audio
-          const binaryString = atob(data.audio);
-          const bytes = new Uint8Array(binaryString.length);
-
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-
-          const blob = new Blob([bytes], { type: 'audio/wav' });
-          const audioUrl = URL.createObjectURL(blob);
-
-          // Create and play audio element
-          currentAudio = new Audio(audioUrl);
-          currentAudio.volume = 1;
-
-          // Resolve when audio ends
-          currentAudio.onended = () => {
-            currentAudio = null;
-            resolve();
-          };
-
-          currentAudio.onerror = () => {
-            currentAudio = null;
-            reject(new Error('Audio playback failed'));
-          };
-
-          // Start playing
-          currentAudio.play().catch(err => {
-            currentAudio = null;
-            reject(new Error(`Playback error: ${err.message}`));
-          });
-        })
-        .catch(error => {
-          currentAudio = null;
-          reject(new Error(`Coqui TTS failed: ${error.message}`));
-        });
-    } catch (error) {
-      reject(error);
-    }
-
-    // Timeout protection - reject if audio takes too long
-    const timeout = setTimeout(() => {
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio = null;
-      }
-      reject(new Error('TTS timeout'));
-    }, 30000);
-
-    // Clear timeout when done
-    const originalResolve = resolve;
-    const originalReject = reject;
-    resolve = (value) => {
-      clearTimeout(timeout);
-      originalResolve(value);
-    };
-    reject = (error) => {
-      clearTimeout(timeout);
-      originalReject(error);
-    };
-  });
-}
-
-/**
- * Internal: Fallback to Web Speech API for TTS
- * @returns {Promise} - Resolves when speech ends
- */
-async function _playWebSpeechTTS(text, language) {
-  return new Promise((resolve, reject) => {
-    try {
-      const utterance = new SpeechSynthesisUtterance(text);
-
-      // Map language to language codes for Web Speech API
-      const langMap = {
-        english: 'en-US',
-        telugu: 'te-IN',
-        hindi: 'hi-IN',
-        marathi: 'mr-IN',
-        bengali: 'bn-IN',
-        tamil: 'ta-IN',
-        kannada: 'kn-IN',
-        malayalam: 'ml-IN',
-        gujarati: 'gu-IN',
-      };
-
-      utterance.lang = langMap[language] || 'en-US';
-      utterance.rate = 0.9;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-
-      // Clear any previous utterance
-      window.speechSynthesis.cancel();
-
-      // Store current utterance
-      currentUtterance = utterance;
-
-      // Resolve when speech ends
-      utterance.onend = () => {
-        currentUtterance = null;
-        resolve();
-      };
-
-      // Handle errors
-      utterance.onerror = (event) => {
-        currentUtterance = null;
-        reject(new Error(`Web Speech error: ${event.error}`));
-      };
-
-      // Start speaking
-      window.speechSynthesis.speak(utterance);
-      console.log(`✓ Using Web Speech API for ${language}`);
-    } catch (error) {
-      reject(error);
-    }
-
-    // Timeout protection for Web Speech
-    const timeout = setTimeout(() => {
-      if (currentUtterance) {
-        window.speechSynthesis.cancel();
-        currentUtterance = null;
-      }
-      reject(new Error('Web Speech timeout'));
-    }, 30000);
-
-    // Clear timeout when done
-    const originalResolve = resolve;
-    const originalReject = reject;
-    resolve = (value) => {
-      clearTimeout(timeout);
-      originalResolve(value);
-    };
-    reject = (error) => {
-      clearTimeout(timeout);
-      originalReject(error);
-    };
-  });
 }
 
 /**
@@ -327,8 +163,7 @@ async function _playWebSpeechTTS(text, language) {
  */
 export async function getAvailableLanguages() {
   try {
-    const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-    const response = await fetch(`${apiBase}/api/tts/languages`);
+    const response = await fetch(`${API_BASE}/api/tts/languages`);
     if (response.ok) {
       return await response.json();
     }

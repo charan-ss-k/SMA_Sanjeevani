@@ -15,10 +15,12 @@ import Dashboard from './components/Dashboard.jsx';
 import Tutorial from './components/Tutorial.jsx';
 import MedicineRecommendation from './components/MedicineRecommendation.jsx';
 import ConsultPage from './components/ConsultPage.jsx';
-import ChatWidget from './components/Chatwidget.jsx';
+import ChatWidget from './components/ChatWidget.jsx';
 import AppointmentNotification from './components/AppointmentNotification.jsx';
+import ReminderNotification from './components/ReminderNotification.jsx';
 import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
 import { ProtectedRoute } from './components/ProtectedRoute.jsx';
+import { stopAllTTS } from './utils/tts';
 
 // Create Language Context
 export const LanguageContext = createContext('english');
@@ -29,6 +31,37 @@ function AppWrapper() {
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('selectedLanguage') || 'english';
   });
+
+  useEffect(() => {
+    if (!window.speechSynthesis || typeof window.speechSynthesis.speak !== 'function') {
+      return undefined;
+    }
+
+    const stopSpeechOnInteraction = () => {
+      stopAllTTS();
+    };
+
+    const windowEvents = ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'input', 'change', 'focusin', 'scroll', 'blur'];
+    const documentEvents = ['visibilitychange'];
+
+    windowEvents.forEach((eventName) => {
+      window.addEventListener(eventName, stopSpeechOnInteraction, true);
+    });
+
+    documentEvents.forEach((eventName) => {
+      document.addEventListener(eventName, stopSpeechOnInteraction, true);
+    });
+
+    return () => {
+      windowEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, stopSpeechOnInteraction, true);
+      });
+
+      documentEvents.forEach((eventName) => {
+        document.removeEventListener(eventName, stopSpeechOnInteraction, true);
+      });
+    };
+  }, []);
 
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
@@ -54,6 +87,7 @@ function AppWrapper() {
             <Route path="/tutorial" element={<Tutorial />} />
           </Routes>
           <ChatWidget />
+          <ReminderNotification />
           <AppointmentNotification />
         </Router>
       </LanguageContext.Provider>

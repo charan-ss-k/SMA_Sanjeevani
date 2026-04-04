@@ -7,10 +7,10 @@ from psycopg2 import sql
 from urllib.parse import urlparse
 import os
 import sys
-from dotenv import load_dotenv
+from app.core.env_loader import load_backend_env
 
-# Load from root .env (parent directory)
-load_dotenv(dotenv_path='../.env')
+# Load backend env files in a stable order
+load_backend_env()
 
 # Parse connection string from .env
 DATABASE_URL = os.getenv(

@@ -8,6 +8,7 @@ import logging
 from typing import Optional, Dict
 import os
 from pathlib import Path
+from app.core.env_loader import load_backend_env
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +16,9 @@ logger = logging.getLogger(__name__)
 def _load_env():
     """Load environment variables from .env file"""
     env_path = Path(__file__).parent.parent.parent.parent / ".env"
-    if env_path.exists():
-        try:
-            from dotenv import load_dotenv
-            load_dotenv(env_path)
-            logger.info(f"✅ Loaded environment variables from {env_path}")
-        except ImportError:
-            logger.debug("python-dotenv not installed, skipping .env file")
+    loaded_envs = load_backend_env()
+    if loaded_envs:
+        logger.info("✅ Loaded environment variables from: %s", ", ".join(str(path) for path in loaded_envs))
     
     # Set up Google Cloud credentials if not already set
     if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):

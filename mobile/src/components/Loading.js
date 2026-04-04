@@ -18,22 +18,37 @@ export const Loading = ({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
+    backgroundColor: fullScreen ? colors.background : 'transparent',
   };
 
   return (
     <View style={container}>
-      <ActivityIndicator size={size} color={color} />
+      <View
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: 16,
+          paddingVertical: 18,
+          paddingHorizontal: 22,
+          borderWidth: 1,
+          borderColor: '#D1FAE5',
+          alignItems: 'center',
+          minWidth: 150,
+        }}
+      >
+        <ActivityIndicator size={size} color={color} />
       {message && (
         <Text
           style={{
             marginTop: spacing.md,
             color: colors.textSecondary,
             fontSize: 14,
+            fontWeight: '600',
           }}
         >
           {message}
         </Text>
       )}
+      </View>
     </View>
   );
 };

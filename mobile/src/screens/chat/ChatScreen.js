@@ -4,7 +4,7 @@
  * Matches frontend ChatWidget.jsx functionality exactly
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,13 +17,15 @@ import {
   ScrollView,
 } from 'react-native';
 import { useChat } from '../../context/ChatContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { renderMedicalResponse, getMedicalTextForTTS } from '../../utils/formatMedicalResponse';
 import ttsService from '../../services/ttsService';
 import { Card, Button, Alert } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
-const ChatMessageBubble = ({ message, isUser, onSpeak, isMuted }) => {
+const ChatMessageBubble = ({ message, isUser, onSpeak, isMuted, t, isSpeaking, isProcessing }) => {
   // Safety check to prevent text rendering errors
   if (!message || typeof message !== 'object' || !message.text) {
     return null;
@@ -53,10 +55,12 @@ const ChatMessageBubble = ({ message, isUser, onSpeak, isMuted }) => {
           variant="elevated"
           padding="md"
           style={{
-            backgroundColor: isUser ? colors.primary : colors.white,
-            borderRadius: 16,
-            borderBottomRightRadius: isUser ? 4 : 16,
-            borderBottomLeftRadius: isUser ? 16 : 4,
+            backgroundColor: isUser ? '#15803d' : '#FFFFFF',
+            borderRadius: 18,
+            borderBottomRightRadius: isUser ? 6 : 18,
+            borderBottomLeftRadius: isUser ? 18 : 6,
+            borderWidth: isUser ? 0 : 1,
+            borderColor: '#BBF7D0',
           }}
         >
           {isUser ? (
@@ -89,11 +93,15 @@ const ChatMessageBubble = ({ message, isUser, onSpeak, isMuted }) => {
               alignItems: 'center',
               marginTop: spacing.sm,
               paddingHorizontal: spacing.md,
-              opacity: isMuted ? 0.5 : 1,
+              opacity: isMuted && !isSpeaking ? 0.5 : 1,
             }}
+            disabled={isMuted && !isSpeaking}
           >
+            {isProcessing ? (
+              <ActivityIndicator size="small" color={colors.textSecondary} />
+            ) : null}
             <MaterialIcons
-              name={isMuted ? 'volume-off' : 'volume-up'}
+              name={isSpeaking ? 'stop' : (isMuted ? 'volume-off' : 'volume-up')}
               size={16}
               color={colors.textSecondary}
             />
@@ -106,7 +114,9 @@ const ChatMessageBubble = ({ message, isUser, onSpeak, isMuted }) => {
                 },
               ]}
             >
-              {isMuted ? 'TTS Muted' : 'Tap to speak'}
+              {isSpeaking
+                ? (isProcessing ? t('ttsProcessing') : t('stop'))
+                : (isMuted ? t('ttsMuted') : t('tapToSpeak'))}
             </Text>
           </Pressable>
         )}
@@ -116,6 +126,7 @@ const ChatMessageBubble = ({ message, isUser, onSpeak, isMuted }) => {
 };
 
 export default function ChatScreen() {
+  const { language, t } = useLanguage();
   const { 
     chatHistory, 
     sendMessage, 
@@ -123,14 +134,26 @@ export default function ChatScreen() {
     isLoading, 
     error: contextError, 
     isMuted, 
-    toggleMute 
+    toggleMute,
   } = useChat();
   const [inputText, setInputText] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [activeTtsMessageId, setActiveTtsMessageId] = useState(null);
+  const [isTtsProcessing, setIsTtsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [abortController, setAbortController] = useState(null);
   const flatListRef = useRef(null);
+
+  const stopTTSPlayback = useCallback(async () => {
+    try {
+      await ttsService.stop();
+    } catch (_) {
+      // noop
+    }
+    setActiveTtsMessageId(null);
+    setIsTtsProcessing(false);
+  }, []);
 
   // Clear local error when context error changes (ignore chat history load errors)
   useEffect(() => {
@@ -148,6 +171,14 @@ export default function ChatScreen() {
     }
   }, [chatHistory, streamingText]);
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopTTSPlayback();
+      };
+    }, [stopTTSPlayback])
+  );
+
   const handleStop = () => {
     if (abortController) {
       abortController.abort();
@@ -156,11 +187,14 @@ export default function ChatScreen() {
     setIsStreaming(false);
     setStreamingText('');
     // Stop any ongoing TTS
-    ttsService.stop();
+    stopTTSPlayback();
   };
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || isStreaming) return;
+
+    // Stop any ongoing speech when user sends a new input
+    await stopTTSPlayback();
 
     const userMessage = inputText.trim();
     setInputText('');
@@ -205,15 +239,29 @@ export default function ChatScreen() {
     }
   };
 
-  const handleSpeak = async (text) => {
+  const handleSpeak = async (messageId, text) => {
     if (isMuted) return;
+
+    // Toggle stop if currently speaking same message
+    if (activeTtsMessageId === String(messageId)) {
+      await ttsService.stop();
+      setActiveTtsMessageId(null);
+      setIsTtsProcessing(false);
+      return;
+    }
     
     try {
+      setError(null);
+      setActiveTtsMessageId(String(messageId));
+      setIsTtsProcessing(true);
       // Convert medical formatted text to plain text for TTS
       const plainText = getMedicalTextForTTS(text);
-      await ttsService.synthesizeAndPlay(plainText, 'en');
+      await ttsService.synthesizeAndPlay(plainText, language);
     } catch (err) {
-      setError('Failed to play audio');
+      setError(t('failedToPlayAudio'));
+    } finally {
+      setActiveTtsMessageId(null);
+      setIsTtsProcessing(false);
     }
   };
 
@@ -221,8 +269,16 @@ export default function ChatScreen() {
     toggleMute();
     if (!isMuted) {
       // If we're muting, stop any current TTS
-      ttsService.stop();
+      stopTTSPlayback();
     }
+  };
+
+  const handleInputChange = (text) => {
+    // Stop speech as soon as user starts a new input
+    if ((activeTtsMessageId || isTtsProcessing) && text.trim().length > 0) {
+      stopTTSPlayback();
+    }
+    setInputText(text);
   };
 
   // Combine chat history with streaming message for display
@@ -279,16 +335,56 @@ export default function ChatScreen() {
               <ChatMessageBubble
                 message={item}
                 isUser={item.sender === 'user'}
-                onSpeak={handleSpeak}
+                onSpeak={(text) => handleSpeak(item.id, text)}
                 isMuted={isMuted}
+                t={t}
+                isSpeaking={activeTtsMessageId === String(item.id)}
+                isProcessing={activeTtsMessageId === String(item.id) && isTtsProcessing}
               />
             );
           }}
           contentContainerStyle={{
             padding: spacing.md,
             paddingBottom: spacing.xl,
-            backgroundColor: '#f8fffe', // Light green-blue background like frontend
+            backgroundColor: '#F0FDF4',
           }}
+          ListHeaderComponent={
+            <View
+              style={{
+                marginBottom: spacing.md,
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: '#BBF7D0',
+                padding: spacing.lg,
+                shadowColor: '#0F172A',
+                shadowOpacity: 0.08,
+                shadowOffset: { width: 0, height: 6 },
+                shadowRadius: 14,
+                elevation: 4,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    backgroundColor: '#E0F2FE',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: spacing.sm,
+                  }}
+                >
+                  <MaterialIcons name="medical-services" size={24} color="#0C4A6E" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: '#0C4A6E' }}>AI Health Assistant</Text>
+                  <Text style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>Ask in simple language and get structured medical guidance</Text>
+                </View>
+              </View>
+            </View>
+          }
           ListEmptyComponent={
             <View
               style={{
@@ -309,7 +405,7 @@ export default function ChatScreen() {
                   },
                 ]}
               >
-                💬 Start a Conversation
+                Start a Conversation
               </Text>
               <Text
                 style={[
@@ -369,8 +465,8 @@ export default function ChatScreen() {
           style={{
             padding: spacing.md,
             paddingBottom: Platform.OS === 'ios' ? spacing.md : spacing.lg,
-            backgroundColor: colors.white,
-            borderTopColor: colors.border,
+            backgroundColor: '#FFFFFF',
+            borderTopColor: '#D1FAE5',
             borderTopWidth: 1,
             minHeight: 70,
           }}
@@ -379,12 +475,16 @@ export default function ChatScreen() {
             style={{
               flexDirection: 'row',
               alignItems: 'flex-end',
-              gap: spacing.sm,
+              backgroundColor: '#F8FAFC',
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: '#D1FAE5',
+              padding: 6,
             }}
           >
             <TextInput
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleInputChange}
               onFocus={() => {
                 // Scroll to bottom when keyboard opens
                 setTimeout(() => {
@@ -401,14 +501,14 @@ export default function ChatScreen() {
               style={{
                 flex: 1,
                 borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 8,
+                borderColor: '#D1D5DB',
+                borderRadius: 12,
                 paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
+                paddingVertical: spacing.sm + 2,
                 color: colors.text,
                 fontSize: 16,
                 minHeight: 44,
-                backgroundColor: colors.gray[100],
+                backgroundColor: '#FFFFFF',
               }}
             />
             
@@ -416,9 +516,10 @@ export default function ChatScreen() {
               <Pressable
                 onPress={handleStop}
                 style={{
-                  backgroundColor: colors.warning,
-                  borderRadius: 8,
+                  backgroundColor: '#D97706',
+                  borderRadius: 12,
                   padding: spacing.md,
+                  marginLeft: spacing.sm,
                   justifyContent: 'center',
                   alignItems: 'center',
                   minWidth: 44,
@@ -434,10 +535,11 @@ export default function ChatScreen() {
                 style={{
                   backgroundColor:
                     inputText.trim() && !isStreaming
-                      ? colors.primary
+                      ? '#15803d'
                       : colors.gray[200],
-                  borderRadius: 8,
+                  borderRadius: 12,
                   padding: spacing.md,
+                  marginLeft: spacing.sm,
                   justifyContent: 'center',
                   alignItems: 'center',
                   minWidth: 44,

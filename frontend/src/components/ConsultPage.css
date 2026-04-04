@@ -70,6 +70,10 @@
 }
 
 .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 12px 20px;
   border: 2px solid rgba(16, 185, 129, 0.3);
   background: white;
@@ -92,6 +96,25 @@
   color: white;
   border-color: #10b981;
   box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.consult-calendar-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.consult-calendar-icon-lg {
+  width: 24px;
+  height: 24px;
+}
+
+.state-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 /* Messages */
@@ -241,6 +264,10 @@
 }
 
 .btn-book {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
   margin-top: 15px;
 }
@@ -417,6 +444,14 @@
   margin: 6px 0;
   opacity: 0.95;
   font-weight: 400;
+}
+
+/* Booking Header with Icon */
+.booking-header-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
 }
 
 /* Booking Form */
@@ -616,6 +651,13 @@ textarea.form-control:focus {
   margin-bottom: 20px;
 }
 
+.empty-state-icon img {
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+  display: inline-block;
+}
+
 .empty-state h3 {
   font-size: 1.3rem;
   color: #666;
@@ -682,6 +724,11 @@ textarea.form-control:focus {
 .btn-reminder {
   background: #4caf50;
   color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .btn-reminder:hover {
@@ -715,6 +762,15 @@ textarea.form-control:focus {
 
 .delete-btn:hover {
   background: #ffcdd2;
+}
+
+.action-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: inline-block;
+  margin-right: 6px;
 }
 
 /* Edit Modal Styles */
@@ -817,7 +873,10 @@ textarea.form-control:focus {
 }
 
 .modal-form-group label {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
   margin-bottom: 10px;
   color: #333;
   font-weight: 600;

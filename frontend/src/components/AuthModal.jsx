@@ -2,6 +2,7 @@ import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../main';
 import { LanguageContext } from '../main';
+import { API_BASE } from '../config/apiBase';
 import './AuthModal.css';
 import { t } from '../utils/translations';
 
@@ -22,8 +23,6 @@ const AuthModal = ({ isOpen, onClose }) => {
     age: '',
     gender: 'Male'
   });
-
-  const API_BASE = 'http://localhost:8000';
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

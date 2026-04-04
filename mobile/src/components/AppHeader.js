@@ -18,13 +18,16 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { colors, typography, spacing } from '../utils/theme';
 
 const { width } = Dimensions.get('window');
 
 const AppHeader = () => {
   const { isAuthenticated, user, logout } = useAuth();
+  const { language, setLanguage, languages, t } = useLanguage();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [userInitials, setUserInitials] = useState('');
 
   useEffect(() => {
@@ -54,10 +57,12 @@ const AppHeader = () => {
   const UserAvatar = () => (
     <View style={styles.avatar}>
       <Text style={styles.avatarText}>
-        {String(userInitials || '👤')}
+        {String(userInitials || 'U')}
       </Text>
     </View>
   );
+
+  const currentLanguage = languages[language] || languages.english;
 
   return (
     <>
@@ -66,15 +71,28 @@ const AppHeader = () => {
         
         <View style={styles.header}>
           <View style={styles.logoContainer}>
+            <View style={styles.logoBadge}>
             <Image
               source={require('../../assets/Sanjeevani Logo.png')}
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Sanjeevani</Text>
+            </View>
+            <View>
+              <Text style={styles.title}>{t('sanjeevani')}</Text>
+              <Text style={styles.subtitle}>{t('yourPersonalHealthAssistant')}</Text>
+            </View>
           </View>
 
           <View style={styles.userSection}>
+            <Pressable
+              onPress={() => setShowLanguageMenu(true)}
+              style={styles.languageButton}
+            >
+              <Text style={styles.languageFlag}>{currentLanguage.flag}</Text>
+              <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.white} />
+            </Pressable>
+
             {isAuthenticated ? (
               <Pressable 
                 onPress={() => setShowUserMenu(true)}
@@ -89,7 +107,7 @@ const AppHeader = () => {
               </Pressable>
             ) : (
               <Pressable style={styles.loginButton}>
-                <Text style={styles.loginText}>Login</Text>
+                <Text style={styles.loginText}>{t('login')}</Text>
               </Pressable>
             )}
           </View>
@@ -124,8 +142,45 @@ const AppHeader = () => {
               onPress={handleLogout}
             >
               <MaterialIcons name="logout" size={20} color={colors.error} />
-              <Text style={styles.logoutText}>Logout</Text>
+              <Text style={styles.logoutText}>{t('logout')}</Text>
             </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={showLanguageMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLanguageMenu(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowLanguageMenu(false)}
+        >
+          <View style={styles.dropdown}>
+            <View style={styles.languageHeader}>
+              <Text style={styles.languageHeaderText}>{t('selectLanguage')}</Text>
+            </View>
+
+            {Object.entries(languages).map(([key, lang]) => {
+              const selected = key === language;
+              return (
+                <Pressable
+                  key={key}
+                  style={[styles.languageItem, selected && styles.languageItemSelected]}
+                  onPress={async () => {
+                    await setLanguage(key);
+                    setShowLanguageMenu(false);
+                  }}
+                >
+                  <Text style={styles.languageItemFlag}>{lang.flag}</Text>
+                  <Text style={[styles.languageItemText, selected && styles.languageItemTextSelected]}>
+                    {lang.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </Pressable>
       </Modal>
@@ -143,44 +198,73 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   topStripe: {
-    height: 12,
-    backgroundColor: '#166534', // Dark green (green-800)
+    height: 10,
+    backgroundColor: '#166534',
   },
   header: {
-    height: 80,
-    backgroundColor: '#fef3c7', // Amber-100
+    height: 76,
+    backgroundColor: '#fef3c7',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    shadowColor: '#000',
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fcd34d',
+    shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 5,
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  logoBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: '#E6F8F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#BFEDE6',
+  },
   logo: {
-    width: 48,
-    height: 48,
-    marginRight: spacing.md,
+    width: 30,
+    height: 30,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#166534', // Green-800
-    letterSpacing: 0.5,
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#166534',
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 1,
   },
   userSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  languageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f766e',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  languageFlag: {
+    fontSize: 16,
+    marginRight: 4,
   },
   muteButton: {
     width: 40,
@@ -192,34 +276,34 @@ const styles = StyleSheet.create({
   userButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#15803d', // Green-700
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
+    backgroundColor: '#15803d',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 16,
     gap: spacing.xs,
   },
   loginButton: {
-    backgroundColor: '#15803d', // Green-700
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
+    backgroundColor: '#15803d',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   loginText: {
     color: colors.white,
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 14,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#16a34a', // Green-600
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#16a34a',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
     color: colors.white,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   modalOverlay: {
@@ -227,7 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: 92, // Account for header height
+    paddingTop: 84,
     paddingRight: spacing.lg,
   },
   dropdown: {
@@ -242,6 +326,38 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
     elevation: 8,
+  },
+  languageHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  languageHeaderText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  languageItemSelected: {
+    backgroundColor: '#DCFCE7',
+  },
+  languageItemFlag: {
+    fontSize: 18,
+    marginRight: spacing.sm,
+  },
+  languageItemText: {
+    fontSize: 14,
+    color: colors.text,
+  },
+  languageItemTextSelected: {
+    fontWeight: '700',
+    color: '#166534',
   },
   userInfo: {
     flexDirection: 'row',

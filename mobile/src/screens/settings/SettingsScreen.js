@@ -140,7 +140,7 @@ export default function SettingsScreen({ navigation }) {
     <ScrollView
       contentContainerStyle={{
         padding: spacing.lg,
-        paddingTop: spacing.lg + 92, // Add padding for AppHeader
+        paddingTop: spacing.lg + 84, // Add padding for AppHeader
       }}
     >
       <Text
@@ -289,7 +289,7 @@ export default function SettingsScreen({ navigation }) {
               },
             ]}
           >
-            📚 Privacy Policy
+            Privacy Policy
           </Text>
         </Pressable>
         <Pressable
@@ -306,20 +306,20 @@ export default function SettingsScreen({ navigation }) {
               },
             ]}
           >
-            📄 Terms & Conditions
+            Terms & Conditions
           </Text>
         </Pressable>
       </SettingSection>
       <SettingSection title="Danger Zone">
         <View style={{ gap: spacing.sm }}>
           <Button
-            title="🚪 Logout"
+            title="Logout"
             onPress={handleLogout}
             variant="danger"
             fullWidth
           />
           <Button
-            title="🗑️ Delete Account"
+            title="Delete Account"
             onPress={handleDeleteAccount}
             variant="danger"
             fullWidth
@@ -329,7 +329,7 @@ export default function SettingsScreen({ navigation }) {
       <SettingSection title="Support">
         <View style={{ gap: spacing.sm }}>
           <Button
-            title="📧 Contact Support"
+            title="Contact Support"
             onPress={() => {
               // TODO: Open email or support form
               console.log('Contact support');

@@ -1,10 +1,12 @@
-import React, { useContext } from 'react';
-import { playTTS } from '../utils/tts';
+import React, { useContext, useMemo, useState } from 'react';
+import { playTTS, stopAllTTS } from '../utils/tts';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
 
 const RecommendationResult = ({ result, onReset }) => {
   const { language } = useContext(LanguageContext);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
   if (!result) return null;
 
   // Handle both old format (direct result) and new format (with input)
@@ -19,6 +21,57 @@ const RecommendationResult = ({ result, onReset }) => {
     disclaimer,
     tts_payload,
   } = resultData;
+
+  const speakableText = useMemo(() => {
+    if (tts_payload && tts_payload.trim()) {
+      return tts_payload;
+    }
+
+    const medicineLines = (recommended_medicines || [])
+      .map((med) => [med.name, med.dosage, med.instructions].filter(Boolean).join('. '))
+      .filter(Boolean);
+
+    const homeCareLines = (home_care_advice || []).filter(Boolean);
+
+    return [
+      predicted_condition ? `${t('predictedCondition', language)} ${predicted_condition}` : null,
+      medicineLines.length > 0 ? `${t('recommendedMedicines', language)}. ${medicineLines.join('. ')}` : null,
+      homeCareLines.length > 0 ? `${t('homeCareAdvice', language)}. ${homeCareLines.join('. ')}` : null,
+      doctor_consultation_advice ? `${t('whenToConsultDoctor', language)}. ${doctor_consultation_advice}` : null,
+      disclaimer || null,
+    ]
+      .filter(Boolean)
+      .join('. ');
+  }, [
+    tts_payload,
+    recommended_medicines,
+    home_care_advice,
+    predicted_condition,
+    doctor_consultation_advice,
+    disclaimer,
+    language,
+  ]);
+
+  const handleSpeak = async () => {
+    if (!speakableText.trim()) {
+      return;
+    }
+
+    if (isSpeaking) {
+      stopAllTTS();
+      setIsSpeaking(false);
+      return;
+    }
+
+    try {
+      setIsSpeaking(true);
+      await playTTS(speakableText, language, { userInitiated: true });
+    } catch (error) {
+      console.error('Speak failed:', error);
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
 
   return (
     <div className="mt-6 space-y-4">
@@ -79,10 +132,10 @@ const RecommendationResult = ({ result, onReset }) => {
         <p className="text-gray-700 mb-3">{disclaimer}</p>
         <div className="flex gap-3">
           <button
-            onClick={() => playTTS(tts_payload || t('noAudioAvailable', language), language)}
+            onClick={handleSpeak}
             className="bg-amber-50 px-4 py-2 rounded hover:bg-amber-100"
           >
-            {t('readAloud', language)}
+            {isSpeaking ? t('stop', language) : t('readAloud', language)}
           </button>
           <button onClick={onReset} className="px-4 py-2 rounded border border-gray-400 hover:bg-gray-50">
             {t('back', language)}
@@ -117,12 +170,6 @@ const RecommendationResult = ({ result, onReset }) => {
                     </ul>
                   </div>
                 )}
-                <button
-                  onClick={() => playTTS(`${med.name}. ${med.dosage || ''} ${med.instructions || ''}`, language)}
-                  className="text-sm text-blue-600 mt-2 hover:underline"
-                >
-                  {t('readMedicine', language)}
-                </button>
               </div>
             ))}
           </div>
@@ -138,12 +185,6 @@ const RecommendationResult = ({ result, onReset }) => {
               <li key={i} className="flex items-start gap-2">
                 <span className="text-green-600 text-lg">✓</span>
                 <span className="text-gray-700">{advice}</span>
-                <button
-                  onClick={() => playTTS(advice, language)}
-                  className="ml-2 text-amber-600 text-sm hover:underline"
-                >
-                  🔊
-                </button>
               </li>
             ))}
           </ul>
@@ -155,12 +196,6 @@ const RecommendationResult = ({ result, onReset }) => {
         <div className="bg-orange-50 rounded-lg shadow p-6 border-l-4 border-orange-400">
           <h3 className="text-lg font-semibold text-orange-900 mb-2">{t('whenToConsultDoctor', language)}</h3>
           <p className="text-orange-800">{doctor_consultation_advice}</p>
-          <button
-            onClick={() => playTTS(doctor_consultation_advice, language)}
-            className="text-sm text-orange-600 mt-2 hover:underline"
-          >
-            {t('readAloud', language)}
-          </button>
         </div>
       )}
 

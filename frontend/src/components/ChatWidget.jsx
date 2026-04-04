@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { playTTS } from '../utils/tts';
+import { playTTS, stopAllTTS } from '../utils/tts';
 import { formatMedicalResponse } from '../utils/formatMedicalResponse';
 import { LanguageContext } from '../main';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { t } from '../utils/translations';
 import './ChatWidget.css';
+import { API_BASE } from '../config/apiBase';
+import { useLocation } from 'react-router-dom';
 
 // --- SVG Icons ---
 
@@ -50,15 +52,7 @@ const CloseIcon = () => (
     </svg>
 );
 
-// Mute icon (speaker off)
-const MuteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M13.5 4.06c0-1.336-1.616-2.318-2.674-1.338l-5.383 4.267A2 2 0 003 10v4a2 2 0 001.439 1.905l5.383 4.267c1.058.98 2.674.002 2.674-1.338V4.061z" />
-    <path d="M15.932 7.757a.75.75 0 011.061 1.061M18.286 10.5a.75.75 0 11-1.061-1.061M15.932 16.243a.75.75 0 011.061 1.061M18.286 13.5a.75.75 0 11-1.061-1.061M19.5 6.75a.75.75 0 00-1.061 1.061M20.25 10a.75.75 0 01-1.061-1.061M19.5 17.25a.75.75 0 001.061-1.061M20.25 14a.75.75 0 01-1.061-1.061" />
-  </svg>
-);
-
-// Unmute icon (speaker on)
+// Speak icon
 const UnmuteIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
     <path d="M13.5 4.06c0-1.336-1.616-2.318-2.674-1.338l-5.383 4.267A2 2 0 003 10v4a2 2 0 001.439 1.905l5.383 4.267c1.058.98 2.674.002 2.674-1.338V4.061z" />
@@ -74,9 +68,10 @@ const StopIcon = () => (
 );
 
 // --- Chatbot Window Component ---
-const ChatbotWindow = () => {
+const ChatbotWindow = ({ containerRef }) => {
   const { language } = useContext(LanguageContext);
   const { token, isAuthenticated } = useContext(AuthContext);
+  const location = useLocation();
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -87,7 +82,7 @@ const ChatbotWindow = () => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
@@ -102,6 +97,19 @@ const ChatbotWindow = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    return () => {
+      stopAllTTS();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    stopAllTTS();
+  }, [location.pathname]);
 
   // Update welcome message when language changes
   useEffect(() => {
@@ -166,7 +174,6 @@ const ChatbotWindow = () => {
       }
 
       try {
-        const apiBase = window.__API_BASE__ || 'http://localhost:8000';
         console.log('[ChatWidget] Loading history from database for authenticated user');
         console.log('[ChatWidget] Token available:', !!authToken);
         
@@ -176,7 +183,7 @@ const ChatbotWindow = () => {
           return;
         }
         
-        const response = await fetch(`${apiBase}/api/qa-history/?limit=50`, {
+        const response = await fetch(`${API_BASE}/api/qa-history/?limit=50`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -250,17 +257,25 @@ const ChatbotWindow = () => {
       console.log('[ChatWidget] Request stopped by user');
     }
     setIsTyping(false);
-    window.speechSynthesis.cancel();
+    stopAllTTS();
   };
 
-  // Function to toggle mute
-  const handleMuteToggle = () => {
-    setIsMuted(!isMuted);
-    if (!isMuted) {
-      window.speechSynthesis.cancel();
-      console.log('[ChatWidget] TTS muted');
-    } else {
-      console.log('[ChatWidget] TTS unmuted');
+  const handleSpeakMessage = async (text) => {
+    if (!text || !text.trim()) return;
+
+    if (isSpeaking) {
+      stopAllTTS();
+      setIsSpeaking(false);
+      return;
+    }
+
+    try {
+      setIsSpeaking(true);
+      await playTTS(text, language, { userInitiated: true });
+    } catch (ttsErr) {
+      console.warn('[ChatWidget] TTS error (non-fatal):', ttsErr);
+    } finally {
+      setIsSpeaking(false);
     }
   };
 
@@ -291,8 +306,7 @@ const ChatbotWindow = () => {
 
     try {
       // Call backend API for medical Q&A
-      const apiBase = window.__API_BASE__ || 'http://localhost:8000';
-      console.log('[ChatWidget] Calling API:', `${apiBase}/api/medical-qa`);
+      console.log('[ChatWidget] Calling API:', `${API_BASE}/api/medical-qa`);
       
       // Prepare headers with authentication if available
       const headers = { 'Content-Type': 'application/json' };
@@ -304,7 +318,7 @@ const ChatbotWindow = () => {
         console.log('[ChatWidget] No authentication token, request will be unauthenticated');
       }
       
-      const response = await fetch(`${apiBase}/api/medical-qa`, {
+      const response = await fetch(`${API_BASE}/api/medical-qa`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
@@ -340,17 +354,6 @@ const ChatbotWindow = () => {
       
       // Note: Q&A is automatically saved to database by backend if user is authenticated
       console.log('[ChatWidget] Response received and displayed. Saved to database:', isAuthenticated);
-      
-      // Speak the response using TTS in the selected language (only if not muted)
-      if (!isMuted) {
-        try {
-          // Use the current language for TTS
-          playTTS(botResponseText, language);
-          console.log(`[ChatWidget] Playing TTS in ${language} language`);
-        } catch (ttsErr) {
-          console.warn('[ChatWidget] TTS error (non-fatal):', ttsErr);
-        }
-      }
     } catch (err) {
       // Check if error is due to abort
       if (err.name === 'AbortError') {
@@ -389,10 +392,13 @@ const ChatbotWindow = () => {
   };
 
   return (
-    <div className="fixed bottom-24 right-8 z-50 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200" style={{maxWidth: '400px'}}>
-      <div className="flex flex-col h-[70vh] md:h-[600px]">
+    <div
+      ref={containerRef}
+      className="fixed bottom-20 left-3 right-3 z-50 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:bottom-24 sm:left-auto sm:right-6 sm:w-[380px] md:right-8 md:w-[400px]"
+    >
+      <div className="flex flex-col h-[68vh] max-h-[560px] sm:h-[70vh] sm:max-h-[600px]">
         {/* Chat Header */}
-        <div className="p-4 bg-gradient-to-r from-green-600 to-blue-600 text-white flex items-center space-x-3">
+        <div className="p-4 bg-linear-to-r from-green-600 to-blue-600 text-white flex items-center space-x-3">
           <div className="relative">
             <img
               className="w-10 h-10 rounded-full"
@@ -408,7 +414,7 @@ const ChatbotWindow = () => {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 p-4 overflow-y-auto bg-gradient-to-b from-green-50 to-blue-50 space-y-4">
+        <div className="flex-1 p-4 overflow-y-auto bg-linear-to-b from-green-50 to-blue-50 space-y-4">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -417,19 +423,29 @@ const ChatbotWindow = () => {
               }`}
             >
               <div
-                className={`p-3 px-4 rounded-2xl max-w-[85%] text-sm shadow-sm ${
+                className={`p-3 px-4 rounded-2xl max-w-[92%] sm:max-w-[85%] text-sm shadow-sm ${
                   message.sender === 'user'
                     ? 'bg-green-600 text-white rounded-br-none'
                     : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
                 }`}
               >
                 {message.sender === 'bot' ? (
-                  <div
-                    className="medical-response prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{
-                      __html: formatMedicalResponse(message.text),
-                    }}
-                  />
+                  <>
+                    <div
+                      className="medical-response prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{
+                        __html: formatMedicalResponse(message.text),
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSpeakMessage(message.text)}
+                      className="mt-2 px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold inline-flex items-center gap-1"
+                    >
+                      <UnmuteIcon />
+                      {isSpeaking ? t('stop', language) : t('readAloud', language)}
+                    </button>
+                  </>
                 ) : (
                   message.text
                 )}
@@ -440,7 +456,7 @@ const ChatbotWindow = () => {
           {/* Typing Indicator */}
           {isTyping && (
             <div className="flex justify-start">
-              <div className="p-3 px-4 rounded-2xl max-w-[85%] text-sm bg-white text-gray-800 rounded-bl-none border border-gray-200 shadow-sm">
+              <div className="p-3 px-4 rounded-2xl max-w-[92%] sm:max-w-[85%] text-sm bg-white text-gray-800 rounded-bl-none border border-gray-200 shadow-sm">
                 <div className="flex items-center space-x-1">
                   <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                   <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
@@ -465,29 +481,20 @@ const ChatbotWindow = () => {
             className="flex-1 border-none outline-none text-sm p-3 rounded-lg bg-gray-100 focus:ring-2 focus:ring-green-500 transition-all disabled:bg-gray-200 disabled:cursor-not-allowed"
             disabled={isTyping}
           />
-          
-          {/* Mute Button */}
-          <button
-            onClick={handleMuteToggle}
-            title={isMuted ? t('unmute', language) : t('mute', language)}
-            className={`p-3 rounded-lg cursor-pointer transition-colors flex-shrink-0 ${isMuted ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'}`}
-          >
-            {isMuted ? <MuteIcon /> : <UnmuteIcon />}
-          </button>
 
           {/* Stop/Send Button */}
           {isTyping ? (
             <button
               onClick={handleStop}
               title={t('stop', language)}
-              className="bg-orange-500 text-white p-3 rounded-lg cursor-pointer hover:bg-orange-600 transition-colors flex-shrink-0"
+              className="bg-orange-500 text-white p-3 rounded-lg cursor-pointer hover:bg-orange-600 transition-colors shrink-0"
             >
               <StopIcon />
             </button>
           ) : (
             <button
               onClick={handleSend}
-              className="bg-green-600 text-white p-3 rounded-lg cursor-pointer hover:bg-green-700 transition-colors disabled:bg-gray-400 flex-shrink-0"
+              className="bg-green-600 text-white p-3 rounded-lg cursor-pointer hover:bg-green-700 transition-colors disabled:bg-gray-400 shrink-0"
               disabled={inputValue.trim() === ''}
               title={t('send', language)}
             >
@@ -506,10 +513,15 @@ const ChatWidget = () => {
   // State to manage if the chat window is open or not
   const [isOpen, setIsOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const chatWindowRef = useRef(null);
+  const toggleButtonRef = useRef(null);
 
   // Function to toggle the chat window
   const toggleChat = () => {
     const newState = !isOpen;
+    if (!newState) {
+      stopAllTTS();
+    }
     setIsOpen(newState);
     // Force reload of history when opening
     if (newState) {
@@ -517,17 +529,41 @@ const ChatWidget = () => {
     }
   };
 
+  useEffect(() => {
+    const handleOutsideInteraction = (event) => {
+      if (!isOpen) return;
+
+      const target = event.target;
+      const clickedInsideChat = chatWindowRef.current?.contains(target);
+      const clickedToggleButton = toggleButtonRef.current?.contains(target);
+
+      if (clickedInsideChat || clickedToggleButton) return;
+
+      stopAllTTS();
+      setIsOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handleOutsideInteraction, true);
+    document.addEventListener('touchstart', handleOutsideInteraction, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsideInteraction, true);
+      document.removeEventListener('touchstart', handleOutsideInteraction, true);
+    };
+  }, [isOpen]);
+
   return (
     <>
       {/* Conditionally render the chat window based on 'isOpen' state */}
       {/* Key prop forces remount when reloadKey changes, which reloads history */}
-      {isOpen && <ChatbotWindow key={reloadKey} />}
+      {isOpen && <ChatbotWindow key={reloadKey} containerRef={chatWindowRef} />}
 
       {/* The toggle button, using the icon from ChatbotIcon.jsx */}
-      <div className="fixed bottom-8 right-8 z-50">
+      <div className="fixed bottom-4 right-4 z-50 sm:bottom-8 sm:right-8">
         <button 
+          ref={toggleButtonRef}
           onClick={toggleChat} 
-          className="bg-green-500 hover:bg-green-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:shadow-xl transition-all animate-pulse"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition-all hover:bg-green-600 hover:shadow-xl animate-pulse sm:h-16 sm:w-16"
         >
           {/* Change the icon based on the 'isOpen' state */}
           {isOpen ? <CloseIcon /> : <ChatIcon />}

@@ -2,11 +2,13 @@
 Configuration settings for SMA Sanjeevani
 """
 import os
-from typing import Optional
+import json
+from typing import Optional, List
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
+from .env_loader import load_backend_env
 
-load_dotenv()
+load_backend_env()
 
 
 class Settings(BaseSettings):
@@ -29,7 +31,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # CORS
-    CORS_ORIGINS: list = [
+    CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:8000",
@@ -39,14 +41,50 @@ class Settings(BaseSettings):
         "http://0.0.0.0:5173",
         "http://0.0.0.0:3000",
         "http://0.0.0.0:8000",
+        "http://98.70.223.78",
+        "https://98.70.223.78",
     ]
+
+    CORS_ORIGIN_REGEX: str = r"^https?://((localhost|127\.0\.0\.1|0\.0\.0\.0)|(.*\.azurestaticapps\.net))(:\d+)?$"
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        """Support JSON array or comma-separated env values for CORS origins."""
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return []
+            if value.startswith("["):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        return [str(origin).strip().rstrip("/") for origin in parsed if str(origin).strip()]
+                except json.JSONDecodeError:
+                    pass
+            return [origin.strip().rstrip("/") for origin in value.split(",") if origin.strip()]
+
+        if isinstance(value, list):
+            return [str(origin).strip().rstrip("/") for origin in value if str(origin).strip()]
+
+        return value
     
     # LLM Configuration
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
+    
+    # Ollama Configuration
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")  # Alternative naming
     LLM_MODEL: str = os.getenv("LLM_MODEL", "microsoft/phi-4")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "phi4")
+    
+    # Azure OpenAI Configuration
+    AZURE_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+    AZURE_OPENAI_API_KEY: str = os.getenv("AZURE_OPENAI_API_KEY", "")
+    AZURE_OPENAI_MODEL_NAME: str = os.getenv("AZURE_OPENAI_MODEL_NAME", "Phi-4")
+    AZURE_OPENAI_DEPLOYMENT_NAME: str = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4")
+    
+    # General LLM Parameters
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.2"))
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1024"))
     

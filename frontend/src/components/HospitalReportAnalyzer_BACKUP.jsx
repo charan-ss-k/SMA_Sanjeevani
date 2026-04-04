@@ -30,11 +30,10 @@ const HospitalReportAnalyzer = () => {
 
   // Fetch history on component mount and when auth token changes
   useEffect(() => {
-    const apiBase = window.__API_BASE__ || 'http://localhost:8000';
     const loadHistory = async () => {
       setHistoryLoading(true);
       try {
-        const response = await fetch(`${apiBase}/api/hospital-report-history`, {
+        const response = await fetch(`${API_BASE}/api/hospital-report-history`, {
           headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         });
         const data = await response.json();
@@ -49,8 +48,6 @@ const HospitalReportAnalyzer = () => {
     };
     loadHistory();
   }, [authToken]);
-
-  const apiBase = window.__API_BASE__ || 'http://localhost:8000';
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -101,7 +98,7 @@ const HospitalReportAnalyzer = () => {
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${apiBase}/api/hospital-reports/analyze`, {
+      const response = await fetch(`${API_BASE}/api/hospital-reports/analyze`, {
         method: 'POST',
         body: formData,
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
@@ -162,7 +159,7 @@ const HospitalReportAnalyzer = () => {
   const refreshHistory = async () => {
     setHistoryLoading(true);
     try {
-      const response = await fetch(`${apiBase}/api/hospital-report-history`, {
+      const response = await fetch(`${API_BASE}/api/hospital-report-history`, {
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       });
       const data = await response.json();
@@ -189,7 +186,7 @@ const HospitalReportAnalyzer = () => {
         structured_data: analysisResult?.structured_data || null,
       };
 
-      const response = await fetch(`${apiBase}/api/hospital-report-history`, {
+      const response = await fetch(`${API_BASE}/api/hospital-report-history`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,7 +212,7 @@ const HospitalReportAnalyzer = () => {
 
   const deleteHistoryItem = async (id) => {
     try {
-      const response = await fetch(`${apiBase}/api/hospital-report-history/${id}`, {
+      const response = await fetch(`${API_BASE}/api/hospital-report-history/${id}`, {
         method: 'DELETE',
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       });

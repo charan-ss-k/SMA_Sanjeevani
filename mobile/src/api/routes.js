@@ -10,7 +10,7 @@ export const API_ROUTES = {
     SIGNUP: '/auth/signup',
     LOGOUT: '/auth/logout',
     REFRESH: '/auth/refresh',
-    PROFILE: '/auth/profile',
+    PROFILE: '/auth/me',
   },
 
   // Chat/LLM
@@ -30,17 +30,17 @@ export const API_ROUTES = {
 
   // Text-to-Speech
   TTS: {
-    GENERATE: '/tts/generate',
+    GENERATE: '/tts',
     STREAM: '/tts/stream',
-    VOICES: '/tts/voices',
+    VOICES: '/tts/languages',
   },
 
   // Medicine
   MEDICINE: {
-    IDENTIFY: '/medicine/identify',
-    SEARCH: '/medicine/search',
-    HISTORY: '/medicine/history',
-    DETAILS: '/medicine/:id',
+    IDENTIFY: '/medicine-identification/analyze',
+    SEARCH: '/medicine-history',
+    HISTORY: '/medicine-history',
+    DETAILS: '/medicine-history/:id',
   },
 
   // Prescriptions

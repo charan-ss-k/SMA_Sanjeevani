@@ -2,9 +2,11 @@
 Medicine LLM Service
 Integrates CSV dataset with LLM (Phi-4) to generate intelligent
 medicine information from structured data.
+Supports both Ollama and Azure OpenAI providers.
 """
 
 import logging
+import os
 import requests
 import json
 from typing import Dict, Any
@@ -16,11 +18,89 @@ class MedicineLLMGenerator:
     """
     Uses LLM to generate comprehensive medicine information
     based on CSV dataset + natural language generation.
+    Supports both Ollama and Azure OpenAI providers.
     """
     
     OLLAMA_URL = "http://localhost:11434/api/generate"
     MODEL = "phi4"
     TIMEOUT = 60  # seconds
+    
+    @staticmethod
+    def _call_llm(prompt: str) -> str:
+        """
+        Call LLM (Ollama or Azure OpenAI) based on LLM_PROVIDER environment variable
+        """
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
+        logger.info(f"🔧 Medicine LLM using provider: {provider}")
+        
+        if provider == "azure_openai":
+            # Azure OpenAI implementation
+            azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+            azure_api_key = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
+            azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
+            
+            if not azure_endpoint or not azure_api_key:
+                raise ValueError("Azure OpenAI credentials missing. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY in .env")
+            
+            # Remove '/openai/v1/' from endpoint if present and reconstruct proper URL
+            base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+            api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+            
+            try:
+                response = requests.post(
+                    api_url,
+                    json={
+                        "messages": [
+                            {"role": "system", "content": "You are a medical AI assistant providing accurate medicine information. Always respond with valid, well-formatted JSON when requested."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": float(os.getenv("LLM_TEMPERATURE", 0.2)),
+                        "max_tokens": int(os.getenv("LLM_MAX_TOKENS", 2048)),
+                        "top_p": 0.95,
+                        "frequency_penalty": 0.0,
+                        "presence_penalty": 0.0
+                    },
+                    headers={
+                        "Content-Type": "application/json",
+                        "api-key": azure_api_key
+                    },
+                    timeout=(15, MedicineLLMGenerator.TIMEOUT)
+                )
+                
+                if response.status_code == 200:
+                    content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+                    logger.info(f"✅ Azure OpenAI response received: {len(content)} chars")
+                    return content
+                else:
+                    error_text = response.text[:500]
+                    logger.error(f"❌ Azure OpenAI error: {response.status_code} - {error_text}")
+                    raise Exception(f"Azure OpenAI error: {response.status_code} - {error_text}")
+            except requests.Timeout:
+                logger.error("❌ Azure OpenAI request timed out")
+                raise Exception("Azure OpenAI request timed out")
+            except Exception as e:
+                logger.error(f"❌ Azure OpenAI request failed: {e}")
+                raise
+        
+        else:  # ollama provider (default)
+            ollama_url = os.getenv("OLLAMA_URL", MedicineLLMGenerator.OLLAMA_URL).strip()
+            ollama_model = os.getenv("OLLAMA_MODEL", MedicineLLMGenerator.MODEL).strip()
+            
+            response = requests.post(
+                f"{ollama_url}/api/generate",
+                json={
+                    "model": ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.3,  # Lower temperature for factual output
+                },
+                timeout=MedicineLLMGenerator.TIMEOUT
+            )
+            
+            if response.status_code == 200:
+                return response.json().get('response', '')
+            else:
+                raise Exception(f"Ollama error: {response.status_code} - {response.text}")
     
     @staticmethod
     def generate_medicine_info(ocr_text: str, medicine_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -45,20 +125,10 @@ class MedicineLLMGenerator:
         try:
             logger.info(f"🧠 Generating medicine info using LLM for: {medicine_info.get('name')}")
             
-            # Call Ollama LLM
-            response = requests.post(
-                MedicineLLMGenerator.OLLAMA_URL,
-                json={
-                    "model": MedicineLLMGenerator.MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.3,  # Lower temperature for factual output
-                },
-                timeout=MedicineLLMGenerator.TIMEOUT
-            )
+            # Call LLM (Ollama or Azure OpenAI)
+            llm_output = MedicineLLMGenerator._call_llm(prompt)
             
-            if response.status_code == 200:
-                llm_output = response.json().get('response', '')
+            if llm_output:
                 logger.info("✅ LLM generated medicine information successfully")
                 
                 # Parse and structure LLM output
@@ -67,7 +137,7 @@ class MedicineLLMGenerator:
                     medicine_info
                 )
             else:
-                logger.warning(f"LLM returned status {response.status_code}")
+                logger.warning("LLM returned empty response")
                 return MedicineLLMGenerator._create_csv_based_response(medicine_info)
                 
         except requests.exceptions.Timeout:

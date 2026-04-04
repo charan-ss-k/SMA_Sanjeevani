@@ -12,6 +12,7 @@ import {
   TextInput,
   Pressable,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../api/client';
 import { Button, Card, Avatar, Badge, Loading } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
@@ -60,8 +61,9 @@ const DoctorCard = ({ doctor, onSelect }) => (
               gap: spacing.xs,
             }}
           >
+            <MaterialCommunityIcons name="star" size={14} color={colors.primary} />
             <Text style={{ color: colors.primary, fontWeight: '600' }}>
-              ⭐ {doctor.rating}
+              {doctor.rating}
             </Text>
             <Text style={{ color: colors.textSecondary }}>
               ({doctor.reviews} reviews)
@@ -87,7 +89,7 @@ const DoctorCard = ({ doctor, onSelect }) => (
             },
           ]}
         >
-          📍 {doctor.location}
+          {doctor.location}
         </Text>
       </View>
 

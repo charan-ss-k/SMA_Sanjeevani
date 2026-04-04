@@ -18,6 +18,7 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing } from '../../utils/theme';
 
@@ -188,7 +189,15 @@ export default function AuthScreen({ navigation }) {
               {/* Error Message */}
               {displayError && (
                 <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>❌ {displayError}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialCommunityIcons
+                      name="alert-circle"
+                      size={16}
+                      color={colors.error}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.errorText}>{displayError}</Text>
+                  </View>
                 </View>
               )}
 
@@ -342,19 +351,19 @@ export default function AuthScreen({ navigation }) {
             {/* Benefits Section */}
             <View style={styles.benefits}>
               <View style={styles.benefit}>
-                <Text style={styles.benefitIcon}>🔒</Text>
+                <MaterialCommunityIcons name="lock-outline" size={16} color={colors.textSecondary} style={styles.benefitIcon} />
                 <Text style={styles.benefitText}>
                   <Text style={styles.benefitBold}>Secure</Text> - Your data is encrypted
                 </Text>
               </View>
               <View style={styles.benefit}>
-                <Text style={styles.benefitIcon}>📊</Text>
+                <MaterialCommunityIcons name="chart-line" size={16} color={colors.textSecondary} style={styles.benefitIcon} />
                 <Text style={styles.benefitText}>
                   <Text style={styles.benefitBold}>Track</Text> - Monitor your health journey
                 </Text>
               </View>
               <View style={styles.benefit}>
-                <Text style={styles.benefitIcon}>🔔</Text>
+                <MaterialCommunityIcons name="bell-outline" size={16} color={colors.textSecondary} style={styles.benefitIcon} />
                 <Text style={styles.benefitText}>
                   <Text style={styles.benefitBold}>Reminders</Text> - Never miss medications
                 </Text>

@@ -5,6 +5,7 @@
  */
 
 import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 import * as FileSystem from 'expo-file-system';
 import apiClient from '../api/client';
 import { ENABLE_DEBUG as DEBUG } from '../config/environment';
@@ -16,6 +17,46 @@ class TTSService {
     this.isStopped = false;
     this.currentFile = null;
     this.audioSession = null;
+  }
+
+  getSpeechLanguageCode(language = 'english') {
+    const map = {
+      english: 'en-IN',
+      hindi: 'hi-IN',
+      telugu: 'te-IN',
+      tamil: 'ta-IN',
+      marathi: 'mr-IN',
+      bengali: 'bn-IN',
+      kannada: 'kn-IN',
+      malayalam: 'ml-IN',
+      gujarati: 'gu-IN',
+    };
+    return map[String(language || 'english').toLowerCase()] || 'en-IN';
+  }
+
+  async speakWithDeviceTTS(text, language = 'english') {
+    try {
+      if (!text || !String(text).trim()) return false;
+
+      const locale = this.getSpeechLanguageCode(language);
+
+      await new Promise((resolve, reject) => {
+        Speech.speak(String(text), {
+          language: locale,
+          rate: 0.9,
+          pitch: 1.0,
+          onDone: resolve,
+          onStopped: resolve,
+          onError: reject,
+        });
+      });
+
+      if (DEBUG) console.log(`[TTS] Device fallback speech completed (${locale})`);
+      return true;
+    } catch (error) {
+      if (DEBUG) console.error('[TTS] Device fallback speech failed:', error);
+      return false;
+    }
   }
 
   /**
@@ -41,23 +82,47 @@ class TTSService {
   /**
    * Generate TTS and play immediately (non-streaming)
    */
-  async synthesizeAndPlay(text, language = 'en', voiceId = 'default') {
+  async synthesizeAndPlay(text, language = 'english', voiceId = 'default') {
     try {
       this.isStopped = false;
+      if (!this.audioSession) {
+        await this.initializeAudioSession();
+      }
       if (DEBUG) console.log(`[TTS] Generating speech for: ${text.substring(0, 50)}...`);
 
-      // Generate TTS from backend
+      // Generate TTS from backend (/api/tts) - same contract as frontend
       const response = await apiClient.generateTTS(text, language, voiceId);
 
-      if (response.audio_url) {
-        await this.playAudio(response.audio_url);
+      if (response?.audio) {
+        const cacheDir = FileSystem.cacheDirectory + 'tts_chunks/';
+        await FileSystem.makeDirectoryAsync(cacheDir, { intermediates: true }).catch(() => {});
+
+        const extension = response.format === 'wav' ? 'wav' : 'mp3';
+        const filePath = cacheDir + `tts_${Date.now()}.${extension}`;
+
+        await FileSystem.writeAsStringAsync(filePath, response.audio, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        await this.playAudio(filePath);
+        this.currentFile = filePath;
       } else {
-        throw new Error('No audio URL in response');
+        const reason = response?.error || response?.note || 'TTS service unavailable';
+        throw new Error(`No audio returned from backend (${reason})`);
       }
 
       return response;
     } catch (error) {
       if (DEBUG) console.error('[TTS] Synthesis error:', error);
+      const fallbackSpoken = await this.speakWithDeviceTTS(text, language);
+      if (fallbackSpoken) {
+        return {
+          audio: null,
+          language,
+          format: 'device',
+          note: 'Played with device TTS fallback',
+        };
+      }
       throw error;
     }
   }
@@ -66,7 +131,7 @@ class TTSService {
    * Stream TTS and play chunks as they arrive
    * Requires backend to support streaming TTS endpoint
    */
-  async streamAndPlayTTS(text, language = 'en', voiceId = 'default', onProgress = null) {
+  async streamAndPlayTTS(text, language = 'english', voiceId = 'default', onProgress = null) {
     try {
       this.isStopped = false;
       if (DEBUG) console.log(`[TTS] Starting TTS stream for: ${text.substring(0, 50)}...`);
@@ -180,6 +245,11 @@ class TTSService {
   async stopAudio() {
     try {
       this.isStopped = true;
+      try {
+        await Speech.stop();
+      } catch (_) {
+        // noop
+      }
       if (this.currentSound) {
         await this.currentSound.stopAsync();
         this.isPlaying = false;

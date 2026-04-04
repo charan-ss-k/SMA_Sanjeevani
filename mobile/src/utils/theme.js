@@ -4,19 +4,19 @@
  */
 
 export const colors = {
-  // Primary
-  primary: '#1F2937',      // Dark blue-gray
-  primaryLight: '#374151', // Lighter blue-gray
-  primaryDark: '#111827',  // Very dark blue-gray
+  // Primary (frontend-aligned green)
+  primary: '#166534',
+  primaryLight: '#15803D',
+  primaryDark: '#14532D',
 
-  // Secondary
-  secondary: '#06B6D4',    // Cyan/Teal
-  secondaryLight: '#67E8F9',
-  secondaryDark: '#0891B2',
+  // Secondary (frontend-aligned green)
+  secondary: '#16A34A',
+  secondaryLight: '#4ADE80',
+  secondaryDark: '#15803D',
 
   // Status
-  success: '#10B981',
-  warning: '#F59E0B',
+  success: '#059669',
+  warning: '#D97706',
   error: '#EF4444',
   info: '#3B82F6',
 
@@ -36,13 +36,17 @@ export const colors = {
     900: '#111827',
   },
 
-  // Special
-  background: '#F9FAFB',
+  // Special surfaces
+  background: '#F0FDF4',
+  backgroundSoft: '#FEFCE8',
   surface: '#FFFFFF',
+  surfaceAlt: '#F8FAFC',
   border: '#E5E7EB',
+  borderStrong: '#D1D5DB',
   text: '#1F2937',
   textSecondary: '#6B7280',
   textLight: '#9CA3AF',
+  accent: '#F59E0B',
 };
 
 export const spacing = {
@@ -56,14 +60,14 @@ export const spacing = {
 
 export const typography = {
   h1: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: 'bold',
-    lineHeight: 40,
+    lineHeight: 42,
   },
   h2: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: 'bold',
-    lineHeight: 36,
+    lineHeight: 38,
   },
   h3: {
     fontSize: 24,
@@ -89,6 +93,11 @@ export const typography = {
     fontSize: 12,
     fontWeight: '400',
     lineHeight: 16,
+  },
+  labelSmall: {
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 14,
   },
 };
 

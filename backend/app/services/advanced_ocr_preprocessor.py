@@ -18,7 +18,8 @@ class AdvancedOCRPreprocessor:
     def preprocess_for_printed_text(image: np.ndarray) -> np.ndarray:
         """
         Preprocess image for optimal printed text OCR accuracy.
-        Multiple techniques for best results.
+        Enhanced for structured documents with multiple sections (hospital reports, prescriptions).
+        Handles both clear and low-quality scans/photos.
         """
         logger.info("🔬 Advanced preprocessing for printed text (high accuracy mode)...")
         
@@ -32,43 +33,58 @@ class AdvancedOCRPreprocessor:
             logger.error("Failed to read image")
             return None
         
-        # Step 2: Convert to grayscale
+        # Step 2: Upscale if image is too small (improves OCR accuracy)
+        height, width = img.shape[:2]
+        if height < 1000 or width < 1000:
+            logger.debug(f"📍 Upscaling small image from {width}x{height}...")
+            scale_factor = max(2.0, 1500.0 / max(height, width))
+            new_width = int(width * scale_factor)
+            new_height = int(height * scale_factor)
+            img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+            logger.debug(f"   Upscaled to {new_width}x{new_height}")
+        
+        # Step 3: Convert to grayscale
         if len(img.shape) == 3:
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         else:
             gray = img.copy()
         
-        # Step 3: Denoise multiple passes
-        logger.debug("📍 Denoising...")
-        denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+        # Step 4: Denoise while preserving text clarity
+        logger.debug("📍 Denoising with edge preservation...")
+        denoised = cv2.fastNlMeansDenoising(gray, None, h=8, templateWindowSize=7, searchWindowSize=21)
         
-        # Step 4: Bilateral filtering to preserve edges
-        bilateral = cv2.bilateralFilter(denoised, 9, 75, 75)
+        # Step 5: Enhance contrast using CLAHE (adaptive - better for varied lighting)
+        logger.debug("📍 Adaptive contrast enhancement...")
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        enhanced = clahe.apply(denoised)
         
-        # Step 5: Enhance contrast using CLAHE
-        logger.debug("📍 Contrast enhancement...")
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(10, 10))
-        enhanced = clahe.apply(bilateral)
+        # Step 6: Bilateral filtering to preserve edges and text structure
+        bilateral = cv2.bilateralFilter(enhanced, 7, 50, 50)
         
-        # Step 6: Adaptive threshold for text isolation
+        # Step 7: Sharpen text for better OCR (unsharp mask)
+        logger.debug("📍 Sharpening text...")
+        gaussian = cv2.GaussianBlur(bilateral, (0, 0), 2.0)
+        sharpened = cv2.addWeighted(bilateral, 1.5, gaussian, -0.5, 0)
+        
+        # Step 8: Adaptive threshold - better for documents with varying background
         logger.debug("📍 Adaptive thresholding...")
         binary = cv2.adaptiveThreshold(
-            enhanced, 255,
+            sharpened, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY,
-            11, 2
+            15, 8  # Larger block size for structured documents
         )
         
-        # Step 7: Morphological operations - close small holes
-        logger.debug("📍 Morphological processing...")
-        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-        closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_close, iterations=1)
+        # Step 9: Minimal morphological operations (preserve text structure)
+        logger.debug("📍 Morphological refinement...")
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 1))
+        processed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_close, iterations=1)
         
-        # Step 8: Erode slightly to separate touching characters
-        kernel_erode = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
-        processed = cv2.morphologyEx(closed, cv2.MORPH_ERODE, kernel_erode, iterations=1)
+        # Step 10: Remove noise - eliminate very small components
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
+        processed = cv2.morphologyEx(processed, cv2.MORPH_OPEN, kernel_open, iterations=1)
         
-        logger.info("✅ Advanced preprocessing complete")
+        logger.info("✅ Advanced preprocessing complete (optimized for structured documents)")
         return processed
     
     @staticmethod

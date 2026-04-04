@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, Animated } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../utils/theme';
 
 export const Alert = ({
@@ -28,10 +29,10 @@ export const Alert = ({
   }, [dismissAfter, onDismiss]);
 
   const typeStyles = {
-    info: { bg: colors.info, icon: 'ℹ' },
-    success: { bg: colors.success, icon: '✓' },
-    error: { bg: colors.error, icon: '✕' },
-    warning: { bg: colors.warning, icon: '⚠' },
+    info: { bg: '#E0F2FE', text: '#0C4A6E', icon: 'information-outline' },
+    success: { bg: '#DCFCE7', text: '#14532D', icon: 'check-circle-outline' },
+    error: { bg: '#FEE2E2', text: '#7F1D1D', icon: 'close-circle-outline' },
+    warning: { bg: '#FEF3C7', text: '#78350F', icon: 'alert-outline' },
   };
 
   const typeStyle = typeStyles[type];
@@ -41,27 +42,26 @@ export const Alert = ({
       style={{
         opacity,
         backgroundColor: typeStyle.bg,
-        borderRadius: borderRadius.md,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.04)',
         padding: spacing.md,
         marginVertical: spacing.sm,
         flexDirection: 'row',
       }}
     >
-      <Text
-        style={{
-          fontSize: 20,
-          marginRight: spacing.md,
-          color: colors.white,
-        }}
-      >
-        {typeStyle.icon}
-      </Text>
+      <MaterialCommunityIcons
+        name={typeStyle.icon}
+        size={20}
+        color={typeStyle.text}
+        style={{ marginRight: spacing.md, marginTop: 1 }}
+      />
       <View style={{ flex: 1 }}>
         {title && (
           <Text
             style={{
               fontWeight: '600',
-              color: colors.white,
+              color: typeStyle.text,
               marginBottom: spacing.xs,
             }}
           >
@@ -71,8 +71,8 @@ export const Alert = ({
         {message && (
           <Text
             style={{
-              color: colors.white,
-              opacity: 0.9,
+              color: typeStyle.text,
+              opacity: 0.95,
               fontSize: 14,
             }}
           >
@@ -87,7 +87,7 @@ export const Alert = ({
         >
           <Text
             style={{
-              color: colors.white,
+              color: typeStyle.text,
               fontWeight: '600',
               fontSize: 14,
             }}

@@ -8,6 +8,14 @@ import { LanguageContext } from '../main';
 import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
+import calendarIcon from '../assets/calendar.png';
+import capsuleIcon from '../assets/capsule.png';
+import remainderIcon from '../assets/remainder.png';
+import analyticsIcon from '../assets/analytics.png';
+import rashIcon from '../assets/rash.png';
+import hospitalIcon from '../assets/hospital.png';
+import clockIcon from '../assets/clock.png';
+import trashIcon from '../assets/trash.png';
 import { translateData, translateDataBatch } from '../data/dataTranslations';
 import DashboardAppointments from './DashboardAppointments';
 import DashboardReminders from './DashboardReminders';
@@ -334,6 +342,7 @@ const Dashboard = () => {
   const { isAuthenticated } = useContext(AuthContext);
   const { language } = useContext(LanguageContext);
   const [searchHistory, setSearchHistory] = useState([]);
+  const [showAllRecentSearches, setShowAllRecentSearches] = useState(false);
   const [stats, setStats] = useState({
     totalSearches: 0,
     mostCommonSymptoms: [],
@@ -442,6 +451,8 @@ const Dashboard = () => {
   };
 
   const colors = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444'];
+  const recentSearchLimit = 5;
+  const visibleSearchHistory = showAllRecentSearches ? searchHistory : searchHistory.slice(0, recentSearchLimit);
 
   // Transform chart data to include translated names
   const translateChartData = (data, category) => {
@@ -451,186 +462,297 @@ const Dashboard = () => {
     }));
   };
 
+  const dashboardTitle = getTranslation('yourHealthDashboard', language).replace(/^\p{Extended_Pictographic}\s*/u, '');
+  const topMedicinesTitle = getTranslation('topRecommendedMedicines', language).replace(/^\p{Extended_Pictographic}\s*/u, '');
+  const mostCommonSymptomsTitle = getTranslation('mostCommonSymptoms', language).replace(/^\p{Extended_Pictographic}\s*/u, '');
+  const recentSearchesTitle = getTranslation('recentSearches', language).replace(/^\p{Extended_Pictographic}\s*/u, '');
+  const clearHistoryTitle = getTranslation('clearHistory', language).replace(/^\p{Extended_Pictographic}\s*/u, '');
+
   return (
     <>
       {!isAuthenticated && <FeatureLoginPrompt featureName="the dashboard" />}
-      <div className="min-h-screen bg-gradient-to-b from-green-50 to-blue-50 pt-24 pb-10">
+      <div className="min-h-screen bg-linear-to-b from-green-50 to-blue-50 pt-24 pb-10">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-5xl font-bold text-green-800 mb-2">{getTranslation('yourHealthDashboard', language)}</h1>
-          <p className="text-xl text-gray-700">{getTranslation('trackSymptomSearches', language)}</p>
+          <h1 className="mb-2 flex flex-wrap items-center gap-3 text-3xl font-bold text-green-800 md:text-5xl">
+            <img src={analyticsIcon} alt="Analytics" className="h-12 w-12 object-contain" />
+            <span className="wrap-break-word">{dashboardTitle}</span>
+          </h1>
+          <p className="text-base text-gray-700 md:text-xl">{getTranslation('trackSymptomSearches', language)}</p>
+          {/* icons for medicine, upcoming, reminders under subtitle */}
+          <div className="mt-4 flex flex-wrap items-center gap-4 md:gap-8">
+            <div className="flex items-center gap-1">
+              <img src={capsuleIcon} alt="Medicine" className="h-6 w-6" />
+              <span className="text-gray-700">{t('medicine', language)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <img src={calendarIcon} alt="Upcoming" className="h-6 w-6" />
+              <span className="text-gray-700">{t('upcoming', language) || 'Upcoming'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <img src={remainderIcon} alt="Reminders" className="h-6 w-6" />
+              <span className="text-gray-700">{t('reminders', language)}</span>
+            </div>
+          </div>
         </div>
 
         {/* Quick Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{getTranslation('totalSearches', language)}</h3>
-            <p className="text-4xl font-bold mt-2">{stats.totalSearches}</p>
+        <div className="mb-8 grid grid-cols-1 gap-4 auto-rows-fr items-stretch sm:grid-cols-2">
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-linear-to-br from-white via-emerald-50 to-emerald-100 p-5 md:p-6 text-center shadow-lg">
+            <div className="absolute left-0 top-0 h-1.5 w-full bg-emerald-500" />
+            <div className="flex w-full flex-1 flex-col items-center justify-center">
+              <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700 leading-tight">{getTranslation('totalSearches', language)}</h3>
+              <p className="mt-3 text-3xl md:text-4xl font-black tabular-nums text-emerald-900 leading-none">{stats.totalSearches}</p>
+            </div>
+            <p className="mt-4 text-xs md:text-sm leading-relaxed text-emerald-900/70">Overview of all symptom searches recorded so far.</p>
           </div>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{getTranslation('mostCommonSymptom', language)}</h3>
-            <p className="text-2xl font-bold mt-2 capitalize">
-              {stats.mostCommonSymptoms.length > 0 ? translateData(stats.mostCommonSymptoms[0].name, 'symptom', language) : '—'}
-            </p>
+
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-sky-100 bg-linear-to-br from-white via-sky-50 to-sky-100 p-5 md:p-6 text-center shadow-lg">
+            <div className="absolute left-0 top-0 h-1.5 w-full bg-sky-500" />
+            <div className="flex w-full flex-1 flex-col items-center justify-center">
+              <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-sky-700 leading-tight">{getTranslation('mostCommonSymptom', language)}</h3>
+              <p className="mt-3 text-2xl md:text-3xl font-bold leading-tight text-sky-900 capitalize wrap-break-word">
+                {stats.mostCommonSymptoms.length > 0 ? translateData(stats.mostCommonSymptoms[0].name, 'symptom', language) : '—'}
+              </p>
+            </div>
+            <p className="mt-4 text-xs md:text-sm leading-relaxed text-sky-900/70">The symptom appearing most frequently in recent searches.</p>
           </div>
-          <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{getTranslation('mostDiagnosed', language)}</h3>
-            <p className="text-2xl font-bold mt-2 capitalize">
-              {stats.conditionFrequency.length > 0 ? translateData(stats.conditionFrequency[0].name, 'condition', language) : '—'}
-            </p>
+
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-amber-100 bg-linear-to-br from-white via-amber-50 to-amber-100 p-5 md:p-6 text-center shadow-lg">
+            <div className="absolute left-0 top-0 h-1.5 w-full bg-amber-500" />
+            <div className="flex w-full flex-1 flex-col items-center justify-center">
+              <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-amber-700 leading-tight">{getTranslation('mostDiagnosed', language)}</h3>
+              <p className="mt-3 text-2xl md:text-3xl font-bold leading-tight text-amber-900 capitalize wrap-break-word">
+                {stats.conditionFrequency.length > 0 ? translateData(stats.conditionFrequency[0].name, 'condition', language) : '—'}
+              </p>
+            </div>
+            <p className="mt-4 text-xs md:text-sm leading-relaxed text-amber-900/70">Most common predicted condition from the current dataset.</p>
           </div>
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg p-6 shadow-lg">
-            <h3 className="text-sm font-semibold opacity-90">{getTranslation('medicinesRecommended', language)}</h3>
-            <p className="text-3xl font-bold mt-2">{stats.recommendedMedicines.length}</p>
+
+          <div className="relative flex h-full min-h-[190px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-violet-100 bg-linear-to-br from-white via-violet-50 to-violet-100 p-5 md:p-6 text-center shadow-lg">
+            <div className="absolute left-0 top-0 h-1.5 w-full bg-violet-500" />
+            <div className="flex w-full flex-1 flex-col items-center justify-center">
+              <h3 className="text-xs md:text-sm font-semibold uppercase tracking-[0.2em] text-violet-700 leading-tight">{getTranslation('medicinesRecommended', language)}</h3>
+              <p className="mt-3 text-3xl md:text-4xl font-black tabular-nums text-violet-900 leading-none">{stats.recommendedMedicines.length}</p>
+            </div>
+            <p className="mt-4 text-xs md:text-sm leading-relaxed text-violet-900/70">Recommended medicines identified for likely treatment support.</p>
           </div>
         </div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
           {/* Symptom Frequency */}
-          {stats.mostCommonSymptoms.length > 0 && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">{getTranslation('mostCommonSymptoms', language)}</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={translateChartData(stats.mostCommonSymptoms, 'symptom')}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="displayName" angle={-45} textAnchor="end" height={100} />
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800 md:text-2xl">
+              <img src={rashIcon} alt="Symptoms" className="h-7 w-7 object-contain" />
+              <span className="min-w-0 wrap-break-word">{mostCommonSymptomsTitle}</span>
+            </h2>
+            {stats.mostCommonSymptoms.length > 0 ? (
+              <ResponsiveContainer width="100%" height={340}>
+                <BarChart data={translateChartData(stats.mostCommonSymptoms, 'symptom')} barCategoryGap="22%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="displayName" angle={-25} textAnchor="end" height={90} interval={0} tick={{ fill: '#374151', fontSize: 11 }} />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip cursor={{ fill: '#ecfdf5' }} />
                   <Bar dataKey="count" fill="#10b981" name={getTranslation('frequency', language)} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Condition Frequency - Pie Chart */}
-          {stats.conditionFrequency.length > 0 && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">{getTranslation('diagnosedConditions', language)}</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={translateChartData(stats.conditionFrequency, 'condition')}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ displayName, value }) => `${displayName}: ${value}`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {stats.conditionFrequency.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Top Medicines */}
-          {stats.recommendedMedicines.length > 0 && (
-            <div className="bg-white rounded-lg shadow-lg p-6 lg:col-span-2">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">{getTranslation('topRecommendedMedicines', language)}</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={translateChartData(stats.recommendedMedicines, 'medicine')}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 250, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="displayName" type="category" width={240} fontSize={12} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#3b82f6" name={getTranslation('recommendations', language)} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-
-        {/* Search History */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">{getTranslation('recentSearches', language)}</h2>
-            <button
-              onClick={clearHistory}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold"
-            >
-              {getTranslation('clearHistory', language)}
-            </button>
+            ) : (
+              <div className="h-[300px] rounded-lg bg-gray-50 flex items-center justify-center text-gray-500">
+                {getTranslation('noSearchHistory', language)}
+              </div>
+            )}
           </div>
 
-          {searchHistory.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-gray-600 text-lg">{getTranslation('noSearchHistory', language)}</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100 border-b-2 border-gray-300">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('date', language)}</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('symptoms', language)}</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('ageGender', language)}</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('predictedCondition', language)}</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('action', language)}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {searchHistory.map((entry, idx) => (
-                    <tr key={idx} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-700">
-                        {entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : 'N/A'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {entry.input?.symptoms?.slice(0, 3).map((s, i) => (
-                            <span key={i} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
-                              {translateData(s, 'symptom', language)}
-                            </span>
-                          ))}
-                          {entry.input?.symptoms?.length > 3 && (
-                            <span className="text-gray-600 text-xs">+{entry.input.symptoms.length - 3} more</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        {entry.input?.age}/{entry.input?.gender?.substring(0, 1).toUpperCase()}
-                      </td>
-                      <td className="px-4 py-3 text-gray-700 capitalize font-medium">
-                        {translateData(entry.result?.predicted_condition, 'condition', language) || 'N/A'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => speak(`${entry.result?.predicted_condition}: ${entry.result?.home_care_advice?.join(', ')}`, language)}
-                          className="text-amber-600 hover:text-amber-800 font-semibold text-sm"
-                        >
-                          {getTranslation('details', language)}
-                        </button>
-                      </td>
-                    </tr>
+          {/* Condition Frequency - Pie Chart */}
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800 md:text-2xl">
+              <img src={hospitalIcon} alt="Diagnosed Conditions" className="h-7 w-7 object-contain" />
+              <span className="min-w-0 wrap-break-word">{getTranslation('diagnosedConditions', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</span>
+            </h2>
+            {stats.conditionFrequency.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                    <Pie
+                      data={translateChartData(stats.conditionFrequency, 'condition')}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={88}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {stats.conditionFrequency.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {translateChartData(stats.conditionFrequency, 'condition').map((item, index) => (
+                    <div key={`${item.name}-${index}`} className="flex items-center gap-2 rounded-md bg-gray-50 px-2 py-1.5 min-w-0">
+                      <span
+                        className="h-3 w-3 rounded-sm shrink-0"
+                        style={{ backgroundColor: colors[index % colors.length] }}
+                      />
+                      <span className="text-xs text-gray-700 truncate" title={`${item.displayName}: ${item.value}`}>
+                        {item.displayName}: {item.value}
+                      </span>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </>
+            ) : (
+              <div className="h-[300px] rounded-lg bg-gray-50 flex items-center justify-center text-gray-500">
+                {getTranslation('noConditionsRecorded', language)}
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Medicines + Search History Row */}
+        <div className="mb-8 grid grid-cols-1 gap-6 items-stretch xl:grid-cols-2">
+          <div className="h-full rounded-2xl border border-blue-100 bg-white p-4 shadow-lg md:p-6">
+            <h2 className="mb-5 flex items-center gap-3 text-xl font-bold text-gray-800 md:text-2xl">
+              <img src={capsuleIcon} alt="Medicines" className="h-8 w-8 object-contain" />
+              <span className="min-w-0 wrap-break-word">{topMedicinesTitle}</span>
+            </h2>
+            {stats.recommendedMedicines.length > 0 ? (
+              <div className="rounded-lg bg-blue-50/60 p-2">
+                <ResponsiveContainer width="100%" height={340}>
+                  <BarChart
+                    data={translateChartData(stats.recommendedMedicines, 'medicine')}
+                    layout="vertical"
+                    margin={{ top: 12, right: 26, left: 26, bottom: 12 }}
+                    barSize={16}
+                    barCategoryGap="32%"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dbeafe" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fill: '#1e3a8a', fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis
+                      dataKey="displayName"
+                      type="category"
+                      width={145}
+                      tickMargin={10}
+                      fontSize={11}
+                      tick={{ fill: '#1f2937' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip cursor={{ fill: '#dbeafe' }} />
+                    <Bar dataKey="count" fill="#2563eb" name={getTranslation('recommendations', language)} radius={[0, 10, 10, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-[300px] rounded-lg bg-blue-50/60 flex items-center justify-center text-gray-500">
+                {getTranslation('noSearchHistory', language)}
+              </div>
+            )}
+          </div>
+
+          <div className="flex h-full flex-col rounded-2xl bg-white p-4 shadow-lg md:p-6">
+            <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="flex min-w-0 items-center gap-2 text-xl font-bold text-gray-800 md:text-2xl">
+                <img src={clockIcon} alt="Recent Searches" className="h-7 w-7 object-contain" />
+                <span className="wrap-break-word">{recentSearchesTitle}</span>
+              </h2>
+              <button
+                onClick={clearHistory}
+                className="inline-flex max-w-full items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600 sm:px-4 sm:text-base"
+              >
+                <img src={trashIcon} alt="Clear History" className="h-5 w-5 shrink-0 object-contain" />
+                <span className="wrap-break-word">{clearHistoryTitle}</span>
+              </button>
             </div>
-          )}
+
+            {searchHistory.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg flex-1 flex items-center justify-center">
+                <p className="text-gray-600 text-lg">{getTranslation('noSearchHistory', language)}</p>
+              </div>
+            ) : (
+              <div className="flex-1">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead className="bg-gray-100 border-b-2 border-gray-300">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('date', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('symptoms', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('ageGender', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('predictedCondition', language)}</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">{getTranslation('action', language)}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleSearchHistory.map((entry, idx) => (
+                      <tr key={idx} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-700">
+                          {entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {entry.input?.symptoms?.slice(0, 3).map((s, i) => (
+                              <span key={i} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                                {translateData(s, 'symptom', language)}
+                              </span>
+                            ))}
+                            {entry.input?.symptoms?.length > 3 && (
+                              <span className="text-gray-600 text-xs">+{entry.input.symptoms.length - 3} more</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-700">
+                          {entry.input?.age}/{entry.input?.gender?.substring(0, 1).toUpperCase()}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 capitalize font-medium wrap-break-word">
+                          {translateData(entry.result?.predicted_condition, 'condition', language) || 'N/A'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => speak(`${entry.result?.predicted_condition}: ${entry.result?.home_care_advice?.join(', ')}`, language)}
+                            className="text-amber-600 hover:text-amber-800 font-semibold text-sm"
+                          >
+                            {getTranslation('details', language)}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                </div>
+                {searchHistory.length > recentSearchLimit && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllRecentSearches((current) => !current)}
+                      className="rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                    >
+                      {showAllRecentSearches ? 'Show less' : `${t('viewMore', language)} (${searchHistory.length - recentSearchLimit})`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Health Insights */}
         {searchHistory.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Common Conditions */}
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg shadow-lg p-6 border-l-4 border-orange-500">
-              <h3 className="text-xl font-bold text-orange-900 mb-4">{getTranslation('yourConditionHistory', language)}</h3>
+            <div className="bg-linear-to-br from-amber-50 to-orange-50 rounded-lg shadow-lg p-6 border-l-4 border-orange-500">
+              <h3 className="text-xl font-bold text-orange-900 mb-4">{getTranslation('yourConditionHistory', language).replace(/^\p{Extended_Pictographic}\s*/u, '')}</h3>
               {stats.mostCommonConditions.length > 0 ? (
                 <ul className="space-y-2">
                   {stats.mostCommonConditions.map((cond, i) => (
-                    <li key={i} className="flex items-center justify-between">
-                      <span className="text-gray-800 capitalize">{translateData(cond.name, 'condition', language)}</span>
-                      <span className="bg-orange-200 text-orange-900 px-3 py-1 rounded-full text-sm font-semibold">
+                    <li key={i} className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 flex-1 wrap-break-word text-gray-800 capitalize">{translateData(cond.name, 'condition', language)}</span>
+                      <span className="shrink-0 rounded-full bg-orange-200 px-3 py-1 text-sm font-semibold text-orange-900">
                         {cond.count}x
                       </span>
                     </li>
@@ -642,15 +764,15 @@ const Dashboard = () => {
             </div>
 
             {/* Health Tips */}
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-lg p-6 border-l-4 border-green-500">
+            <div className="bg-linear-to-br from-green-50 to-emerald-50 rounded-lg shadow-lg p-6 border-l-4 border-green-500">
               <h3 className="text-xl font-bold text-green-900 mb-4">{getTranslation('wellnessTips', language)}</h3>
               <ul className="space-y-2 text-gray-800">
-                <li>{getTranslation('stayHydratedWater', language)}</li>
-                <li>{getTranslation('getQualitySleep', language)}</li>
-                <li>{getTranslation('exerciseRegularly', language)}</li>
-                <li>{getTranslation('maintainBalancedDiet', language)}</li>
-                <li>{getTranslation('washHandsFrequently', language)}</li>
-                <li>{getTranslation('consultDoctorPersistent', language)}</li>
+                <li className="wrap-break-word">{getTranslation('stayHydratedWater', language)}</li>
+                <li className="wrap-break-word">{getTranslation('getQualitySleep', language)}</li>
+                <li className="wrap-break-word">{getTranslation('exerciseRegularly', language)}</li>
+                <li className="wrap-break-word">{getTranslation('maintainBalancedDiet', language)}</li>
+                <li className="wrap-break-word">{getTranslation('washHandsFrequently', language)}</li>
+                <li className="wrap-break-word">{getTranslation('consultDoctorPersistent', language)}</li>
               </ul>
             </div>
           </div>

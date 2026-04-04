@@ -19,14 +19,18 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Button, Card, Alert } from '../../components';
 import { colors, spacing, typography } from '../../utils/theme';
 import apiClient from '../../api/client';
+import ttsService from '../../services/ttsService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const FREQUENCY_OPTIONS = [
   { label: 'Select Frequency', value: '' },
@@ -39,7 +43,7 @@ const FREQUENCY_OPTIONS = [
   { label: 'As needed', value: 'As needed' },
 ];
 
-const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
+const MedicineCard = ({ med, onDelete, onEdit, onSpeak, isSpeaking, isProcessing }) => (
   <View style={{ 
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -64,7 +68,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
         alignItems: 'center',
         marginRight: spacing.md,
       }}>
-        <Text style={{ fontSize: 26 }}>💊</Text>
+        <MaterialCommunityIcons name="pill" size={26} color="#1D4ED8" />
       </View>
       
       {/* Medicine Info */}
@@ -82,19 +86,28 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
           </Text>
           
           {/* Action Buttons */}
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={{ flexDirection: 'row' }}>
             <Pressable 
               onPress={onSpeak} 
               style={{ 
                 width: 36, 
                 height: 36, 
-                backgroundColor: '#FEF3C7', 
+                backgroundColor: isSpeaking ? '#FEE2E2' : '#FEF3C7', 
                 borderRadius: 10,
                 alignItems: 'center',
                 justifyContent: 'center',
+                marginRight: 6,
               }}
             >
-              <Text style={{ fontSize: 16 }}>🔊</Text>
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#92400E" />
+              ) : (
+                <MaterialCommunityIcons
+                  name={isSpeaking ? 'stop-circle-outline' : 'volume-high'}
+                  size={16}
+                  color="#92400E"
+                />
+              )}
             </Pressable>
             <Pressable 
               onPress={onEdit} 
@@ -105,9 +118,10 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
                 borderRadius: 10,
                 alignItems: 'center',
                 justifyContent: 'center',
+                marginRight: 6,
               }}
             >
-              <Text style={{ fontSize: 16 }}>✏️</Text>
+              <MaterialCommunityIcons name="pencil-outline" size={16} color="#2563EB" />
             </Pressable>
             <Pressable 
               onPress={onDelete} 
@@ -120,13 +134,13 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 16 }}>🗑️</Text>
+              <MaterialCommunityIcons name="delete-outline" size={16} color="#DC2626" />
             </Pressable>
           </View>
         </View>
         
         {/* Medicine Details - Pill Tags */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
           <View style={{ 
             flexDirection: 'row', 
             alignItems: 'center',
@@ -134,8 +148,10 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             paddingHorizontal: 10,
             paddingVertical: 6,
             borderRadius: 8,
+            marginRight: 8,
+            marginBottom: 8,
           }}>
-            <Text style={{ fontSize: 12, marginRight: 4 }}>💉</Text>
+            <MaterialCommunityIcons name="medical-bag" size={12} color="#6B7280" style={{ marginRight: 4 }} />
             <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{String(med.dosage || '-')}</Text>
           </View>
           <View style={{ 
@@ -145,8 +161,10 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             paddingHorizontal: 10,
             paddingVertical: 6,
             borderRadius: 8,
+            marginRight: 8,
+            marginBottom: 8,
           }}>
-            <Text style={{ fontSize: 12, marginRight: 4 }}>📅</Text>
+            <MaterialCommunityIcons name="calendar-month-outline" size={12} color="#6B7280" style={{ marginRight: 4 }} />
             <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{String(med.frequency || '-')}</Text>
           </View>
           <View style={{ 
@@ -156,8 +174,10 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             paddingHorizontal: 10,
             paddingVertical: 6,
             borderRadius: 8,
+            marginRight: 8,
+            marginBottom: 8,
           }}>
-            <Text style={{ fontSize: 12, marginRight: 4 }}>⏳</Text>
+            <MaterialCommunityIcons name="timer-outline" size={12} color="#6B7280" style={{ marginRight: 4 }} />
             <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{String(med.duration || '-')}</Text>
           </View>
           <View style={{ 
@@ -167,8 +187,10 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             paddingHorizontal: 10,
             paddingVertical: 6,
             borderRadius: 8,
+            marginRight: 8,
+            marginBottom: 8,
           }}>
-            <Text style={{ fontSize: 12, marginRight: 4 }}>📦</Text>
+            <MaterialCommunityIcons name="package-variant-closed" size={12} color="#6B7280" style={{ marginRight: 4 }} />
             <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>{String(med.quantity || 0)} units</Text>
           </View>
         </View>
@@ -182,7 +204,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             marginBottom: 10,
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={{ fontSize: 14, marginRight: 6 }}>⏰</Text>
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#065F46" style={{ marginRight: 6 }} />
               <Text style={{ 
                 fontSize: 13, 
                 fontWeight: '600', 
@@ -191,7 +213,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
                 Reminders Active
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               {med.reminders.map((r, i) => (
                 <View 
                   key={i} 
@@ -200,6 +222,8 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
                     paddingHorizontal: 12, 
                     paddingVertical: 6, 
                     borderRadius: 8,
+                    marginRight: 6,
+                    marginBottom: 6,
                   }}
                 >
                   <Text style={{ 
@@ -224,7 +248,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
             padding: 10,
             borderRadius: 10,
           }}>
-            <Text style={{ fontSize: 14, marginRight: 6 }}>📝</Text>
+            <MaterialCommunityIcons name="note-text-outline" size={14} color="#92400E" style={{ marginRight: 6 }} />
             <Text style={{ 
               fontSize: 13, 
               color: '#92400E', 
@@ -240,7 +264,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak }) => (
   </View>
 );
 
-const StatCard = ({ title, value, gradient, icon }) => (
+const StatCard = ({ title, value, gradient, iconName }) => (
   <View style={{
     flex: 1,
     backgroundColor: gradient === 'blue' ? '#3B82F6' : '#22C55E',
@@ -274,7 +298,12 @@ const StatCard = ({ title, value, gradient, icon }) => (
     }} />
     
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-      <Text style={{ fontSize: 20, marginRight: 6 }}>{icon || (gradient === 'blue' ? '💊' : '📄')}</Text>
+      <MaterialCommunityIcons
+        name={iconName || (gradient === 'blue' ? 'pill' : 'file-document-outline')}
+        size={20}
+        color="#FFFFFF"
+        style={{ marginRight: 6 }}
+      />
       <Text style={{ 
         fontSize: 12, 
         fontWeight: '600', 
@@ -297,7 +326,12 @@ const StatCard = ({ title, value, gradient, icon }) => (
 );
 
 export default function PrescriptionScreen({ navigation }) {
+  const { language } = useLanguage();
   const { user, isAuthenticated } = useAuth();
+  const [activeMedicineTtsId, setActiveMedicineTtsId] = useState(null);
+  const [isMedicineTtsProcessing, setIsMedicineTtsProcessing] = useState(false);
+  const [activeSectionTtsKey, setActiveSectionTtsKey] = useState(null);
+  const [isSectionTtsProcessing, setIsSectionTtsProcessing] = useState(false);
   
   // Medicines state (local)
   const [medicines, setMedicines] = useState([]);
@@ -322,15 +356,29 @@ export default function PrescriptionScreen({ navigation }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState('');
+  const analysisCancelledRef = useRef(false);
+
+  // Report analysis state
+  const [reportImageUri, setReportImageUri] = useState(null);
+  const [reportAnalyzing, setReportAnalyzing] = useState(false);
+  const [reportAnalysisResult, setReportAnalysisResult] = useState(null);
+  const [reportAnalysisError, setReportAnalysisError] = useState('');
+  const reportAnalysisCancelledRef = useRef(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState(null);
   
   // Prescription history state (from API)
   const [prescriptionHistory, setPrescriptionHistory] = useState([]);
+  const [medicineHistory, setMedicineHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [medicineHistoryLoading, setMedicineHistoryLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
   
   // Tab state
-  const [activeTab, setActiveTab] = useState('manage');
+  const [activeTab, setActiveTab] = useState('medicines');
+  const [identifyMode, setIdentifyMode] = useState('medicine');
   
   // Error state
   const [error, setError] = useState(null);
@@ -346,6 +394,7 @@ export default function PrescriptionScreen({ navigation }) {
     loadMedicines();
     if (isAuthenticated) {
       fetchPrescriptionHistory();
+      fetchMedicineHistory();
     }
   }, [isAuthenticated]);
 
@@ -353,6 +402,86 @@ export default function PrescriptionScreen({ navigation }) {
   useEffect(() => {
     saveMedicines();
   }, [medicines]);
+
+  useEffect(() => {
+    return () => {
+      ttsService.stop();
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        ttsService.stop();
+        setActiveMedicineTtsId(null);
+        setIsMedicineTtsProcessing(false);
+        setActiveSectionTtsKey(null);
+        setIsSectionTtsProcessing(false);
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    if (activeMedicineTtsId || isMedicineTtsProcessing) {
+      ttsService.stop();
+      setActiveMedicineTtsId(null);
+      setIsMedicineTtsProcessing(false);
+      setActiveSectionTtsKey(null);
+      setIsSectionTtsProcessing(false);
+    }
+  }, [formData.name, formData.dosage, formData.frequency, formData.duration, formData.quantity, formData.notes]);
+
+  const resetImageAnalysisState = useCallback(() => {
+    analysisCancelledRef.current = true;
+    ttsService.stop();
+    setActiveMedicineTtsId(null);
+    setIsMedicineTtsProcessing(false);
+    setActiveSectionTtsKey(null);
+    setIsSectionTtsProcessing(false);
+    setAnalyzing(false);
+    setImageUri(null);
+    setAnalysisResult(null);
+    setAnalysisError('');
+  }, []);
+
+  const resetReportAnalysisState = useCallback(() => {
+    reportAnalysisCancelledRef.current = true;
+    ttsService.stop();
+    setActiveMedicineTtsId(null);
+    setIsMedicineTtsProcessing(false);
+    setActiveSectionTtsKey(null);
+    setIsSectionTtsProcessing(false);
+    setReportAnalyzing(false);
+    setReportImageUri(null);
+    setReportAnalysisResult(null);
+    setReportAnalysisError('');
+  }, []);
+
+  const handleTabChange = useCallback((nextTab) => {
+    if (nextTab === activeTab) return;
+
+    if (activeTab === 'analyze') {
+      resetImageAnalysisState();
+    }
+
+    if (activeTab === 'report') {
+      resetReportAnalysisState();
+    }
+
+    ttsService.stop();
+    setActiveMedicineTtsId(null);
+    setIsMedicineTtsProcessing(false);
+    setActiveSectionTtsKey(null);
+    setIsSectionTtsProcessing(false);
+    setActiveTab(nextTab);
+  }, [activeTab, resetImageAnalysisState, resetReportAnalysisState]);
+
+  const handleIdentifyModeChange = useCallback((nextMode) => {
+    if (nextMode === identifyMode) return;
+
+    resetImageAnalysisState();
+    setIdentifyMode(nextMode);
+  }, [identifyMode, resetImageAnalysisState]);
 
   // Configure how notifications are displayed
   const configureNotifications = () => {
@@ -377,12 +506,12 @@ export default function PrescriptionScreen({ navigation }) {
       }
       
       if (finalStatus !== 'granted') {
-        console.warn('❌ Notification permissions not granted');
+        console.warn('Notification permissions not granted');
       } else {
-        console.log('✅ Notification permissions granted');
+        console.log('Notification permissions granted');
       }
     } catch (error) {
-      console.error('❌ Error requesting notification permissions:', error);
+      console.error('Error requesting notification permissions:', error);
     }
   };
 
@@ -394,7 +523,7 @@ export default function PrescriptionScreen({ navigation }) {
       // Schedule daily recurring notification
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: '💊 Medicine Reminder',
+          title: 'Medicine Reminder',
           body: `Time to take ${medicineName} - ${dosage}`,
           data: { medicineId, time: timeString },
           sound: true,
@@ -418,10 +547,10 @@ export default function PrescriptionScreen({ navigation }) {
         })
       );
 
-      console.log('✅ Medicine reminder scheduled:', notificationId, 'for', timeString);
+      console.log('Medicine reminder scheduled:', notificationId, 'for', timeString);
       return notificationId;
     } catch (error) {
-      console.error('❌ Error scheduling medicine reminder:', error);
+      console.error('Error scheduling medicine reminder:', error);
       throw error;
     }
   };
@@ -436,10 +565,10 @@ export default function PrescriptionScreen({ navigation }) {
         const { notificationId } = JSON.parse(stored);
         await Notifications.cancelScheduledNotificationAsync(notificationId);
         await AsyncStorage.removeItem(key);
-        console.log('✅ Cancelled reminder:', notificationId);
+        console.log('Cancelled reminder:', notificationId);
       }
     } catch (error) {
-      console.error('❌ Error cancelling reminder:', error);
+      console.error('Error cancelling reminder:', error);
     }
   };
 
@@ -465,9 +594,10 @@ export default function PrescriptionScreen({ navigation }) {
   const fetchPrescriptionHistory = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/prescriptions/');
+      const response = await apiClient.get('/api/hospital-report-history/');
       if (Array.isArray(response)) {
         setPrescriptionHistory(response);
+        setSelectedReport((current) => current || response[0] || null);
       }
     } catch (err) {
       console.error('Failed to fetch prescription history:', err);
@@ -476,11 +606,65 @@ export default function PrescriptionScreen({ navigation }) {
     }
   };
 
+  const fetchMedicineHistory = async () => {
+    try {
+      setMedicineHistoryLoading(true);
+      const response = await apiClient.get('/api/prescriptions/');
+      if (Array.isArray(response)) {
+        setMedicineHistory(response);
+      }
+    } catch (err) {
+      console.error('Failed to fetch medicine history:', err);
+    } finally {
+      setMedicineHistoryLoading(false);
+    }
+  };
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchPrescriptionHistory();
+    await fetchMedicineHistory();
     setRefreshing(false);
   }, []);
+
+  const pickReportImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      RNAlert.alert('Permission needed', 'Please grant camera roll permissions');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.85,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setReportImageUri(result.assets[0].uri);
+      setReportAnalysisResult(null);
+      setReportAnalysisError('');
+    }
+  };
+
+  const takeReportPhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      RNAlert.alert('Permission needed', 'Please grant camera permissions');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.85,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setReportImageUri(result.assets[0].uri);
+      setReportAnalysisResult(null);
+      setReportAnalysisError('');
+    }
+  };
 
   const handleAddMedicine = async () => {
     if (!formData.name || !formData.dosage || !formData.frequency) {
@@ -510,7 +694,7 @@ export default function PrescriptionScreen({ navigation }) {
       
       if (scheduledCount > 0) {
         RNAlert.alert(
-          '🔔 Reminders Set!',
+          'Reminders Set',
           `${scheduledCount} daily reminder(s) scheduled for ${formData.name}. You will be notified at the specified times.`,
           [{ text: 'OK' }]
         );
@@ -574,10 +758,83 @@ export default function PrescriptionScreen({ navigation }) {
     );
   };
 
-  const handleSpeakMedicine = (med) => {
-    // TTS functionality - can integrate with expo-speech
+  const handleSpeakMedicine = async (med) => {
+    if (activeMedicineTtsId === med.id) {
+      await ttsService.stop();
+      setActiveMedicineTtsId(null);
+      setIsMedicineTtsProcessing(false);
+      return;
+    }
+
     const text = `${med.name}. Dosage: ${med.dosage}. Frequency: ${med.frequency}. ${med.notes || ''}`;
-    RNAlert.alert('Medicine Info', text);
+    try {
+      setActiveMedicineTtsId(med.id);
+      setIsMedicineTtsProcessing(true);
+      await ttsService.synthesizeAndPlay(text, language);
+    } catch (_) {
+      RNAlert.alert('Medicine Info', text);
+    } finally {
+      setActiveMedicineTtsId(null);
+      setIsMedicineTtsProcessing(false);
+    }
+  };
+
+  const handleSpeakSection = async (key, text) => {
+    const normalizedKey = String(key);
+    const safeText = String(text || '').trim();
+    if (!safeText) return;
+
+    if (activeSectionTtsKey === normalizedKey) {
+      await ttsService.stop();
+      setActiveSectionTtsKey(null);
+      setIsSectionTtsProcessing(false);
+      return;
+    }
+
+    try {
+      setActiveSectionTtsKey(normalizedKey);
+      setIsSectionTtsProcessing(true);
+      await ttsService.synthesizeAndPlay(safeText, language);
+    } catch (_) {
+      // non-fatal
+    } finally {
+      setActiveSectionTtsKey(null);
+      setIsSectionTtsProcessing(false);
+    }
+  };
+
+  const renderTtsActionChip = (key, text) => {
+    const isSpeaking = activeSectionTtsKey === String(key);
+    const isProcessing = isSpeaking && isSectionTtsProcessing;
+
+    return (
+      <Pressable
+        onPress={() => handleSpeakSection(key, text)}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: isSpeaking ? '#FCA5A5' : '#BAE6FD',
+          backgroundColor: isSpeaking ? '#FEE2E2' : '#E0F2FE',
+        }}
+      >
+        {isProcessing ? (
+          <ActivityIndicator size="small" color="#0369A1" />
+        ) : (
+          <MaterialCommunityIcons
+            name={isSpeaking ? 'stop-circle-outline' : 'volume-high'}
+            size={14}
+            color="#0369A1"
+          />
+        )}
+        <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: '700', color: '#0F172A' }}>
+          {isProcessing ? 'Processing...' : isSpeaking ? 'Stop' : 'Speak'}
+        </Text>
+      </Pressable>
+    );
   };
 
   // Handle time picker change
@@ -662,21 +919,28 @@ export default function PrescriptionScreen({ navigation }) {
     setAnalyzing(true);
     setAnalysisError('');
     setAnalysisResult(null);
+    analysisCancelledRef.current = false;
 
     try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: imageUri,
-        type: 'image/jpeg',
-        name: 'medicine.jpg',
-      });
-
-      const response = await apiClient.uploadFile('/medicine-identification/analyze', formData);
-
-      if (response.analysis) {
-        setAnalysisResult(response.analysis);
+      if (identifyMode === 'medicine') {
+        const result = await apiClient.identifyMedicineFromImage(imageUri);
+        if (analysisCancelledRef.current) return;
+        const hasMedicineData = Boolean(result?.medicine_name || result?.name || result?.dosage || result?.full_information);
+        if (hasMedicineData) {
+          setAnalysisResult(result);
+        } else {
+          setAnalysisError('No medicine data detected from the image');
+        }
       } else {
-        setAnalysisError('No analysis data received');
+        const result = await apiClient.analyzePrescriptionImage(imageUri);
+        if (analysisCancelledRef.current) return;
+        const hasMedicines = Array.isArray(result?.medicines) && result.medicines.length > 0;
+
+        if (result?.status === 'success' || hasMedicines) {
+          setAnalysisResult(result);
+        } else {
+          setAnalysisError(result?.message || 'No medicines detected in the prescription');
+        }
       }
     } catch (err) {
       console.error('Analysis error:', err);
@@ -687,6 +951,12 @@ export default function PrescriptionScreen({ navigation }) {
   };
 
   const handleCancelAnalysis = () => {
+    analysisCancelledRef.current = true;
+    ttsService.stop();
+    setActiveMedicineTtsId(null);
+    setIsMedicineTtsProcessing(false);
+    setActiveSectionTtsKey(null);
+    setIsSectionTtsProcessing(false);
     setAnalyzing(false);
     setAnalysisError('Analysis cancelled');
   };
@@ -695,28 +965,63 @@ export default function PrescriptionScreen({ navigation }) {
     if (!analysisResult) return;
 
     try {
-      const prescriptionData = {
-        medicine_name: analysisResult.medicine_name || 'Unknown Medicine',
-        dosage: analysisResult.dosage || 'As prescribed',
-        frequency: 'As per prescription',
-        duration: 'As prescribed',
-        notes: analysisResult.full_information || 'Medicine identified from image',
-        doctor_name: 'AI Medicine Identification',
-      };
+      let payloads = [];
 
-      await apiClient.post('/prescriptions/', prescriptionData);
+      if (identifyMode === 'medicine') {
+        payloads = [{
+          medicine_name: analysisResult.medicine_name || analysisResult.name || 'Unknown Medicine',
+          dosage: analysisResult.dosage || 'As prescribed',
+          frequency: analysisResult.frequency || 'As per prescription',
+          duration: analysisResult.duration || 'As prescribed',
+          notes: analysisResult.full_information || analysisResult.notes || 'Identified from medicine image',
+          doctor_name: 'AI Medicine Identification',
+        }];
+      } else {
+        const extracted = Array.isArray(analysisResult.medicines) ? analysisResult.medicines : [];
+        if (!extracted.length) {
+          setAnalysisError('No medicines available to save');
+          return;
+        }
 
-      // Add to local medicines list
-      setMedicines(prev => [...prev, {
-        id: Date.now(),
-        name: analysisResult.medicine_name || 'Unknown Medicine',
-        dosage: analysisResult.dosage || 'As prescribed',
-        frequency: 'As per prescription',
-        duration: 'As prescribed',
-        quantity: 0,
-        reminders: [],
-        notes: analysisResult.full_information || 'Medicine identified from image',
-      }]);
+        payloads = extracted.map((med) => ({
+          medicine_name: med.medicine_name || med.name || 'Unknown Medicine',
+          dosage: med.dosage || 'As prescribed',
+          frequency: med.frequency || 'As per prescription',
+          duration: med.duration || 'As prescribed',
+          notes: med.instructions || med.notes || 'Extracted from handwritten prescription',
+          doctor_name: analysisResult?.doctor_name || 'AI Prescription Analyzer',
+        }));
+      }
+
+      await Promise.all(payloads.map((prescriptionData) => apiClient.post('/api/prescriptions/', prescriptionData)));
+
+      // Add extracted medicines to local list
+      setMedicines((prev) => [
+        ...prev,
+        ...payloads.map((item, index) => ({
+          id: Date.now() + index,
+          name: item.medicine_name,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          duration: item.duration,
+          quantity: 0,
+          reminders: [],
+          notes: item.notes,
+        })),
+      ]);
+
+      setMedicineHistory((prev) => [
+        ...payloads.map((item, index) => ({
+          id: Date.now() + index,
+          medicine_name: item.medicine_name,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          duration: item.duration,
+          notes: item.notes,
+          created_at: new Date().toISOString(),
+        })),
+        ...prev,
+      ]);
 
       // Refresh history
       fetchPrescriptionHistory();
@@ -725,11 +1030,126 @@ export default function PrescriptionScreen({ navigation }) {
       setAnalysisResult(null);
       setImageUri(null);
 
-      RNAlert.alert('Success', 'Prescription saved successfully!');
+      RNAlert.alert('Success', `${payloads.length} medicine(s) saved successfully!`);
     } catch (err) {
       console.error('Save error:', err);
       setAnalysisError(`Failed to save: ${err.message}`);
     }
+  };
+
+  const handleAnalyzeReport = async () => {
+    if (!reportImageUri) {
+      setReportAnalysisError('Please select a report image first');
+      return;
+    }
+
+    setReportAnalyzing(true);
+    setReportAnalysisError('');
+    setReportAnalysisResult(null);
+    reportAnalysisCancelledRef.current = false;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', {
+        uri: reportImageUri,
+        type: 'image/jpeg',
+        name: 'hospital-report.jpg',
+      });
+
+      const result = await apiClient.uploadFile('/api/hospital-reports/analyze', formData, {
+      });
+
+      if (reportAnalysisCancelledRef.current) return;
+      if (result?.structured_data) {
+        setReportAnalysisResult(result);
+        setSelectedReport(null);
+      } else {
+        setReportAnalysisError('No report data received');
+      }
+    } catch (err) {
+      console.error('Report analysis error:', err);
+      setReportAnalysisError(`Failed to analyze report: ${err.message}`);
+    } finally {
+      setReportAnalyzing(false);
+    }
+  };
+
+  const handleSaveReport = async () => {
+    if (!reportAnalysisResult) return;
+
+    setSavingReport(true);
+    try {
+      const payload = {
+        report_title: reportImageUri ? 'Hospital Report' : 'Hospital Report',
+        uploaded_file: 'mobile-upload',
+        ocr_method: reportAnalysisResult.ocr_method || 'GoogleVision',
+        extracted_text: reportAnalysisResult.extracted_text || '',
+        structured_data: reportAnalysisResult.structured_data || {},
+      };
+
+      const saved = await apiClient.post('/api/hospital-report-history/', payload);
+      setPrescriptionHistory((prev) => [saved, ...prev.filter((item) => item.id !== saved.id)]);
+      setSelectedReport(saved);
+      setReportAnalysisResult(null);
+      setReportImageUri(null);
+      setReportAnalysisError('');
+      RNAlert.alert('Success', 'Report saved successfully!');
+    } catch (err) {
+      console.error('Save report error:', err);
+      setReportAnalysisError(`Failed to save report: ${err.message}`);
+    } finally {
+      setSavingReport(false);
+    }
+  };
+
+  const handleDeleteReport = async (id) => {
+    RNAlert.alert(
+      'Delete Report',
+      'Are you sure you want to delete this report?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`/api/hospital-report-history/${id}`);
+              setPrescriptionHistory((prev) => prev.filter((item) => item.id !== id));
+              setSelectedReport((current) => (current && current.id === id ? null : current));
+              if (expandedHistoryId === id) {
+                setExpandedHistoryId(null);
+              }
+            } catch (err) {
+              console.error('Delete report error:', err);
+              setReportAnalysisError(`Failed to delete report: ${err.message}`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteMedicineHistory = async (id) => {
+    RNAlert.alert(
+      'Delete Medicine',
+      'Are you sure you want to delete this medicine history entry?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`/api/prescriptions/${id}`);
+              setMedicineHistory((prev) => prev.filter((item) => item.id !== id));
+            } catch (err) {
+              console.error('Delete medicine history error:', err);
+              setError(`Failed to delete medicine history: ${err.message}`);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeletePrescription = async (id) => {
@@ -743,8 +1163,9 @@ export default function PrescriptionScreen({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiClient.delete(`/prescriptions/${id}`);
+              await apiClient.delete(`/api/prescriptions/${id}`);
               setPrescriptionHistory(prev => prev.filter(p => p.id !== id));
+              setSelectedReport((current) => (current && current.id === id ? null : current));
             } catch (err) {
               console.error('Delete error:', err);
               setError('Failed to delete prescription');
@@ -760,10 +1181,19 @@ export default function PrescriptionScreen({ navigation }) {
     totalPrescriptions: prescriptionHistory.length,
   };
 
+  const formatDateTime = (value) => {
+    if (!value) return 'Unknown';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString();
+  };
+
+  const selectedReportItem = selectedReport || prescriptionHistory[0] || null;
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: '#F0FDF4' }}
-      contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.lg + 92 }}
+      contentContainerStyle={{ padding: spacing.md, paddingTop: spacing.lg + 84 }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -772,13 +1202,15 @@ export default function PrescriptionScreen({ navigation }) {
       <View style={{ 
         marginBottom: spacing.lg,
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
+        borderRadius: 24,
         padding: spacing.lg,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.08,
-        shadowRadius: 8,
+        shadowRadius: 16,
         elevation: 3,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
           <View style={{
@@ -790,7 +1222,7 @@ export default function PrescriptionScreen({ navigation }) {
             justifyContent: 'center',
             marginRight: spacing.sm,
           }}>
-            <Text style={{ fontSize: 24 }}>💊</Text>
+                  <MaterialCommunityIcons name="history" size={18} color="#4338CA" />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ 
@@ -824,62 +1256,75 @@ export default function PrescriptionScreen({ navigation }) {
       {/* Quick Stats */}
       <View style={{ 
         flexDirection: 'row', 
-        gap: spacing.md, 
+        justifyContent: 'space-between',
         marginBottom: spacing.xl,
       }}>
-        <StatCard title="Medicines" value={stats.totalMedicines} gradient="blue" icon="💊" />
-        <StatCard title="Prescriptions" value={stats.totalPrescriptions} gradient="green" icon="📄" />
+        <View style={{ flex: 1, marginRight: spacing.sm }}>
+          <StatCard title="Medicines" value={stats.totalMedicines} gradient="blue" iconName="pill" />
+        </View>
+        <View style={{ flex: 1, marginLeft: spacing.sm }}>
+          <StatCard title="Reports" value={stats.totalPrescriptions} gradient="green" iconName="file-document-outline" />
+        </View>
       </View>
 
       {/* Tab Navigation - Modern Segmented Control */}
       <View style={{
         flexDirection: 'row',
         marginBottom: spacing.lg,
-        backgroundColor: '#E5E7EB',
+        backgroundColor: '#DCFCE7',
         borderRadius: 16,
-        padding: 4,
-        shadowColor: '#000',
+        padding: 5,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
         elevation: 2,
       }}>
         <Pressable
-          onPress={() => setActiveTab('manage')}
+          onPress={() => handleTabChange('medicines')}
           style={{
             flex: 1,
-            flexDirection: 'row',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            paddingVertical: 14,
+            paddingVertical: 10,
             paddingHorizontal: spacing.md,
             borderRadius: 12,
-            backgroundColor: activeTab === 'manage' ? '#FFFFFF' : 'transparent',
-            shadowColor: activeTab === 'manage' ? '#000' : 'transparent',
+            backgroundColor: activeTab === 'medicines' ? '#FFFFFF' : 'transparent',
+            shadowColor: activeTab === 'medicines' ? '#000' : 'transparent',
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: activeTab === 'manage' ? 0.1 : 0,
+            shadowOpacity: activeTab === 'medicines' ? 0.1 : 0,
             shadowRadius: 4,
-            elevation: activeTab === 'manage' ? 3 : 0,
+            elevation: activeTab === 'medicines' ? 3 : 0,
+            minHeight: 58,
           }}
         >
-          <Text style={{ fontSize: 18, marginRight: 8 }}>📋</Text>
+          <MaterialCommunityIcons
+            name="pill"
+            size={18}
+            color={activeTab === 'medicines' ? '#1F2937' : '#6B7280'}
+            style={{ marginBottom: 2 }}
+          />
           <Text style={{
-            fontSize: 15,
+            fontSize: 12,
             fontWeight: '700',
-            color: activeTab === 'manage' ? '#1F2937' : '#6B7280',
+            color: activeTab === 'medicines' ? '#1F2937' : '#6B7280',
             letterSpacing: 0.3,
+            textAlign: 'center',
           }}>
-            Manage
+            Medicines
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => setActiveTab('analyze')}
+          onPress={() => handleTabChange('analyze')}
           style={{
             flex: 1,
-            flexDirection: 'row',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            paddingVertical: 14,
+            paddingVertical: 10,
             paddingHorizontal: spacing.md,
             borderRadius: 12,
             backgroundColor: activeTab === 'analyze' ? '#FFFFFF' : 'transparent',
@@ -888,21 +1333,63 @@ export default function PrescriptionScreen({ navigation }) {
             shadowOpacity: activeTab === 'analyze' ? 0.1 : 0,
             shadowRadius: 4,
             elevation: activeTab === 'analyze' ? 3 : 0,
+            minHeight: 58,
           }}
         >
-          <Text style={{ fontSize: 18, marginRight: 8 }}>🔬</Text>
+          <MaterialCommunityIcons
+            name="flask-outline"
+            size={18}
+            color={activeTab === 'analyze' ? '#1F2937' : '#6B7280'}
+            style={{ marginBottom: 2 }}
+          />
           <Text style={{
-            fontSize: 15,
+            fontSize: 12,
             fontWeight: '700',
             color: activeTab === 'analyze' ? '#1F2937' : '#6B7280',
             letterSpacing: 0.3,
+            textAlign: 'center',
           }}>
             Identify
           </Text>
         </Pressable>
+        <Pressable
+          onPress={() => handleTabChange('report')}
+          style={{
+            flex: 1,
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 10,
+            paddingHorizontal: spacing.md,
+            borderRadius: 12,
+            backgroundColor: activeTab === 'report' ? '#FFFFFF' : 'transparent',
+            shadowColor: activeTab === 'report' ? '#000' : 'transparent',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: activeTab === 'report' ? 0.1 : 0,
+            shadowRadius: 4,
+            elevation: activeTab === 'report' ? 3 : 0,
+            minHeight: 58,
+          }}
+        >
+          <MaterialCommunityIcons
+            name="file-document-outline"
+            size={18}
+            color={activeTab === 'report' ? '#1F2937' : '#6B7280'}
+            style={{ marginBottom: 2 }}
+          />
+          <Text style={{
+            fontSize: 12,
+            fontWeight: '700',
+            color: activeTab === 'report' ? '#1F2937' : '#6B7280',
+            letterSpacing: 0.3,
+            textAlign: 'center',
+          }}>
+            Report
+          </Text>
+        </Pressable>
       </View>
 
-      {/* Analyze Tab Content */}
+      {/* Identify Tab Content */}
       {activeTab === 'analyze' && (
         <Card variant="elevated" padding="lg" style={{ 
           marginBottom: spacing.lg,
@@ -922,23 +1409,75 @@ export default function PrescriptionScreen({ navigation }) {
               justifyContent: 'center',
               marginRight: spacing.sm,
             }}>
-              <Text style={{ fontSize: 22 }}>🔬</Text>
+              <MaterialCommunityIcons name="flask-outline" size={22} color="#4338CA" />
             </View>
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ 
                 fontSize: 18, 
                 fontWeight: '700', 
                 color: '#1F2937',
-              }}>
-                AI Medicine Identification
+                flexShrink: 1,
+                lineHeight: 24,
+              }} numberOfLines={2}>
+                {identifyMode === 'medicine' ? 'AI Medicine Identification' : 'Handwritten Prescription Analysis'}
               </Text>
               <Text style={{ 
                 fontSize: 13, 
                 color: '#6B7280',
-              }}>
-                Scan to identify medicines
+                flexShrink: 1,
+                lineHeight: 18,
+              }} numberOfLines={2}>
+                {identifyMode === 'medicine' ? 'Scan to identify medicines' : 'Analyze handwritten prescriptions'}
               </Text>
             </View>
+          </View>
+
+          {/* Identify Sub-tabs */}
+          <View style={{
+            flexDirection: 'row',
+            marginBottom: spacing.md,
+            backgroundColor: '#E5E7EB',
+            borderRadius: 12,
+            padding: 4,
+          }}>
+            <Pressable
+              onPress={() => handleIdentifyModeChange('medicine')}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 10,
+                borderRadius: 9,
+                backgroundColor: identifyMode === 'medicine' ? '#FFFFFF' : 'transparent',
+              }}
+            >
+              <Text style={{
+                fontSize: 14,
+                fontWeight: '700',
+                color: identifyMode === 'medicine' ? '#1F2937' : '#6B7280',
+              }}>
+                Medicine
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleIdentifyModeChange('prescription')}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 10,
+                borderRadius: 9,
+                backgroundColor: identifyMode === 'prescription' ? '#FFFFFF' : 'transparent',
+              }}
+            >
+              <Text style={{
+                fontSize: 14,
+                fontWeight: '700',
+                color: identifyMode === 'prescription' ? '#1F2937' : '#6B7280',
+              }}>
+                Prescription
+              </Text>
+            </Pressable>
           </View>
 
           {/* Image Upload Section */}
@@ -953,15 +1492,15 @@ export default function PrescriptionScreen({ navigation }) {
           }}>
             {!imageUri ? (
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📸</Text>
+                <MaterialCommunityIcons name="image-plus" size={42} color="#2563EB" style={{ marginBottom: spacing.md }} />
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <Button
-                    title="📷 Camera"
+                    title="Camera"
                     onPress={takePhoto}
                     variant="primary"
                   />
                   <Button
-                    title="🖼️ Gallery"
+                    title="Gallery"
                     onPress={pickImage}
                     variant="secondary"
                   />
@@ -1002,7 +1541,7 @@ export default function PrescriptionScreen({ navigation }) {
           {/* Analyze Button */}
           {imageUri && !analyzing && !analysisResult && (
             <Button
-              title="🔍 Analyze Now"
+              title={identifyMode === 'medicine' ? 'Identify Medicine' : 'Analyze Prescription'}
               onPress={handleAnalyze}
               variant="primary"
               fullWidth
@@ -1016,7 +1555,7 @@ export default function PrescriptionScreen({ navigation }) {
               <ActivityIndicator size="large" color="#2563EB" />
               <Text style={[typography.body, { color: '#1E40AF', marginTop: spacing.sm }]}>Analyzing... Please wait</Text>
               <Button
-                title="⛔ Cancel"
+                title="Cancel"
                 onPress={handleCancelAnalysis}
                 variant="danger"
                 style={{ marginTop: spacing.md }}
@@ -1034,52 +1573,98 @@ export default function PrescriptionScreen({ navigation }) {
           {/* Analysis Results */}
           {analysisResult && (
             <View style={{ backgroundColor: '#F0FDF4', borderRadius: 12, padding: spacing.md, borderWidth: 2, borderColor: '#86EFAC' }}>
-              <Text style={[typography.h4, { color: colors.text, marginBottom: spacing.md }]}>📋 Analysis Results</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+                <Text style={[typography.h4, { color: colors.text }]}>Analysis Results</Text>
+                {renderTtsActionChip('analysis-summary', JSON.stringify(analysisResult))}
+              </View>
 
-              {analysisResult.medicine_name && (
-                <View style={{ backgroundColor: '#FEFCE8', padding: spacing.md, borderRadius: 8, marginBottom: spacing.sm }}>
-                  <Text style={[typography.labelSmall, { color: '#166534' }]}>Medicine Name</Text>
-                  <Text style={[typography.h4, { color: '#166534' }]}>💊 {String(analysisResult.medicine_name)}</Text>
-                </View>
+              {identifyMode === 'medicine' && (
+                <>
+                  {(analysisResult.medicine_name || analysisResult.name) && (
+                    <View style={{ backgroundColor: '#FEFCE8', padding: spacing.md, borderRadius: 8, marginBottom: spacing.sm }}>
+                      <Text style={[typography.labelSmall, { color: '#166534' }]}>Medicine Name</Text>
+                      <Text style={[typography.h4, { color: '#166534' }]}>{String(analysisResult.medicine_name || analysisResult.name)}</Text>
+                    </View>
+                  )}
+
+                  {analysisResult.dosage && (
+                    <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#3B82F6', marginBottom: spacing.sm }}>
+                      <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>Dosage</Text>
+                      <Text style={[typography.body, { color: colors.text }]}>{String(analysisResult.dosage)}</Text>
+                    </View>
+                  )}
+
+                  {analysisResult.category && (
+                    <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#9333EA', marginBottom: spacing.sm }}>
+                      <Text style={[typography.labelSmall, { color: '#6B21A8' }]}>Category</Text>
+                      <Text style={[typography.body, { color: colors.text }]}>{String(analysisResult.category)}</Text>
+                    </View>
+                  )}
+
+                  {analysisResult.manufacturer && (
+                    <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#4F46E5', marginBottom: spacing.sm }}>
+                      <Text style={[typography.labelSmall, { color: '#3730A3' }]}>Manufacturer</Text>
+                      <Text style={[typography.body, { color: colors.text }]}>🏭 {String(analysisResult.manufacturer)}</Text>
+                    </View>
+                  )}
+
+                  {analysisResult.price && (
+                    <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F59E0B', marginBottom: spacing.sm }}>
+                      <Text style={[typography.labelSmall, { color: '#B45309' }]}>Price</Text>
+                      <Text style={[typography.h4, { color: '#B45309' }]}>💰 {String(analysisResult.price)}</Text>
+                    </View>
+                  )}
+
+                  {analysisResult.full_information && (
+                    <View style={{ backgroundColor: '#EFF6FF', padding: spacing.sm, borderRadius: 8, borderWidth: 2, borderColor: '#BFDBFE', marginBottom: spacing.md }}>
+                      <Text style={[typography.labelSmall, { color: '#1E40AF', marginBottom: 4 }]}>Additional Information</Text>
+                      <Text style={[typography.caption, { color: colors.text }]}>{String(analysisResult.full_information)}</Text>
+                    </View>
+                  )}
+                </>
               )}
 
-              {analysisResult.dosage && (
-                <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#3B82F6', marginBottom: spacing.sm }}>
-                  <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>Dosage</Text>
-                  <Text style={[typography.body, { color: colors.text }]}>💉 {String(analysisResult.dosage)}</Text>
-                </View>
-              )}
+              {identifyMode === 'prescription' && (
+                <>
+                  {analysisResult.pipeline?.htr && (
+                    <View style={{ backgroundColor: '#ECFDF5', padding: spacing.sm, borderRadius: 8, marginBottom: spacing.sm }}>
+                      <Text style={[typography.caption, { color: '#166534' }]}>OCR: {String(analysisResult.pipeline.htr)}</Text>
+                    </View>
+                  )}
 
-              {analysisResult.category && (
-                <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#9333EA', marginBottom: spacing.sm }}>
-                  <Text style={[typography.labelSmall, { color: '#6B21A8' }]}>Category</Text>
-                  <Text style={[typography.body, { color: colors.text }]}>🏷️ {String(analysisResult.category)}</Text>
-                </View>
-              )}
+                  {Array.isArray(analysisResult.medicines) && analysisResult.medicines.map((medicine, index) => (
+                    <View key={index} style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#3B82F6', marginBottom: spacing.sm }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>Medicine {index + 1}</Text>
+                        {renderTtsActionChip(
+                          `analysis-medicine-${index}`,
+                          `${medicine.medicine_name || medicine.name || 'Unknown Medicine'}. Dosage ${medicine.dosage || 'As prescribed'}. Frequency ${medicine.frequency || 'As per prescription'}. Duration ${medicine.duration || 'As prescribed'}. ${medicine.instructions || medicine.notes || ''}`
+                        )}
+                      </View>
+                      <Text style={[typography.h4, { color: colors.text, marginTop: 4 }]}>{String(medicine.medicine_name || medicine.name || 'Unknown Medicine')}</Text>
+                      <Text style={[typography.body, { color: colors.text, marginTop: 4 }]}>Dosage: {String(medicine.dosage || 'As prescribed')}</Text>
+                      <Text style={[typography.body, { color: colors.text, marginTop: 2 }]}>Frequency: {String(medicine.frequency || 'As per prescription')}</Text>
+                      <Text style={[typography.body, { color: colors.text, marginTop: 2 }]}>⏳ Duration: {String(medicine.duration || 'As prescribed')}</Text>
+                      {(medicine.instructions || medicine.notes) && (
+                        <Text style={[typography.caption, { color: '#4B5563', marginTop: 6 }]}>
+                          Notes: {String(medicine.instructions || medicine.notes)}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
 
-              {analysisResult.manufacturer && (
-                <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#4F46E5', marginBottom: spacing.sm }}>
-                  <Text style={[typography.labelSmall, { color: '#3730A3' }]}>Manufacturer</Text>
-                  <Text style={[typography.body, { color: colors.text }]}>🏭 {String(analysisResult.manufacturer)}</Text>
-                </View>
-              )}
-
-              {analysisResult.price && (
-                <View style={{ backgroundColor: '#FFFFFF', padding: spacing.sm, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F59E0B', marginBottom: spacing.sm }}>
-                  <Text style={[typography.labelSmall, { color: '#B45309' }]}>Price</Text>
-                  <Text style={[typography.h4, { color: '#B45309' }]}>💰 {String(analysisResult.price)}</Text>
-                </View>
-              )}
-
-              {analysisResult.full_information && (
-                <View style={{ backgroundColor: '#EFF6FF', padding: spacing.sm, borderRadius: 8, borderWidth: 2, borderColor: '#BFDBFE', marginBottom: spacing.md }}>
-                  <Text style={[typography.labelSmall, { color: '#1E40AF', marginBottom: 4 }]}>ℹ️ Additional Information</Text>
-                  <Text style={[typography.caption, { color: colors.text }]}>{String(analysisResult.full_information)}</Text>
-                </View>
+                  {Array.isArray(analysisResult.warnings) && analysisResult.warnings.length > 0 && (
+                    <View style={{ backgroundColor: '#FEF3C7', padding: spacing.sm, borderRadius: 8, marginBottom: spacing.md }}>
+                      {analysisResult.warnings.map((warning, idx) => (
+                        <Text key={idx} style={[typography.caption, { color: '#92400E' }]}>{String(warning)}</Text>
+                      ))}
+                    </View>
+                  )}
+                </>
               )}
 
               <Button
-                title="✓ Save to Prescriptions"
+                title={identifyMode === 'medicine' ? 'Save Medicine to Prescriptions' : 'Save to Prescriptions'}
                 onPress={handleSaveAnalysisResult}
                 variant="primary"
                 fullWidth
@@ -1089,99 +1674,387 @@ export default function PrescriptionScreen({ navigation }) {
         </Card>
       )}
 
-      {/* Manage Tab Content */}
-      {activeTab === 'manage' && (
-        <>
-          {/* Prescription History Section */}
-          <Card variant="elevated" padding="md" style={{ 
+      {/* Report Tab Content */}
+      {activeTab === 'report' && (
+        <Card variant="elevated" padding="lg" style={{ 
+          marginBottom: spacing.lg,
+          borderRadius: 20,
+        }}>
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
             marginBottom: spacing.lg,
-            borderRadius: 20,
           }}>
-            <View style={{ 
-              flexDirection: 'row', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: spacing.md,
+            <View style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              backgroundColor: '#DBEAFE',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: spacing.sm,
             }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  backgroundColor: '#FEF3C7',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: spacing.sm,
-                }}>
-                  <Text style={{ fontSize: 18 }}>📚</Text>
+              <MaterialCommunityIcons name="file-document-outline" size={22} color="#1D4ED8" />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ 
+                fontSize: 18, 
+                fontWeight: '700', 
+                color: '#1F2937',
+                flexShrink: 1,
+                lineHeight: 24,
+              }} numberOfLines={2}>
+                Hospital Report Analyzer
+              </Text>
+              <Text style={{ 
+                fontSize: 13, 
+                color: '#6B7280',
+                flexShrink: 1,
+                lineHeight: 18,
+              }} numberOfLines={2}>
+                Analyze printed hospital documents and view structured results
+              </Text>
+            </View>
+          </View>
+
+          <View style={{
+            borderWidth: 2,
+            borderStyle: 'dashed',
+            borderColor: '#93C5FD',
+            borderRadius: 12,
+            padding: spacing.lg,
+            backgroundColor: '#EFF6FF',
+            marginBottom: spacing.md,
+          }}>
+            {!reportImageUri ? (
+              <View style={{ alignItems: 'center' }}>
+                <MaterialCommunityIcons name="file-find-outline" size={42} color="#2563EB" style={{ marginBottom: spacing.md }} />
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <Button title="Camera" onPress={takeReportPhoto} variant="primary" />
+                  <Button title="Gallery" onPress={pickReportImage} variant="secondary" />
                 </View>
-                <View>
-                  <Text style={{ 
-                    fontSize: 16, 
-                    fontWeight: '700', 
-                    color: '#1F2937',
-                  }}>
-                    Prescription History
-                  </Text>
-                  <Text style={{ 
-                    fontSize: 12, 
-                    color: '#6B7280',
-                  }}>
-                    {prescriptionHistory.length} records
-                  </Text>
+                <Text style={[typography.caption, { color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center' }]}>
+                  Upload a printed hospital report image
+                </Text>
+              </View>
+            ) : (
+              <View>
+                <Image
+                  source={{ uri: reportImageUri }}
+                  style={{ width: '100%', height: 220, borderRadius: 8, marginBottom: spacing.md }}
+                  resizeMode="contain"
+                />
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <Button title="Change" onPress={pickReportImage} variant="secondary" style={{ flex: 1 }} />
+                  <Button title="Clear" onPress={() => { setReportImageUri(null); setReportAnalysisResult(null); setReportAnalysisError(''); }} variant="danger" style={{ flex: 1 }} />
                 </View>
               </View>
+            )}
+          </View>
+
+          {reportImageUri && !reportAnalyzing && !reportAnalysisResult && (
+            <Button
+              title="Analyze Report"
+              onPress={handleAnalyzeReport}
+              variant="primary"
+              fullWidth
+              style={{ marginBottom: spacing.md }}
+            />
+          )}
+
+          {reportAnalyzing && (
+            <View style={{ alignItems: 'center', padding: spacing.lg, backgroundColor: '#EFF6FF', borderRadius: 8, marginBottom: spacing.md }}>
+              <ActivityIndicator size="large" color="#2563EB" />
+              <Text style={[typography.body, { color: '#1E40AF', marginTop: spacing.sm }]}>Analyzing report... Please wait</Text>
               <Button
-                title={showHistory ? 'Hide' : 'Show'}
-                onPress={() => {
-                  setShowHistory(!showHistory);
-                  if (!showHistory) fetchPrescriptionHistory();
-                }}
-                variant="secondary"
-                size="sm"
+                title="Cancel"
+                onPress={() => setReportAnalyzing(false)}
+                variant="danger"
+                style={{ marginTop: spacing.md }}
               />
             </View>
+          )}
 
-            {showHistory && (
-              loading ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : prescriptionHistory.length === 0 ? (
-                <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.lg }]}>
-                  No prescription history found
-                </Text>
-              ) : (
-                prescriptionHistory.map(prescription => (
-                  <View
-                    key={prescription.id}
-                    style={{
-                      backgroundColor: '#F9FAFB',
-                      padding: spacing.sm,
-                      borderRadius: 8,
-                      marginBottom: spacing.sm,
-                      borderLeftWidth: 4,
-                      borderLeftColor: colors.primary,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[typography.body, { fontWeight: '600', color: colors.text }]}>{String(prescription.medicine_name || '')}</Text>
-                        <Text style={[typography.caption, { color: colors.textSecondary }]}>
-                          {String(prescription.dosage || '')} • {String(prescription.frequency || '')}
+          {reportAnalysisError ? (
+            <View style={{ backgroundColor: '#FEF2F2', padding: spacing.md, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#EF4444', marginBottom: spacing.md }}>
+              <Text style={{ color: '#991B1B', fontWeight: '600' }}>{String(reportAnalysisError)}</Text>
+            </View>
+          ) : null}
+
+          {reportAnalysisResult?.structured_data && (
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 12, padding: spacing.md, borderWidth: 1, borderColor: '#DBEAFE', marginBottom: spacing.md }}>
+              {(() => {
+                const data = reportAnalysisResult.structured_data || {};
+                const hospital = data.hospital_details || {};
+                const doctor = data.doctor_details || {};
+                const patient = data.patient_details || {};
+                const clinical = data.clinical_details || {};
+                const medicines = Array.isArray(data.medicines) ? data.medicines : [];
+                const advice = data.medical_advice || {};
+
+                const hasHospitalData = hospital.name || hospital.address || hospital.phone || hospital.email;
+                const hasDoctorData = doctor.name || doctor.qualifications || doctor.specialization || doctor.registration_number;
+                const hasPatientData = patient.name || patient.patient_id || patient.age || patient.gender || patient.mobile;
+                const hasClinicalData = clinical.diagnosis || (Array.isArray(clinical.chief_complaints) && clinical.chief_complaints.length > 0);
+                const hasAdviceData = (Array.isArray(advice.advice) && advice.advice.length > 0) || advice.precautions || advice.follow_up_date || advice.dietary_restrictions;
+                const isIncompleteData = (String(data.additional_information || '').toLowerCase().includes('regex fallback'));
+
+                return (
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+                      <Text style={[typography.h4, { color: colors.text }]}>Analysis Results</Text>
+                      {renderTtsActionChip('report-summary', JSON.stringify(data))}
+                    </View>
+
+                    {isIncompleteData && (
+                      <View style={{ backgroundColor: '#FEF3C7', borderRadius: 8, padding: spacing.sm, marginBottom: spacing.md, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
+                        <Text style={[typography.labelSmall, { color: '#92400E' }]}>Incomplete Data Extraction</Text>
+                        <Text style={[typography.caption, { color: '#78350F', marginTop: 4 }]}>Some details could not be extracted. Please verify with the original report.</Text>
+                      </View>
+                    )}
+
+                    {hasHospitalData && (
+                      <View style={{ borderBottomWidth: 3, borderBottomColor: '#2563EB', paddingBottom: spacing.md, marginBottom: spacing.md, alignItems: 'center' }}>
+                        <Text style={{ fontSize: 20, fontWeight: '800', color: '#1E3A8A', textAlign: 'center' }}>
+                          {String(hospital.name || 'Medical Center')}
                         </Text>
-                        <Text style={[typography.caption, { color: colors.textSecondary }]}>
-                          {prescription.created_at ? new Date(prescription.created_at).toLocaleDateString() : ''}
+                        {hospital.address ? (
+                          <Text style={[typography.caption, { color: '#475569', marginTop: 4, textAlign: 'center' }]}>{String(hospital.address)}</Text>
+                        ) : null}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
+                          {hospital.phone ? <Text style={[typography.caption, { color: '#475569', marginHorizontal: 6 }]}>Phone: {String(hospital.phone)}</Text> : null}
+                          {hospital.email ? <Text style={[typography.caption, { color: '#475569', marginHorizontal: 6 }]}>Email: {String(hospital.email)}</Text> : null}
+                        </View>
+                      </View>
+                    )}
+
+                    {hasDoctorData && (
+                      <View style={{ backgroundColor: '#EFF6FF', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#2563EB', marginBottom: spacing.sm }}>
+                        <Text style={[typography.labelSmall, { color: '#1E3A8A', marginBottom: 6 }]}>Doctor Information</Text>
+                        {doctor.name ? <Text style={[typography.body, { color: '#111827', fontWeight: '700' }]}>{String(doctor.name)}</Text> : null}
+                        {doctor.qualifications ? <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>{String(doctor.qualifications)}</Text> : null}
+                        {doctor.specialization ? <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Specialization: {String(doctor.specialization)}</Text> : null}
+                        {doctor.registration_number ? <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Registration No: {String(doctor.registration_number)}</Text> : null}
+                      </View>
+                    )}
+
+                    {hasPatientData && (
+                      <View style={{ backgroundColor: '#ECFDF5', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#16A34A', marginBottom: spacing.sm }}>
+                        <Text style={[typography.labelSmall, { color: '#166534', marginBottom: 6 }]}>Patient Information</Text>
+                        {patient.name ? <Text style={[typography.body, { color: '#111827', fontWeight: '700' }]}>{String(patient.name)}</Text> : null}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
+                          {patient.patient_id ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>ID: {String(patient.patient_id)}</Text> : null}
+                          {patient.age ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>Age: {String(patient.age)}</Text> : null}
+                          {patient.gender ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>Gender: {String(patient.gender)}</Text> : null}
+                          {patient.mobile ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>Contact: {String(patient.mobile)}</Text> : null}
+                        </View>
+                        {patient.address ? <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>{String(patient.address)}</Text> : null}
+                      </View>
+                    )}
+
+                    {hasClinicalData && (
+                      <View style={{ backgroundColor: '#FFF7ED', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#EA580C', marginBottom: spacing.sm }}>
+                        <Text style={[typography.labelSmall, { color: '#9A3412', marginBottom: 6 }]}>Clinical Information</Text>
+                        {(clinical.weight_kg || clinical.height_cm || clinical.bmi || clinical.blood_pressure) && (
+                          <View style={{ marginBottom: spacing.xs }}>
+                            <Text style={[typography.caption, { color: '#9CA3AF', fontWeight: '700' }]}>VITAL SIGNS</Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
+                              {clinical.weight_kg ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>Weight: {String(clinical.weight_kg)} kg</Text> : null}
+                              {clinical.height_cm ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>Height: {String(clinical.height_cm)} cm</Text> : null}
+                              {clinical.bmi ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>BMI: {String(clinical.bmi)}</Text> : null}
+                              {clinical.blood_pressure ? <Text style={[typography.caption, { color: '#475569', marginRight: 12 }]}>BP: {String(clinical.blood_pressure)}</Text> : null}
+                            </View>
+                          </View>
+                        )}
+
+                        {Array.isArray(clinical.chief_complaints) && clinical.chief_complaints.length > 0 && (
+                          <View style={{ marginBottom: spacing.xs }}>
+                            <Text style={[typography.caption, { color: '#9CA3AF', fontWeight: '700' }]}>CHIEF COMPLAINTS</Text>
+                            {clinical.chief_complaints.map((complaint, idx) => (
+                              <Text key={idx} style={[typography.caption, { color: '#475569', marginTop: 2 }]}>• {String(complaint)}</Text>
+                            ))}
+                          </View>
+                        )}
+
+                        {clinical.diagnosis ? (
+                          <View>
+                            <Text style={[typography.caption, { color: '#9CA3AF', fontWeight: '700' }]}>DIAGNOSIS</Text>
+                            <Text style={[typography.body, { color: '#7C2D12', fontWeight: '700', marginTop: 2 }]}>{String(clinical.diagnosis)}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    )}
+
+                    {medicines.length > 0 && (
+                      <View style={{ backgroundColor: '#FEF2F2', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#DC2626', marginBottom: spacing.sm }}>
+                        <Text style={[typography.labelSmall, { color: '#991B1B', marginBottom: spacing.xs }]}>Prescription ({medicines.length})</Text>
+                        {medicines.map((medicine, index) => (
+                          <View key={index} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FECACA', borderRadius: 8, padding: spacing.sm, marginBottom: spacing.xs }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 2 }}>
+                                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>{String(medicine.serial_number || index + 1)}</Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                  {renderTtsActionChip(
+                                    `report-medicine-${index}`,
+                                    `${medicine.name || medicine.medicine_name || medicine.medicine || 'Unknown Medicine'}. Strength ${medicine.strength || ''}. Dosage ${medicine.dosage || ''}. Frequency ${medicine.frequency || ''}. Duration ${medicine.duration || ''}. ${medicine.instructions || medicine.note || ''}`
+                                  )}
+                                </View>
+                                <Text style={[typography.body, { color: '#111827', fontWeight: '800' }]}>
+                                  {String(medicine.name || medicine.medicine_name || medicine.medicine || 'Unknown Medicine')}
+                                  {medicine.strength ? ` (${String(medicine.strength)})` : ''}
+                                </Text>
+                                {(medicine.dosage || medicine.frequency || medicine.duration || medicine.timing || medicine.when_to_take) && (
+                                  <View style={{ marginTop: 4 }}>
+                                    {medicine.dosage ? <Text style={[typography.caption, { color: '#475569' }]}>Dosage: {String(medicine.dosage)}</Text> : null}
+                                    {medicine.frequency ? <Text style={[typography.caption, { color: '#475569' }]}>Frequency: {String(medicine.frequency)}</Text> : null}
+                                    {medicine.duration ? <Text style={[typography.caption, { color: '#475569' }]}>Duration: {String(medicine.duration)}</Text> : null}
+                                    {medicine.timing ? <Text style={[typography.caption, { color: '#475569' }]}>Timing: {String(medicine.timing)}</Text> : null}
+                                    {medicine.when_to_take ? <Text style={[typography.caption, { color: '#475569' }]}>When to take: {String(medicine.when_to_take)}</Text> : null}
+                                  </View>
+                                )}
+                                {(medicine.instructions || medicine.note) ? (
+                                  <Text style={[typography.caption, { color: '#6B7280', marginTop: 4 }]}>{String(medicine.instructions || medicine.note)}</Text>
+                                ) : null}
+                              </View>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {hasAdviceData && (
+                      <View style={{ backgroundColor: '#FAF5FF', padding: spacing.sm, borderRadius: 10, borderLeftWidth: 4, borderLeftColor: '#9333EA', marginBottom: spacing.sm }}>
+                        <Text style={[typography.labelSmall, { color: '#6B21A8', marginBottom: 6 }]}>Medical Advice & Instructions</Text>
+                        {Array.isArray(advice.advice) && advice.advice.length > 0 && advice.advice.map((item, idx) => (
+                          <Text key={idx} style={[typography.caption, { color: '#4C1D95', marginTop: 2 }]}>• {String(item)}</Text>
+                        ))}
+                        {advice.dietary_restrictions ? <Text style={[typography.caption, { color: '#4C1D95', marginTop: 4 }]}>Diet: {String(advice.dietary_restrictions)}</Text> : null}
+                        {advice.precautions ? <Text style={[typography.caption, { color: '#4C1D95', marginTop: 4 }]}>Precautions: {String(advice.precautions)}</Text> : null}
+                        {advice.follow_up_date ? <Text style={[typography.caption, { color: '#4C1D95', marginTop: 4, fontWeight: '700' }]}>Follow-up: {String(advice.follow_up_date)}</Text> : null}
+                      </View>
+                    )}
+
+                    {data.additional_notes ? (
+                      <View style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: 8, marginBottom: spacing.sm }}>
+                        <Text style={[typography.labelSmall, { color: '#334155' }]}>Additional Notes</Text>
+                        <Text style={[typography.caption, { color: '#475569', marginTop: 4 }]}>{String(data.additional_notes)}</Text>
+                      </View>
+                    ) : null}
+
+                    <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: spacing.sm, marginTop: spacing.xs }}>
+                      <Text style={[typography.caption, { color: '#6B7280', textAlign: 'center' }]}>AI-assisted extraction. Please verify with the original report.</Text>
+                    </View>
+                  </>
+                );
+              })()}
+
+              <Button
+                title={savingReport ? 'Saving...' : 'Save Report to History'}
+                onPress={handleSaveReport}
+                variant="primary"
+                fullWidth
+                isLoading={savingReport}
+                style={{ marginTop: spacing.md }}
+              />
+            </View>
+          )}
+
+          <View style={{ marginTop: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#1F2937' }}>Report History</Text>
+              <Button title="Refresh" onPress={fetchPrescriptionHistory} variant="secondary" size="sm" />
+            </View>
+
+            {loading ? (
+              <View style={{ alignItems: 'center', padding: spacing.lg }}>
+                <ActivityIndicator size="small" color="#2563EB" />
+                <Text style={{ marginTop: spacing.sm, color: '#6B7280' }}>Loading history...</Text>
+              </View>
+            ) : prescriptionHistory.length === 0 ? (
+              <View style={{ backgroundColor: '#FFF7ED', padding: spacing.md, borderRadius: 12, alignItems: 'center' }}>
+                <MaterialCommunityIcons name="inbox-outline" size={28} color="#9CA3AF" style={{ marginBottom: 8 }} />
+                <Text style={{ color: '#6B7280' }}>No saved reports yet</Text>
+              </View>
+            ) : (
+              prescriptionHistory.map((item) => (
+                <View key={item.id} style={{ backgroundColor: '#F9FAFB', borderRadius: 12, padding: spacing.md, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: spacing.sm }}>
+                  <Pressable onPress={() => setExpandedHistoryId(expandedHistoryId === item.id ? null : item.id)}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1, marginRight: spacing.sm }}>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>
+                          {String(item.report_title || item.uploaded_file || 'Hospital Report')}
+                        </Text>
+                        <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>
+                          {formatDateTime(item.created_at)}
                         </Text>
                       </View>
-                      <Pressable onPress={() => handleDeletePrescription(prescription.id)} style={{ padding: 8 }}>
-                        <Text>🗑️</Text>
-                      </Pressable>
+                      <Text style={{ color: '#059669', fontWeight: '700' }}>{expandedHistoryId === item.id ? 'Hide' : 'View'}</Text>
                     </View>
-                  </View>
-                ))
-              )
+                  </Pressable>
+                  {expandedHistoryId === item.id && item.structured_data && (
+                    <View style={{ marginTop: spacing.md, gap: 8 }}>
+                      {item.structured_data.hospital_details?.name && (
+                        <View style={{ backgroundColor: '#EFF6FF', padding: spacing.sm, borderRadius: 8 }}>
+                          <Text style={[typography.labelSmall, { color: '#1E3A8A' }]}>Hospital Information</Text>
+                          <Text style={[typography.caption, { color: '#1E3A8A', marginTop: 2 }]}>{String(item.structured_data.hospital_details.name)}</Text>
+                          {item.structured_data.hospital_details.address && <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>{String(item.structured_data.hospital_details.address)}</Text>}
+                          {item.structured_data.hospital_details.phone && <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Phone: {String(item.structured_data.hospital_details.phone)}</Text>}
+                        </View>
+                      )}
+                      {item.structured_data.doctor_details?.name && (
+                        <View style={{ backgroundColor: '#EBF8FF', padding: spacing.sm, borderRadius: 8 }}>
+                          <Text style={[typography.labelSmall, { color: '#1E40AF' }]}>Doctor Information</Text>
+                          <Text style={[typography.caption, { color: '#1E40AF', marginTop: 2 }]}>{String(item.structured_data.doctor_details.name)}</Text>
+                          {item.structured_data.doctor_details.specialization && <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Specialization: {String(item.structured_data.doctor_details.specialization)}</Text>}
+                        </View>
+                      )}
+                      {item.structured_data.patient_details?.name && (
+                        <View style={{ backgroundColor: '#ECFDF5', padding: spacing.sm, borderRadius: 8 }}>
+                          <Text style={[typography.labelSmall, { color: '#166534' }]}>Patient Information</Text>
+                          <Text style={[typography.caption, { color: '#166534', marginTop: 2 }]}>{String(item.structured_data.patient_details.name)}</Text>
+                          <Text style={[typography.caption, { color: '#475569', marginTop: 2 }]}>Age: {String(item.structured_data.patient_details.age || 'N/A')}  Gender: {String(item.structured_data.patient_details.gender || 'N/A')}</Text>
+                        </View>
+                      )}
+                      {item.structured_data.clinical_details?.diagnosis && (
+                        <View style={{ backgroundColor: '#FFF7ED', padding: spacing.sm, borderRadius: 8 }}>
+                          <Text style={[typography.labelSmall, { color: '#9A3412' }]}>Clinical Information</Text>
+                          <Text style={[typography.caption, { color: '#9A3412', marginTop: 2 }]}>Diagnosis: {String(item.structured_data.clinical_details.diagnosis)}</Text>
+                        </View>
+                      )}
+                      {Array.isArray(item.structured_data.medicines) && item.structured_data.medicines.length > 0 && (
+                        <View style={{ backgroundColor: '#F0FDF4', padding: spacing.sm, borderRadius: 8 }}>
+                          <Text style={[typography.labelSmall, { color: '#166534', marginBottom: 4 }]}>Prescription ({item.structured_data.medicines.length})</Text>
+                          {item.structured_data.medicines.slice(0, 3).map((med, medIdx) => (
+                            <Text key={medIdx} style={[typography.caption, { color: '#475569' }]}>
+                              • {String(med.name || med.medicine_name || med.medicine || 'Unknown')}
+                              {med.dosage ? ` - ${String(med.dosage)}` : ''}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                      {item.structured_data.medical_advice?.follow_up_date && (
+                        <View style={{ backgroundColor: '#FAF5FF', padding: spacing.sm, borderRadius: 8 }}>
+                          <Text style={[typography.caption, { color: '#6B21A8' }]}>Follow-up: {String(item.structured_data.medical_advice.follow_up_date)}</Text>
+                        </View>
+                      )}
+                      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+                        <Button title="Select" onPress={() => setSelectedReport(item)} variant="secondary" size="sm" />
+                        <Button title="Delete" onPress={() => handleDeleteReport(item.id)} variant="danger" size="sm" />
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ))
             )}
-          </Card>
+          </View>
+        </Card>
+      )}
 
+      {/* Medicines Tab Content */}
+      {activeTab === 'medicines' && (
+        <>
           {/* Your Medicines Section */}
           <Card variant="elevated" padding="md" style={{ 
             marginBottom: spacing.lg,
@@ -1203,7 +2076,7 @@ export default function PrescriptionScreen({ navigation }) {
                   justifyContent: 'center',
                   marginRight: spacing.sm,
                 }}>
-                  <Text style={{ fontSize: 18 }}>💊</Text>
+                  <MaterialCommunityIcons name="pill" size={18} color="#166534" />
                 </View>
                 <View>
                   <Text style={{ 
@@ -1252,7 +2125,7 @@ export default function PrescriptionScreen({ navigation }) {
                 backgroundColor: '#F9FAFB',
                 borderRadius: 16,
               }}>
-                <Text style={{ fontSize: 48, marginBottom: spacing.sm }}>💊</Text>
+                <MaterialCommunityIcons name="pill" size={48} color="#16A34A" style={{ marginBottom: spacing.sm }} />
                 <Text style={{ 
                   fontSize: 16, 
                   fontWeight: '600', 
@@ -1277,8 +2150,96 @@ export default function PrescriptionScreen({ navigation }) {
                   onDelete={() => handleDeleteMedicine(med.id)}
                   onEdit={() => handleEditMedicine(med)}
                   onSpeak={() => handleSpeakMedicine(med)}
+                  isSpeaking={activeMedicineTtsId === med.id}
+                  isProcessing={activeMedicineTtsId === med.id && isMedicineTtsProcessing}
                 />
               ))
+            )}
+          </Card>
+
+          <Card variant="elevated" padding="md" style={{
+            marginBottom: spacing.lg,
+            borderRadius: 20,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: spacing.md,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  backgroundColor: '#FEF3C7',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: spacing.sm,
+                }}>
+                  <MaterialCommunityIcons name="history" size={18} color="#92400E" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#1F2937' }}>Medicine History</Text>
+                  <Text style={{ fontSize: 12, color: '#6B7280' }}>
+                    {medicineHistory.length} records
+                  </Text>
+                </View>
+              </View>
+              <Button
+                title={showHistory ? 'Hide' : 'Show'}
+                onPress={() => {
+                  setShowHistory(!showHistory);
+                  if (!showHistory && medicineHistory.length === 0) {
+                    fetchMedicineHistory();
+                  }
+                }}
+                variant="secondary"
+                size="sm"
+              />
+            </View>
+
+            {showHistory && (
+              medicineHistoryLoading ? (
+                <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
+                  <ActivityIndicator size="small" color="#2563EB" />
+                  <Text style={{ marginTop: spacing.sm, color: '#6B7280' }}>Loading medicine history...</Text>
+                </View>
+              ) : medicineHistory.length === 0 ? (
+                <View style={{ backgroundColor: '#F9FAFB', padding: spacing.lg, borderRadius: 12, alignItems: 'center' }}>
+                  <MaterialCommunityIcons name="inbox-outline" size={28} color="#9CA3AF" style={{ marginBottom: 8 }} />
+                  <Text style={{ color: '#6B7280' }}>No medicine history yet</Text>
+                </View>
+              ) : (
+                medicineHistory.map((item) => (
+                  <View
+                    key={item.id}
+                    style={{
+                      backgroundColor: '#F9FAFB',
+                      padding: spacing.sm,
+                      borderRadius: 8,
+                      marginBottom: spacing.sm,
+                      borderLeftWidth: 4,
+                      borderLeftColor: colors.primary,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[typography.body, { fontWeight: '600', color: colors.text }]}>{String(item.medicine_name || '')}</Text>
+                        <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                          {String(item.dosage || '')} • {String(item.frequency || '')}
+                        </Text>
+                        <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
+                        </Text>
+                      </View>
+                      <Pressable onPress={() => handleDeleteMedicineHistory(item.id)} style={{ padding: 8 }}>
+                        <MaterialCommunityIcons name="delete-outline" size={16} color="#DC2626" />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              )
             )}
           </Card>
         </>
@@ -1295,7 +2256,7 @@ export default function PrescriptionScreen({ navigation }) {
           <View style={{ backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, maxHeight: '90%' }}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[typography.h4, { color: colors.text, marginBottom: spacing.lg }]}>
-                {editingId ? '✏️ Edit Medicine' : '💊 Add Medicine'}
+                {editingId ? 'Edit Medicine' : 'Add Medicine'}
               </Text>
 
               {/* Medicine Name */}
@@ -1412,7 +2373,7 @@ export default function PrescriptionScreen({ navigation }) {
 
               {/* Reminder Times */}
               <View style={{ marginBottom: spacing.md }}>
-                <Text style={[typography.labelSmall, { color: colors.textSecondary, marginBottom: spacing.xs }]}>🔔 Reminder Times (Daily Notifications)</Text>
+                <Text style={[typography.labelSmall, { color: colors.textSecondary, marginBottom: spacing.xs }]}>Reminder Times (Daily Notifications)</Text>
                 
                 {/* Add Reminder Button */}
                 <Pressable
@@ -1429,7 +2390,7 @@ export default function PrescriptionScreen({ navigation }) {
                   }}
                   onPress={() => setShowTimePicker(true)}
                 >
-                  <Text style={{ fontSize: 20, marginRight: 8 }}>⏰</Text>
+                  <MaterialCommunityIcons name="clock-outline" size={20} color="#065F46" style={{ marginRight: 8 }} />
                   <Text style={{ color: '#2563EB', fontWeight: '600', fontSize: 16 }}>
                     Add Reminder Time
                   </Text>
@@ -1469,9 +2430,9 @@ export default function PrescriptionScreen({ navigation }) {
                             borderColor: '#22C55E',
                           }}
                         >
-                          <Text style={{ fontSize: 16 }}>🔔</Text>
+                          <MaterialCommunityIcons name="bell-outline" size={16} color="#166534" />
                           <Text style={{ color: '#166534', fontSize: 14, fontWeight: '600' }}>{String(r)}</Text>
-                          <Text style={{ color: '#EF4444', fontSize: 16, fontWeight: 'bold' }}>✕</Text>
+                          <MaterialCommunityIcons name="close" size={16} color="#EF4444" />
                         </Pressable>
                       ))}
                     </View>

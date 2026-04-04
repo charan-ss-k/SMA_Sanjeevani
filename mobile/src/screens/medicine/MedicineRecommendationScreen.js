@@ -1,16 +1,92 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList, Dimensions } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../../utils/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../../config/environment';
+import { useLanguage } from '../../context/LanguageContext';
+import ttsService from '../../services/ttsService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
 const MedicineRecommendationScreen = () => {
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [showForm, setShowForm] = useState(true);
   const [showSymptomsModal, setShowSymptomsModal] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [activeTtsKey, setActiveTtsKey] = useState(null);
+  const [isTtsProcessing, setIsTtsProcessing] = useState(false);
+  const currentRequestRef = useRef(null);
+
+  const stopTTSPlayback = useCallback(async () => {
+    try {
+      await ttsService.stop();
+    } catch (_) {
+      // noop
+    }
+    setActiveTtsKey(null);
+    setIsTtsProcessing(false);
+  }, []);
+
+  const handleSpeak = async (key, text) => {
+    const normalizedKey = String(key);
+    const safeText = String(text || '').trim();
+    if (!safeText) return;
+
+    if (activeTtsKey === normalizedKey) {
+      await stopTTSPlayback();
+      return;
+    }
+
+    try {
+      setActiveTtsKey(normalizedKey);
+      setIsTtsProcessing(true);
+      await ttsService.synthesizeAndPlay(safeText, language);
+    } catch (error) {
+      Alert.alert('TTS', 'Unable to play audio for this item');
+    } finally {
+      setActiveTtsKey(null);
+      setIsTtsProcessing(false);
+    }
+  };
+
+  const renderSpeakButton = (key, text) => {
+    const isSpeaking = activeTtsKey === String(key);
+    const isProcessing = isSpeaking && isTtsProcessing;
+
+    return (
+      <TouchableOpacity
+        onPress={() => handleSpeak(key, text)}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 10,
+          backgroundColor: isSpeaking ? '#FEE2E2' : '#E0F2FE',
+          borderWidth: 1,
+          borderColor: isSpeaking ? '#FCA5A5' : '#BAE6FD',
+          gap: 6,
+        }}
+      >
+        {isProcessing ? (
+          <ActivityIndicator size="small" color="#0369A1" />
+        ) : (
+          <MaterialCommunityIcons
+            name={isSpeaking ? 'stop-circle-outline' : 'volume-high'}
+            size={14}
+            color="#0369A1"
+          />
+        )}
+        <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>
+          {isProcessing ? 'Processing...' : isSpeaking ? 'Stop' : 'Speak'}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   // Predefined symptoms from frontend - convert to dropdown format
   const predefinedSymptoms = [
@@ -54,6 +130,39 @@ const MedicineRecommendationScreen = () => {
   const [conditions, setConditions] = useState('');
   const [pregnant, setPregnant] = useState(false);
 
+  const resetRecommendationState = useCallback(() => {
+    stopTTSPlayback();
+    setResult(null);
+    setShowForm(true);
+    setShowSymptomsModal(false);
+    setSearchText('');
+    setSelectedSymptoms(['fever', 'headache']);
+    setSymptoms('');
+    setAllergies('');
+    setConditions('');
+    setAge('25');
+    setGender('male');
+    setPregnant(false);
+    setLoading(false);
+  }, [stopTTSPlayback]);
+
+  useFocusEffect(
+    useCallback(() => {
+      resetRecommendationState();
+
+      return () => {
+        if (currentRequestRef.current) {
+          currentRequestRef.current.abort();
+          currentRequestRef.current = null;
+        }
+        stopTTSPlayback();
+        setShowSymptomsModal(false);
+        setSearchText('');
+        setLoading(false);
+      };
+    }, [resetRecommendationState, stopTTSPlayback])
+  );
+
   const toggleSymptom = (symptom) => {
     setSelectedSymptoms(prev => 
       prev.includes(symptom) 
@@ -73,6 +182,8 @@ const MedicineRecommendationScreen = () => {
     }
 
     setLoading(true);
+    const requestController = new AbortController();
+    currentRequestRef.current = requestController;
     try {
       const token = await AsyncStorage.getItem('authToken');
       
@@ -93,22 +204,23 @@ const MedicineRecommendationScreen = () => {
         allergies: allergiesArray,
         existing_conditions: conditionsArray,
         pregnancy_status: pregnant,
-        language: 'english',
+        language,
       };
 
-      console.log('🔍 Sending symptom recommendation request:', payload);
+      console.log('Sending symptom recommendation request:', payload);
 
-      const response = await fetch('http://192.168.29.195:8000/api/symptoms/recommend', {
+      const response = await fetch(`${API_BASE_URL}/symptoms/recommend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
+        signal: requestController.signal,
         body: JSON.stringify(payload),
       });
 
       const data = await response.json();
-      console.log('📊 Symptom recommendation response:', data);
+      console.log('Symptom recommendation response:', data);
 
       if (response.ok) {
         setResult(data);
@@ -117,23 +229,21 @@ const MedicineRecommendationScreen = () => {
         throw new Error(data.detail || 'Failed to get recommendation');
       }
     } catch (error) {
-      console.error('❌ Error getting medicine recommendation:', error);
+      if (error?.name === 'AbortError') {
+        return;
+      }
+      console.error('Error getting medicine recommendation:', error);
       Alert.alert('Error', `Failed to get recommendation: ${error.message}`);
     } finally {
+      if (currentRequestRef.current === requestController) {
+        currentRequestRef.current = null;
+      }
       setLoading(false);
     }
   };
 
   const handleReset = () => {
-    setResult(null);
-    setShowForm(true);
-    setSelectedSymptoms(['fever', 'headache']);
-    setSymptoms('');
-    setAllergies('');
-    setConditions('');
-    setAge('25');
-    setGender('male');
-    setPregnant(false);
+    resetRecommendationState();
   };
 
   const renderForm = () => (
@@ -142,7 +252,7 @@ const MedicineRecommendationScreen = () => {
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionIconBadge}>
-            <Text style={styles.sectionIconText}>👤</Text>
+            <MaterialCommunityIcons name="account-outline" size={24} color="#166534" style={styles.sectionIconText} />
           </View>
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionTitle}>Personal Information</Text>
@@ -154,7 +264,7 @@ const MedicineRecommendationScreen = () => {
           <Text style={styles.label}>Age (Years)</Text>
           <View style={styles.inputWrapper}>
             <TextInput
-              style={styles.input}
+              style={styles.ageInput}
               value={age}
               onChangeText={setAge}
               keyboardType="numeric"
@@ -169,16 +279,16 @@ const MedicineRecommendationScreen = () => {
           <Text style={styles.label}>Gender</Text>
           <View style={styles.genderContainer}>
             {[
-              { value: 'male', icon: '👨', label: 'Male' },
-              { value: 'female', icon: '👩', label: 'Female' },
-              { value: 'other', icon: '🧑', label: 'Other' }
+              { value: 'male', icon: 'account', label: 'Male' },
+              { value: 'female', icon: 'account', label: 'Female' },
+              { value: 'other', icon: 'account', label: 'Other' }
             ].map((g) => (
               <TouchableOpacity
                 key={g.value}
                 style={[styles.genderOption, gender === g.value && styles.genderSelected]}
                 onPress={() => setGender(g.value)}
               >
-                <Text style={styles.genderIcon}>{g.icon}</Text>
+                <MaterialCommunityIcons name={g.icon} size={18} color={gender === g.value ? '#166534' : '#6B7280'} style={styles.genderIcon} />
                 <Text style={[styles.genderText, gender === g.value && styles.genderSelectedText]}>
                   {g.label}
                 </Text>
@@ -207,7 +317,7 @@ const MedicineRecommendationScreen = () => {
       <View style={[styles.sectionContainer, styles.symptomsSection]}>
         <View style={styles.sectionHeaderRow}>
           <View style={[styles.sectionIconBadge, styles.symptomsIconBadge]}>
-            <Text style={styles.sectionIconText}>🤒</Text>
+            <MaterialCommunityIcons name="thermometer" size={24} color="#166534" style={styles.sectionIconText} />
           </View>
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionTitle}>Tell Us About Your Symptoms</Text>
@@ -229,7 +339,7 @@ const MedicineRecommendationScreen = () => {
             activeOpacity={0.7}
           >
             <View style={styles.dropdownLeft}>
-              <Text style={styles.dropdownIcon}>📋</Text>
+              <MaterialCommunityIcons name="clipboard-list-outline" size={18} color="#374151" style={styles.dropdownIcon} />
               <Text style={styles.dropdownTriggerText}>
                 {selectedSymptoms.length > 0 
                   ? `${selectedSymptoms.length} symptom${selectedSymptoms.length > 1 ? 's' : ''} selected`
@@ -253,7 +363,7 @@ const MedicineRecommendationScreen = () => {
                     onPress={() => toggleSymptom(symptom)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Text style={styles.removeSymptomText}>✕</Text>
+                    <MaterialCommunityIcons name="close" size={14} color="#64748B" style={styles.removeSymptomText} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -281,7 +391,7 @@ const MedicineRecommendationScreen = () => {
       <View style={[styles.sectionContainer, styles.allergiesSection]}>
         <View style={styles.sectionHeaderRow}>
           <View style={[styles.sectionIconBadge, styles.allergiesIconBadge]}>
-            <Text style={styles.sectionIconText}>⚠️</Text>
+            <MaterialCommunityIcons name="alert-outline" size={24} color="#DC2626" style={styles.sectionIconText} />
           </View>
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionTitle}>Known Allergies</Text>
@@ -306,7 +416,7 @@ const MedicineRecommendationScreen = () => {
       <View style={[styles.sectionContainer, styles.conditionsSection]}>
         <View style={styles.sectionHeaderRow}>
           <View style={[styles.sectionIconBadge, styles.conditionsIconBadge]}>
-            <Text style={styles.sectionIconText}>📋</Text>
+            <MaterialCommunityIcons name="file-document-outline" size={24} color="#EA580C" style={styles.sectionIconText} />
           </View>
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionTitle}>Existing Health Conditions</Text>
@@ -342,7 +452,7 @@ const MedicineRecommendationScreen = () => {
             </View>
           ) : (
             <View style={styles.submitButtonContent}>
-              <Text style={styles.submitButtonIcon}>🔍</Text>
+              <MaterialCommunityIcons name="magnify" size={18} color={colors.white} style={styles.submitButtonIcon} />
               <Text style={styles.submitButtonText}>Get Medicine Recommendation</Text>
             </View>
           )}
@@ -359,7 +469,7 @@ const MedicineRecommendationScreen = () => {
       {/* Result Header */}
       <View style={styles.resultHeader}>
         <View style={styles.resultSuccessIcon}>
-          <Text style={styles.resultSuccessEmoji}>✅</Text>
+          <MaterialCommunityIcons name="check-circle" size={28} color="#16A34A" style={styles.resultSuccessEmoji} />
         </View>
         <Text style={styles.resultTitle}>Your Personalized Recommendation</Text>
         <Text style={styles.resultSubtitle}>Based on your symptoms and health profile</Text>
@@ -375,12 +485,13 @@ const MedicineRecommendationScreen = () => {
         <View style={[styles.resultCard, styles.conditionCard]}>
           <View style={styles.cardHeaderRow}>
             <View style={[styles.cardIconBadge, styles.conditionIconBadge]}>
-              <Text style={styles.cardIconText}>🔍</Text>
+              <MaterialCommunityIcons name="magnify" size={16} color="#1E40AF" style={styles.cardIconText} />
             </View>
             <View style={styles.cardTitleContainer}>
               <Text style={styles.cardTitle}>Possible Condition</Text>
               <Text style={styles.cardSubtitle}>Based on symptom analysis</Text>
             </View>
+            {renderSpeakButton('condition', result.predicted_condition)}
           </View>
           <View style={styles.conditionContentBox}>
             <Text style={styles.conditionText}>{result.predicted_condition}</Text>
@@ -393,7 +504,7 @@ const MedicineRecommendationScreen = () => {
         <View style={[styles.resultCard, styles.medicinesCard]}>
           <View style={styles.cardHeaderRow}>
             <View style={[styles.cardIconBadge, styles.medicinesIconBadge]}>
-              <Text style={styles.cardIconText}>💊</Text>
+              <MaterialCommunityIcons name="pill" size={16} color="#166534" style={styles.cardIconText} />
             </View>
             <View style={styles.cardTitleContainer}>
               <Text style={styles.cardTitle}>Recommended Medicines</Text>
@@ -410,12 +521,18 @@ const MedicineRecommendationScreen = () => {
                   <Text style={styles.medicineName}>
                     {typeof medicine === 'object' ? medicine.name : medicine}
                   </Text>
+                  {renderSpeakButton(
+                    `medicine-${index}`,
+                    typeof medicine === 'object'
+                      ? `${medicine.name || ''}. Dosage: ${medicine.dosage || 'As prescribed'}. Duration: ${medicine.duration || 'As advised'}. Instructions: ${medicine.instructions || ''}`
+                      : String(medicine || '')
+                  )}
                 </View>
                 {typeof medicine === 'object' && (
                   <View style={styles.medicineDetails}>
                     {medicine.dosage && (
                       <View style={styles.medicineDetailRow}>
-                        <Text style={styles.medicineDetailIcon}>📊</Text>
+                        <MaterialCommunityIcons name="chart-bar" size={14} color="#6B7280" style={styles.medicineDetailIcon} />
                         <Text style={styles.medicineDetail}>
                           <Text style={styles.medicineLabel}>Dosage: </Text>
                           {medicine.dosage}
@@ -424,7 +541,7 @@ const MedicineRecommendationScreen = () => {
                     )}
                     {medicine.duration && (
                       <View style={styles.medicineDetailRow}>
-                        <Text style={styles.medicineDetailIcon}>⏱️</Text>
+                        <MaterialCommunityIcons name="timer-outline" size={14} color="#6B7280" style={styles.medicineDetailIcon} />
                         <Text style={styles.medicineDetail}>
                           <Text style={styles.medicineLabel}>Duration: </Text>
                           {medicine.duration}
@@ -433,7 +550,7 @@ const MedicineRecommendationScreen = () => {
                     )}
                     {medicine.instructions && (
                       <View style={styles.medicineDetailRow}>
-                        <Text style={styles.medicineDetailIcon}>📝</Text>
+                        <MaterialCommunityIcons name="note-text-outline" size={14} color="#6B7280" style={styles.medicineDetailIcon} />
                         <Text style={styles.medicineDetail}>
                           <Text style={styles.medicineLabel}>Instructions: </Text>
                           {medicine.instructions}
@@ -443,7 +560,7 @@ const MedicineRecommendationScreen = () => {
                     {medicine.warnings && medicine.warnings.length > 0 && (
                       <View style={styles.warningsContainer}>
                         <View style={styles.warningsHeader}>
-                          <Text style={styles.warningsIcon}>⚠️</Text>
+                          <MaterialCommunityIcons name="alert-outline" size={14} color="#DC2626" style={styles.warningsIcon} />
                           <Text style={styles.warningsLabel}>Warnings</Text>
                         </View>
                         {medicine.warnings.map((warning, wIndex) => (
@@ -466,19 +583,25 @@ const MedicineRecommendationScreen = () => {
         <View style={[styles.resultCard, styles.homeCard]}>
           <View style={styles.cardHeaderRow}>
             <View style={[styles.cardIconBadge, styles.homeIconBadge]}>
-              <Text style={styles.cardIconText}>🏠</Text>
+              <MaterialCommunityIcons name="home-outline" size={16} color="#7C3AED" style={styles.cardIconText} />
             </View>
             <View style={styles.cardTitleContainer}>
               <Text style={styles.cardTitle}>Home Care Advice</Text>
               <Text style={styles.cardSubtitle}>Self-care recommendations</Text>
             </View>
+            {renderSpeakButton(
+              'home-care',
+              Array.isArray(result.home_care_advice)
+                ? result.home_care_advice.join('. ')
+                : result.home_care_advice
+            )}
           </View>
           {Array.isArray(result.home_care_advice) ? (
             <View style={styles.adviceContainer}>
               {result.home_care_advice.map((advice, index) => (
                 <View key={index} style={styles.adviceItem}>
                   <View style={styles.adviceBulletContainer}>
-                    <Text style={styles.adviceBullet}>✓</Text>
+                    <MaterialCommunityIcons name="check" size={12} color="#166534" style={styles.adviceBullet} />
                   </View>
                   <Text style={styles.adviceText}>{advice}</Text>
                 </View>
@@ -495,12 +618,13 @@ const MedicineRecommendationScreen = () => {
         <View style={[styles.resultCard, styles.doctorCard]}>
           <View style={styles.cardHeaderRow}>
             <View style={[styles.cardIconBadge, styles.doctorIconBadge]}>
-              <Text style={styles.cardIconText}>👨‍⚕️</Text>
+              <MaterialCommunityIcons name="doctor" size={16} color="#9A3412" style={styles.cardIconText} />
             </View>
             <View style={styles.cardTitleContainer}>
               <Text style={styles.cardTitle}>Doctor Consultation</Text>
               <Text style={styles.cardSubtitle}>Professional medical advice</Text>
             </View>
+            {renderSpeakButton('doctor-consult', result.doctor_consultation_advice)}
           </View>
           <View style={styles.doctorAdviceBox}>
             <Text style={styles.cardContent}>{result.doctor_consultation_advice}</Text>
@@ -511,7 +635,7 @@ const MedicineRecommendationScreen = () => {
       {/* Disclaimer Card */}
       <View style={styles.disclaimerCard}>
         <View style={styles.disclaimerHeader}>
-          <Text style={styles.disclaimerIcon}>⚠️</Text>
+          <MaterialCommunityIcons name="alert-outline" size={16} color="#B45309" style={styles.disclaimerIcon} />
           <Text style={styles.disclaimerTitle}>Important Disclaimer</Text>
         </View>
         <Text style={styles.disclaimerText}>
@@ -521,7 +645,7 @@ const MedicineRecommendationScreen = () => {
 
       {/* Reset Button */}
       <TouchableOpacity style={styles.resetButton} onPress={handleReset} activeOpacity={0.8}>
-        <Text style={styles.resetButtonIcon}>🔄</Text>
+        <MaterialCommunityIcons name="refresh" size={16} color="#FFFFFF" style={styles.resetButtonIcon} />
         <Text style={styles.resetButtonText}>Get New Recommendation</Text>
       </TouchableOpacity>
     </View>
@@ -547,7 +671,7 @@ const MedicineRecommendationScreen = () => {
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
                 <View style={styles.modalIconBadge}>
-                  <Text style={styles.modalIconText}>🤒</Text>
+                  <MaterialCommunityIcons name="thermometer" size={20} color="#166534" style={styles.modalIconText} />
                 </View>
                 <View>
                   <Text style={styles.modalTitle}>Select Symptoms</Text>
@@ -559,13 +683,13 @@ const MedicineRecommendationScreen = () => {
                 onPress={() => setShowSymptomsModal(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={styles.modalCloseText}>✕</Text>
+                <MaterialCommunityIcons name="close" size={18} color="#475569" style={styles.modalCloseText} />
               </TouchableOpacity>
             </View>
             
             {/* Search Input */}
             <View style={styles.modalSearchContainer}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <MaterialCommunityIcons name="magnify" size={16} color="#6B7280" style={styles.searchIcon} />
               <TextInput
                 style={styles.modalSearchInput}
                 value={searchText}
@@ -575,7 +699,7 @@ const MedicineRecommendationScreen = () => {
               />
               {searchText.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchText('')}>
-                  <Text style={styles.clearSearchText}>✕</Text>
+                  <MaterialCommunityIcons name="close" size={14} color="#9CA3AF" style={styles.clearSearchText} />
                 </TouchableOpacity>
               )}
             </View>
@@ -608,7 +732,7 @@ const MedicineRecommendationScreen = () => {
                       selectedSymptoms.includes(item.value) && styles.modalItemCheckboxSelected
                     ]}>
                       {selectedSymptoms.includes(item.value) && (
-                        <Text style={styles.modalCheckmark}>✓</Text>
+                        <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" style={styles.modalCheckmark} />
                       )}
                     </View>
                     <Text style={[
@@ -624,7 +748,7 @@ const MedicineRecommendationScreen = () => {
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
                 <View style={styles.emptySearchResult}>
-                  <Text style={styles.emptySearchIcon}>🔍</Text>
+                  <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" style={styles.emptySearchIcon} />
                   <Text style={styles.emptySearchText}>No symptoms found</Text>
                   <Text style={styles.emptySearchSubtext}>Try a different search term</Text>
                 </View>
@@ -656,21 +780,23 @@ const MedicineRecommendationScreen = () => {
         {/* Professional Header Card */}
         <View style={styles.headerCard}>
           <View style={styles.headerIconContainer}>
-            <Text style={styles.headerIcon}>💊</Text>
+            <MaterialCommunityIcons name="pill" size={32} color="#166534" style={styles.headerIcon} />
           </View>
-          <Text style={styles.title}>Medicine Recommendations</Text>
-          <Text style={styles.subtitle}>Get personalized medicine recommendations based on your symptoms</Text>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.title} numberOfLines={2}>Medicine Recommendations</Text>
+            <Text style={styles.subtitle}>Get personalized medicine recommendations based on your symptoms</Text>
+          </View>
           <View style={styles.headerBadgeRow}>
             <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeIcon}>🤖</Text>
+              <MaterialCommunityIcons name="robot-outline" size={12} color="#334155" style={styles.headerBadgeIcon} />
               <Text style={styles.headerBadgeText}>AI-Powered</Text>
             </View>
             <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeIcon}>🔒</Text>
+              <MaterialCommunityIcons name="shield-check-outline" size={12} color="#334155" style={styles.headerBadgeIcon} />
               <Text style={styles.headerBadgeText}>Secure</Text>
             </View>
             <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeIcon}>⚡</Text>
+              <MaterialCommunityIcons name="flash-outline" size={12} color="#334155" style={styles.headerBadgeIcon} />
               <Text style={styles.headerBadgeText}>Instant</Text>
             </View>
           </View>
@@ -687,53 +813,59 @@ const MedicineRecommendationScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0fdf4', // Light green background - PRESERVED
+    backgroundColor: '#F0FDF4',
   },
   content: {
     flexGrow: 1,
     padding: spacing.lg,
-    paddingTop: spacing.lg + 92,
+    paddingTop: spacing.lg + 84,
+    paddingBottom: spacing.xxl,
   },
   
   // Professional Header Card
   headerCard: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: spacing.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: spacing.lg,
     marginBottom: spacing.xl,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
     elevation: 5,
     borderWidth: 1,
-    borderColor: 'rgba(22, 101, 52, 0.1)',
+    borderColor: '#BBF7D0',
   },
   headerIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#f0fdf4',
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#E6F8F5',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
-    borderWidth: 3,
-    borderColor: '#16a34a',
+    borderWidth: 1,
+    borderColor: '#BFEDE6',
   },
   headerIcon: {
-    fontSize: 36,
+    fontSize: 32,
+  },
+  headerTextWrap: {
+    width: '100%',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
     color: '#166534',
     marginBottom: spacing.sm,
     textAlign: 'center',
+    lineHeight: 30,
   },
   subtitle: {
     fontSize: 15,
-    color: '#6b7280',
+    color: '#64748B',
     marginBottom: spacing.lg,
     textAlign: 'center',
     lineHeight: 22,
@@ -741,12 +873,15 @@ const styles = StyleSheet.create({
   headerBadgeRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   headerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 20,
@@ -758,7 +893,7 @@ const styles = StyleSheet.create({
   headerBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#166534',
+    color: '#334155',
   },
   
   // Form Styles
@@ -766,15 +901,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -807,7 +944,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#166534',
     marginBottom: 4,
   },
@@ -880,20 +1017,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#e5e7eb',
+    overflow: 'hidden',
   },
-  input: {
-    flex: 1,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: spacing.md,
+  ageInput: {
+    width: 84,
+    borderWidth: 0,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     fontSize: 16,
     color: '#374151',
     backgroundColor: '#f9fafb',
+    textAlign: 'center',
   },
   inputSuffix: {
     paddingRight: spacing.md,
-    fontSize: 14,
+    fontSize: 13,
     color: '#9ca3af',
     fontWeight: '500',
   },
@@ -947,7 +1085,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: spacing.md,
-    gap: spacing.sm,
   },
   selectedSymptomTag: {
     flexDirection: 'row',
@@ -957,12 +1094,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingLeft: 12,
     paddingRight: 8,
-    gap: 6,
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
   },
   selectedSymptomText: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.white,
+    marginRight: 6,
   },
   removeSymptomButton: {
     width: 20,

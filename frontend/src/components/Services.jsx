@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { LanguageContext } from '../main';
 import { t } from '../utils/translations';
+import AppDownloadBanner from './AppDownloadBanner';
 
 const Services = () => {
   const { language } = useContext(LanguageContext);
@@ -57,38 +58,41 @@ const Services = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50" style={{ paddingTop: '100px' }}>
-      <div className="container mx-auto px-6 py-12">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_40%),linear-gradient(180deg,_#f8fffb_0%,_#edfdf4_45%,_#f8fafc_100%)]" style={{ paddingTop: '100px' }}>
+      <div className="container mx-auto max-w-5xl px-4 py-10 md:py-12">
         {/* Header Section */}
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-green-900 mb-4">
+        <div className="mx-auto mb-8 max-w-4xl rounded-3xl border border-emerald-100 bg-white/90 p-6 md:p-8 text-center shadow-[0_14px_35px_rgba(16,185,129,0.12)]">
+          <p className="mb-3 inline-flex rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-bold tracking-[0.12em] text-emerald-800">
+            {t('ourServicesSubtitle', language)}
+          </p>
+          <h1 className="text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl md:text-5xl">
             {t('ourServicesTitle', language)}
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            {t('ourServicesSubtitle', language)}
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+            Choose the service you need and continue with a simple guided flow.
           </p>
         </div>
 
         {/* Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+        <div className="grid grid-cols-2 gap-4 md:gap-5">
           {services.map((service, index) => (
             <div
               key={index}
-              className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group"
+              className="group overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.14)]"
             >
               {/* Gradient Header */}
-              <div className={`bg-gradient-to-r ${service.color} p-6 text-white`}>
-                <div className="text-6xl mb-3 transform group-hover:scale-110 transition-transform duration-300">
+              <div className={`bg-gradient-to-r ${service.color} p-3 md:p-4 text-white`}>
+                <div className="mb-2 text-3xl md:text-4xl transition-transform duration-300 group-hover:scale-110">
                   {service.icon}
                 </div>
-                <h3 className="text-2xl font-bold">
+                <h3 className="text-sm md:text-lg font-bold tracking-tight leading-snug">
                   {t(service.titleKey, language)}
                 </h3>
               </div>
               
               {/* Content */}
-              <div className="p-6">
-                <p className="text-gray-700 leading-relaxed">
+              <div className="p-3 md:p-4">
+                <p className="text-xs md:text-sm leading-5 md:leading-6 text-slate-600">
                   {t(service.descKey, language)}
                 </p>
               </div>
@@ -96,20 +100,8 @@ const Services = () => {
           ))}
         </div>
 
-        {/* Call to Action */}
-        <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl shadow-xl p-12 text-center text-white">
-          <h2 className="text-3xl font-bold mb-4">
-            {t('getStarted', language)}
-          </h2>
-          <p className="text-xl mb-8 opacity-90">
-            {t('getStartedDesc', language)}
-          </p>
-          <button
-            onClick={() => window.location.href = '/login'}
-            className="bg-white text-green-700 px-8 py-4 rounded-lg font-bold text-lg hover:bg-amber-400 hover:text-green-900 transition-all duration-300 transform hover:scale-105"
-          >
-            {t('loginToContinue', language)}
-          </button>
+        <div className="mt-10 md:mt-14">
+          <AppDownloadBanner />
         </div>
       </div>
     </div>

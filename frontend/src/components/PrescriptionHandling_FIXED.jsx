@@ -6,6 +6,7 @@ import FeatureLoginPrompt from './FeatureLoginPrompt';
 import { t } from '../utils/translations';
 import { playTTS } from '../utils/tts';
 import MedicineIdentificationModal from './MedicineIdentificationModal';
+import capsuleIcon from '../assets/capsule.png';
 
 function speak(text, language) {
   if (!window.speechSynthesis) return;
@@ -35,7 +36,7 @@ const MedicineCard = ({ med, onDelete, onEdit, onSpeak, onSetReminder }) => (
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
-          <div>💉 <span className="font-semibold">{med.dosage}</span></div>
+          <div><img src={capsuleIcon} alt="Dosage" className="h-4 w-4 inline-block mr-1" /> <span className="font-semibold">{med.dosage}</span></div>
           <div>📅 <span className="font-semibold">{med.frequency}</span></div>
           <div>⏳ <span className="font-semibold">{med.duration}</span></div>
           <div>📦 <span className="font-semibold">{med.quantity} {t('units', language)}</span></div>
@@ -96,7 +97,10 @@ const AnalysisResultModal = ({ isOpen, onClose, result, onProceed, language, isM
           {/* Key Details Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-300">
-              <div className="text-sm font-semibold text-gray-600 mb-1">💉 Dosage</div>
+              <div className="text-sm font-semibold text-gray-600 mb-1 flex items-center gap-1">
+                <img src={capsuleIcon} alt="Dosage" className="h-4 w-4 object-contain" />
+                <span>Dosage</span>
+              </div>
               <div className="text-lg font-bold text-blue-700">{result.dosage || 'Not specified'}</div>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg border border-purple-300">

@@ -1,12 +1,16 @@
 import os
 import json
 import logging
-from typing import Dict, Callable, Optional, List
+import time
+import hashlib
+import copy
+from typing import Any, Dict, Callable, Optional, List
 
 import requests
 
 from . import prompt_templates, safety_rules, utils
 from .models import SymptomRequest, SymptomResponse, MedicineRecommendation
+from .medicine_rag_system import rag_system
 from .translation_service import (
     translate_symptoms_to_english,
     translate_response_to_language,
@@ -15,6 +19,51 @@ from .translation_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+_SYMPTOM_REC_CACHE: Dict[str, Dict[str, Any]] = {}
+_SYMPTOM_REC_CACHE_TTL_SEC = int(os.environ.get("SYMPTOM_REC_CACHE_TTL_SEC", "300"))
+_SYMPTOM_REC_CACHE_MAX_ENTRIES = int(os.environ.get("SYMPTOM_REC_CACHE_MAX_ENTRIES", "200"))
+
+
+def _build_recommendation_cache_key(body: Dict[str, Any], language: str) -> str:
+    canonical = {
+        "symptoms": sorted([str(s).strip().lower() for s in body.get("symptoms", []) if str(s).strip()]),
+        "age": body.get("age"),
+        "gender": body.get("gender"),
+        "allergies": sorted([str(x).strip().lower() for x in body.get("allergies", []) if str(x).strip()]),
+        "existing_conditions": sorted([str(x).strip().lower() for x in body.get("existing_conditions", []) if str(x).strip()]),
+        "pregnancy_status": body.get("pregnancy_status"),
+        "language": language,
+        "llm_provider": os.environ.get("LLM_PROVIDER", "ollama").lower().strip(),
+        "llm_model": os.environ.get("OLLAMA_MODEL", "phi4").strip(),
+        "azure_deployment": os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "").strip(),
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _get_cached_recommendation(cache_key: str) -> Optional[Dict[str, Any]]:
+    entry = _SYMPTOM_REC_CACHE.get(cache_key)
+    if not entry:
+        return None
+
+    age_sec = time.time() - entry.get("ts", 0)
+    if age_sec > _SYMPTOM_REC_CACHE_TTL_SEC:
+        _SYMPTOM_REC_CACHE.pop(cache_key, None)
+        return None
+
+    return copy.deepcopy(entry.get("payload"))
+
+
+def _set_cached_recommendation(cache_key: str, payload: Dict[str, Any]) -> None:
+    if len(_SYMPTOM_REC_CACHE) >= _SYMPTOM_REC_CACHE_MAX_ENTRIES:
+        oldest_key = min(_SYMPTOM_REC_CACHE, key=lambda k: _SYMPTOM_REC_CACHE[k].get("ts", 0))
+        _SYMPTOM_REC_CACHE.pop(oldest_key, None)
+
+    _SYMPTOM_REC_CACHE[cache_key] = {
+        "ts": time.time(),
+        "payload": copy.deepcopy(payload),
+    }
 
 
 # Symptom to medicine mapping for intelligent fallback
@@ -183,15 +232,92 @@ except Exception:
 def call_llm(prompt: str) -> str:
     provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
     logger.info("=" * 70)
-    logger.info("LLM PROVIDER: '%s'", provider)
+    logger.info("🔧 Symptoms Recommendation Service using LLM PROVIDER: '%s'", provider)
+    if provider == "azure_openai":
+        logger.info("✅ USING AZURE OPENAI (NOT LOCAL OLLAMA)")
     logger.info("=" * 70)
     
     if provider == "mock":
         logger.warning("!!! WARNING: Using MOCK provider - NOT calling real LLM !!!")
-        logger.warning("To use real Phi-4, set LLM_PROVIDER=ollama in .env")
-        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama in .env to use Phi-4")
+        logger.warning("To use real Phi-4, set LLM_PROVIDER=ollama or azure_openai in .env")
+        raise ValueError("Mock provider disabled. Set LLM_PROVIDER=ollama or azure_openai in .env to use Phi-4")
     
-    if provider == "ollama":
+    if provider == "azure_openai":
+        logger.info("Calling Phi-4 via Azure OpenAI for independent medical reasoning...")
+        
+        # Get Azure OpenAI configuration from environment
+        azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
+        azure_api_key = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
+        azure_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
+        
+        if not azure_endpoint or not azure_api_key:
+            raise ValueError("Azure OpenAI credentials missing. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY in .env")
+        
+        # Azure OpenAI uses OpenAI-compatible API
+        # Remove '/openai/v1/' from endpoint if present and reconstruct proper URL
+        base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+        api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+        
+        logger.info("Azure Endpoint: %s", base_endpoint)
+        logger.info("Deployment: %s", azure_deployment)
+        
+        payload = {
+            "messages": [
+                {"role": "system", "content": "You are a medical AI assistant. Respond only with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.2)),
+            "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", 700)),
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": azure_api_key
+        }
+        
+        try:
+            logger.info("Sending request to Azure OpenAI...")
+            resp = requests.post(api_url, json=payload, headers=headers, timeout=(20, 120))
+            
+            if resp.status_code != 200:
+                error_msg = resp.text
+                logger.error("Azure OpenAI error (status %d): %s", resp.status_code, error_msg)
+                raise Exception(f"Azure OpenAI error: {resp.status_code} - {error_msg}")
+            
+            resp.raise_for_status()
+            
+            # Azure OpenAI returns OpenAI-compatible format
+            resp_json = resp.json()
+            llm_output = resp_json.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            logger.info("✓ Azure OpenAI (Phi-4) response received")
+            
+            # Try to extract JSON from the response
+            try:
+                parsed = utils.try_parse_json(llm_output)
+                logger.info("✓ Successfully parsed Azure OpenAI response")
+                return json.dumps(parsed)
+            except Exception as parse_err:
+                logger.error("✗ Failed to parse JSON from Azure OpenAI response")
+                logger.error("Parse error: %s", parse_err)
+                raise ValueError(f"Azure OpenAI did not return valid JSON. Error: {parse_err}")
+                
+        except requests.exceptions.ConnectionError as ce:
+            logger.error("✗ FATAL: Cannot connect to Azure OpenAI")
+            logger.error("Azure Endpoint: %s", azure_endpoint)
+            logger.error("Error: %s", ce)
+            raise Exception(
+                f"Cannot connect to Azure OpenAI at {azure_endpoint}\n\n"
+                f"Solutions:\n"
+                f"1. Verify AZURE_OPENAI_ENDPOINT is correct in .env\n"
+                f"2. Check AZURE_OPENAI_API_KEY is valid\n"
+                f"3. Ensure network connectivity to Azure"
+            )
+        except Exception as e:
+            logger.exception("✗ ERROR calling Azure OpenAI: %s", e)
+            raise
+    
+    elif provider == "ollama":
         logger.info("Calling Phi-4 via Ollama for independent medical reasoning...")
         ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
         ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
@@ -204,12 +330,12 @@ def call_llm(prompt: str) -> str:
             "prompt": prompt,
             "stream": False,
             "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
-            "num_predict": 512,  # Limit to 512 tokens for faster generation
+            "num_predict": int(os.environ.get("OLLAMA_NUM_PREDICT", 384)),
         }
         
         try:
             logger.info("Sending request to Phi-4...")
-            resp = requests.post(api_url, json=payload, timeout=600)
+            resp = requests.post(api_url, json=payload, timeout=(15, 120))
             
             if resp.status_code != 200:
                 error_msg = resp.text
@@ -251,7 +377,7 @@ def call_llm(prompt: str) -> str:
     
     else:
         logger.error("Invalid LLM_PROVIDER: %s", provider)
-        raise ValueError(f"Invalid LLM_PROVIDER: {provider}. Must be 'ollama'. Set in .env file.")
+        raise ValueError(f"Invalid LLM_PROVIDER: {provider}. Must be 'ollama' or 'azure_openai'. Set in .env file.")
 
 
 def _translate_text_if_needed(text: str, lang: str) -> str:
@@ -331,10 +457,25 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
         english_symptoms = translate_symptoms_to_english(original_symptoms, user_language)
         body["symptoms"] = english_symptoms
         logger.info(f"Translated symptoms: {english_symptoms}")
+
+    cache_key = _build_recommendation_cache_key(body, user_language)
+    cached_payload = _get_cached_recommendation(cache_key)
+    if cached_payload:
+        logger.info("⚡ Returning cached recommendation response")
+        meds = [MedicineRecommendation(**m) for m in cached_payload.get("recommended_medicines", [])]
+        return SymptomResponse(
+            predicted_condition=cached_payload.get("predicted_condition", "Unknown"),
+            recommended_medicines=meds,
+            home_care_advice=cached_payload.get("home_care_advice", []),
+            doctor_consultation_advice=cached_payload.get("doctor_consultation_advice", ""),
+            disclaimer=cached_payload.get("disclaimer", ""),
+            tts_payload=cached_payload.get("tts_payload"),
+        )
     
-    # Step 2: Build prompt - Phi-4 will think independently
-    prompt = prompt_templates.build_prompt(body, rag_context="")
-    logger.info("Prompt built - Phi-4 will generate recommendations independently")
+    # Step 2: Build prompt with lightweight RAG context for improved accuracy.
+    rag_context = rag_system.format_for_llm_context(body.get("symptoms", []))
+    prompt = prompt_templates.build_prompt(body, rag_context=rag_context)
+    logger.info("Prompt built with RAG context - generating recommendations")
     
     # Step 3: Call LLM for independent thinking
     try:
@@ -400,6 +541,15 @@ def recommend_symptoms(req: SymptomRequest) -> SymptomResponse:
             )
         else:
             parsed["disclaimer"] = "This is not a medical diagnosis. Consult a doctor for serious symptoms."
+
+    _set_cached_recommendation(cache_key, {
+        "predicted_condition": parsed.get("predicted_condition", "Unknown"),
+        "recommended_medicines": parsed.get("recommended_medicines", []),
+        "home_care_advice": parsed.get("home_care_advice", []),
+        "doctor_consultation_advice": parsed.get("doctor_consultation_advice", ""),
+        "disclaimer": parsed.get("disclaimer", ""),
+        "tts_payload": parsed.get("tts_payload"),
+    })
 
     # Build Pydantic response
     meds = []
@@ -479,46 +629,93 @@ Question from user: {question}
 Response (in {lang_display}):"""
 
     try:
-        logger.info("Calling Phi-4 LLM for medical Q&A...")
+        logger.info("Calling LLM for medical Q&A...")
         
         # Get LLM config
         provider = os.environ.get("LLM_PROVIDER", "ollama").lower().strip()
-        ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
-        ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
         
-        logger.info("LLM Provider: %s", provider)
-        logger.info("Ollama URL: %s", ollama_url)
-        logger.info("Ollama Model: %s (Phi-4)", ollama_model)
+        logger.info("🔧 Medical Q&A using LLM Provider: %s", provider)
+        if provider == "azure_openai":
+            logger.info("✅ CONFIRMED: Using Azure OpenAI Phi-4 (NOT local Ollama)")
         
-        if provider != "ollama":
-            raise Exception(f"Only Ollama provider is supported. Got: {provider}")
+        if provider == "azure_openai":
+            # Azure OpenAI implementation
+            azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
+            azure_api_key = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
+            azure_deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
+            
+            if not azure_endpoint or not azure_api_key:
+                raise ValueError("Azure OpenAI credentials missing. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY in .env")
+            
+            base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+            api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+            
+            payload = {
+                "messages": [
+                    {"role": "system", "content": f"You are a medical AI assistant. Respond ENTIRELY in {lang_display} language."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
+                "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", 1024)),
+            }
+            
+            headers = {
+                "Content-Type": "application/json",
+                "api-key": azure_api_key
+            }
+            
+            logger.info("Sending request to Azure OpenAI (Phi-4)...")
+            logger.info("Timeout: 60 seconds for medical Q&A response")
+            
+            resp = requests.post(api_url, json=payload, headers=headers, timeout=60)
+            
+            if resp.status_code != 200:
+                error_msg = resp.text
+                logger.error("Azure OpenAI error (status %d): %s", resp.status_code, error_msg)
+                raise Exception(f"Azure OpenAI API error: {resp.status_code} - {error_msg}")
+            
+            resp.raise_for_status()
+            
+            # Extract response from Azure OpenAI
+            resp_json = resp.json()
+            answer = resp_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            
+        elif provider == "ollama":
+            ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").strip()
+            ollama_model = os.environ.get("OLLAMA_MODEL", "phi4").strip()
+            
+            logger.info("Ollama URL: %s", ollama_url)
+            logger.info("Ollama Model: %s (Phi-4)", ollama_model)
+            
+            # Call Ollama directly without JSON parsing
+            api_url = f"{ollama_url}/api/generate"
+            payload = {
+                "model": ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
+            }
+            
+            logger.info("Sending request to Phi-4 via Ollama...")
+            logger.info("Timeout: 60 seconds for Phi-4 medical Q&A response")
+            
+            resp = requests.post(api_url, json=payload, timeout=60)
+            
+            if resp.status_code != 200:
+                error_msg = resp.text
+                logger.error("Ollama error (status %d): %s", resp.status_code, error_msg)
+                raise Exception(f"Ollama API error: {resp.status_code} - {error_msg}")
+            
+            resp.raise_for_status()
+            
+            # Extract response from Ollama
+            resp_json = resp.json()
+            answer = resp_json.get("response", "").strip()
         
-        # Call Ollama directly without JSON parsing
-        api_url = f"{ollama_url}/api/generate"
-        payload = {
-            "model": ollama_model,
-            "prompt": prompt,
-            "stream": False,
-            "temperature": float(os.environ.get("LLM_TEMPERATURE", 0.3)),
-        }
+        else:
+            raise Exception(f"Invalid LLM_PROVIDER: {provider}. Must be 'ollama' or 'azure_openai'")
         
-        logger.info("Sending request to Phi-4 via Ollama...")
-        logger.info("Timeout: 60 seconds for Phi-4 medical Q&A response")
-        
-        resp = requests.post(api_url, json=payload, timeout=60)
-        
-        if resp.status_code != 200:
-            error_msg = resp.text
-            logger.error("Ollama error (status %d): %s", resp.status_code, error_msg)
-            raise Exception(f"Ollama API error: {resp.status_code} - {error_msg}")
-        
-        resp.raise_for_status()
-        
-        # Extract response from Ollama
-        resp_json = resp.json()
-        answer = resp_json.get("response", "").strip()
-        
-        logger.info("✓ Phi-4 response received (%d chars)", len(answer))
+        logger.info("✓ LLM response received (%d chars)", len(answer))
         logger.info("Response (first 500 chars): %s", answer[:500])
         
         # Validate response

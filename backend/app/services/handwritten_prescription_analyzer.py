@@ -1,19 +1,22 @@
 """
 Handwritten Prescription Analyzer - Complete Hybrid Implementation
 Combines CNN Preprocessing + Multi-Method OCR + LLM Parsing
+Supports both Ollama and Azure OpenAI providers
 """
 
 import cv2
 import numpy as np
 import json
 import logging
+import os
+import re
 import requests
 from typing import Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
 
+from app.services.google_vision_ocr import GoogleVisionOCRService
 from app.services.handwritten_prescription_preprocessor import HandwrittenPrescriptionPreprocessor
-from app.services.multimethod_ocr import MultiMethodHandwrittenOCR
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +26,7 @@ class HybridHandwrittenPrescriptionAnalyzer:
     Complete analyzer for handwritten prescriptions using:
     - CNN-based image preprocessing
     - Multi-method OCR (EasyOCR + Tesseract + PaddleOCR)
-    - LLM parsing for structured extraction
+    - LLM parsing for structured extraction (Ollama or Azure OpenAI)
     - Medical validation
     """
 
@@ -38,10 +41,10 @@ class HybridHandwrittenPrescriptionAnalyzer:
         self.logger = logger
         self.ollama_url = ollama_url
         self.ollama_model = ollama_model
+        self.google_vision_api_key = os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip()
 
         # Initialize components
         self.preprocessor = HandwrittenPrescriptionPreprocessor()
-        self.ocr = MultiMethodHandwrittenOCR(languages=['en'])
 
         self.logger.info("✅ Hybrid Handwritten Prescription Analyzer initialized")
 
@@ -68,18 +71,19 @@ class HybridHandwrittenPrescriptionAnalyzer:
             quality_score = self.preprocessor.get_image_quality_score(cv2.imread(image_path))
             self.logger.info(f"  Quality score: {quality_score:.2%}")
 
-            # Step 2: Multi-method OCR extraction
-            self.logger.info("STAGE 2: Multi-Method OCR Extraction")
-            ocr_result = self.ocr.extract_text_multimethod(preprocessed)
+            # Step 2: OCR extraction (Google Vision primary, local multi-method fallback)
+            self.logger.info("STAGE 2: OCR Extraction")
+            ocr_result = self._extract_text_with_best_ocr(preprocessed)
             self.logger.info(f"  Methods used: {', '.join(ocr_result['methods_used'])}")
             self.logger.info(f"  Confidence: {ocr_result['confidence']:.2%}")
             self.logger.info(f"  Quality score: {ocr_result['quality_score']:.2%}")
 
             extracted_text = ocr_result['text']
+            ocr_source = ', '.join(ocr_result.get('methods_used', [])) or 'OCR'
             
             # LOG EXTRACTED TEXT FOR USER CONFIRMATION
             self.logger.info("=" * 80)
-            self.logger.info("📄 EXTRACTED TEXT FROM PRESCRIPTION (Raw OCR Output):")
+            self.logger.info(f"📄 EXTRACTED TEXT FROM {ocr_source}:")
             self.logger.info("=" * 80)
             if extracted_text and len(extracted_text.strip()) > 0:
                 self.logger.info(f"\n{extracted_text}\n")
@@ -91,7 +95,16 @@ class HybridHandwrittenPrescriptionAnalyzer:
             self.logger.info("=" * 80)
 
             # Validate OCR output
-            ocr_validation = self.ocr.validate_extracted_text(extracted_text)
+            ocr_validation = {
+                'valid': len((extracted_text or '').strip()) >= 10,
+                'has_content': len((extracted_text or '').strip()) > 0,
+                'has_medical_keywords': any(
+                    token in (extracted_text or '').lower()
+                    for token in ['mg', 'ml', 'tab', 'tablet', 'capsule', 'syp', 'syrup', 'bd', 'od', 'tds', 'qid']
+                ),
+                'confidence_level': 'high' if ocr_result.get('confidence', 0.0) >= 0.75 else 'medium' if ocr_result.get('confidence', 0.0) >= 0.5 else 'low',
+                'issues': []
+            }
             self.logger.info(f"  OCR Validation: {ocr_validation}")
 
             if not ocr_validation['has_content']:
@@ -137,6 +150,119 @@ class HybridHandwrittenPrescriptionAnalyzer:
                 'message': f'Prescription analysis failed: {str(e)}',
                 'error': str(e)
             }
+
+    def _extract_text_with_best_ocr(self, preprocessed_image: np.ndarray) -> Dict[str, Any]:
+        """
+        Use Google Vision OCR only for fastest cloud extraction.
+        """
+        vision_api_key = (os.getenv("GOOGLE_CLOUD_VISION_API_KEY", "").strip() or self.google_vision_api_key)
+        if not vision_api_key:
+            raise RuntimeError("GOOGLE_CLOUD_VISION_API_KEY not found. Google Vision OCR cannot run.")
+
+        self.logger.info("🔍 Using Google Vision OCR only (DOCUMENT_TEXT_DETECTION, en-t-i0-handwrit)")
+        vision_result = GoogleVisionOCRService.extract_text_from_image(
+            preprocessed_image,
+            vision_api_key,
+            language_hints=["en-t-i0-handwrit"],
+        )
+
+        vision_text = self._normalize_ocr_text(vision_result.get("text") or "")
+        if vision_result.get("status") != "success" or len(vision_text) < 5:
+            raise RuntimeError(
+                f"Google Vision OCR failed or insufficient text. status={vision_result.get('status')} error={vision_result.get('error')}"
+            )
+
+        confidence = float(vision_result.get("confidence", 0.0) or 0.0)
+        quality_score = self._calculate_text_quality(vision_text)
+        self.logger.info("✅ Google Vision OCR selected. confidence=%.3f quality=%.3f", confidence, quality_score)
+
+        return {
+            "text": vision_text,
+            "methods_used": ["GoogleVision"],
+            "confidence": confidence,
+            "quality_score": quality_score,
+            "individual_results": {
+                "GoogleVision": {
+                    "text": vision_text,
+                    "confidence": confidence,
+                    "quality_score": quality_score,
+                }
+            },
+            "hierarchy": vision_result.get("hierarchy", {}),
+            "request": vision_result.get("request", {}),
+        }
+
+    def _normalize_ocr_text(self, text: str) -> str:
+        """Clean OCR text to improve downstream parsing stability."""
+        cleaned = (text or "").replace("\x0c", " ")
+        kept_lines = []
+        for line in cleaned.splitlines():
+            candidate = " ".join(line.strip().split())
+            if not candidate:
+                continue
+
+            # Drop lines that are only digits/symbols.
+            if re.fullmatch(r"[\d\W_]+", candidate):
+                continue
+
+            # Drop tiny non-text fragments.
+            letters = len(re.findall(r"[A-Za-z]", candidate))
+            if letters == 0 and len(candidate) < 5:
+                continue
+
+            kept_lines.append(candidate)
+
+        return "\n".join(kept_lines).strip()
+
+    def _calculate_text_quality(self, text: str) -> float:
+        """Lightweight quality estimator used when local OCR stack is not initialized."""
+        if not text or not text.strip():
+            return 0.0
+
+        cleaned = text.strip()
+        length_score = min(1.0, len(cleaned) / 250.0)
+        non_empty_lines = [line for line in cleaned.splitlines() if line.strip()]
+        line_count = len(non_empty_lines)
+        line_score = min(1.0, line_count / 8.0)
+
+        medical_tokens = ["mg", "ml", "tab", "tablet", "capsule", "syp", "syrup", "bd", "od", "tds", "qid"]
+        lowered = cleaned.lower()
+        token_hits = sum(1 for token in medical_tokens if token in lowered)
+        token_score = min(1.0, token_hits / 3.0)
+
+        lexical_tokens = re.findall(r"\b[a-zA-Z][a-zA-Z0-9\-]{2,}\b", cleaned)
+        lexical_score = min(1.0, len(lexical_tokens) / 20.0)
+
+        noise_char_ratio = len(re.findall(r"[^A-Za-z0-9\s.,:/()\-%]", cleaned)) / max(len(cleaned), 1)
+        digit_heavy_lines = 0
+        for line in non_empty_lines:
+            letters = len(re.findall(r"[A-Za-z]", line))
+            digits = len(re.findall(r"\d", line))
+            if digits > max(4, letters * 2):
+                digit_heavy_lines += 1
+        digit_line_penalty = min(0.25, digit_heavy_lines / max(line_count, 1))
+        noise_penalty = min(0.2, noise_char_ratio)
+
+        score = (0.35 * length_score) + (0.2 * line_score) + (0.2 * token_score) + (0.25 * lexical_score)
+        score -= noise_penalty
+        score -= digit_line_penalty
+        return max(0.0, min(1.0, score))
+
+    def _normalize_medicines_for_ui(self, medicines):
+        normalized = []
+        for med in medicines or []:
+            med_name = med.get('medicine_name') or med.get('name') or 'Unknown medicine'
+            normalized.append({
+                'medicine_name': med_name,
+                'name': med.get('name') or med_name,
+                'dosage': med.get('dosage') or 'Not specified',
+                'frequency': med.get('frequency') or 'Not specified',
+                'duration': med.get('duration') or 'Not specified',
+                'special_instructions': med.get('special_instructions') or med.get('instructions') or '',
+                'notes': med.get('notes') or '',
+                'confidence': med.get('confidence') or 'medium',
+            })
+        return normalized
 
     def _parse_with_llm(self, extracted_text: str) -> Dict[str, Any]:
         """
@@ -206,24 +332,65 @@ class HybridHandwrittenPrescriptionAnalyzer:
         If any field is not found, use null. Be thorough in extracting medicine information.
         """
 
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
+        self.logger.info(f"🔧 Handwritten Prescription Analyzer using LLM provider: {provider}")
+
         try:
-            response = requests.post(
-                f'{self.ollama_url}/api/generate',
-                json={
-                    'model': self.ollama_model,
-                    'prompt': prompt,
-                    'stream': False,
-                    'temperature': 0.3  # Low temperature for precise extraction
-                },
-                timeout=120
-            )
+            if provider == "azure_openai":
+                # Azure OpenAI implementation
+                azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+                azure_api_key = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
+                azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "Sanjeevani-Phi-4").strip()
+                
+                if not azure_endpoint or not azure_api_key:
+                    self.logger.error("Azure OpenAI credentials missing")
+                    return None
+                
+                base_endpoint = azure_endpoint.replace("/openai/v1/", "").rstrip("/")
+                api_url = f"{base_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version=2024-02-15-preview"
+                
+                response = requests.post(
+                    api_url,
+                    json={
+                        "messages": [
+                            {"role": "system", "content": "You are a medical AI assistant that extracts prescription information. Respond only with valid JSON."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 2048,
+                    },
+                    headers={
+                        "Content-Type": "application/json",
+                        "api-key": azure_api_key
+                    },
+                    timeout=120
+                )
 
-            if response.status_code != 200:
-                self.logger.error(f"LLM API error: {response.status_code}")
-                return None
+                if response.status_code != 200:
+                    self.logger.error(f"Azure OpenAI API error: {response.status_code}")
+                    return None
 
-            result = response.json()
-            text_response = result.get('response', '')
+                result = response.json()
+                text_response = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            else:  # ollama provider
+                response = requests.post(
+                    f'{self.ollama_url}/api/generate',
+                    json={
+                        'model': self.ollama_model,
+                        'prompt': prompt,
+                        'stream': False,
+                        'temperature': 0.3  # Low temperature for precise extraction
+                    },
+                    timeout=120
+                )
+
+                if response.status_code != 200:
+                    self.logger.error(f"LLM API error: {response.status_code}")
+                    return None
+
+                result = response.json()
+                text_response = result.get('response', '')
 
             # Extract JSON from response
             try:
@@ -343,6 +510,8 @@ class HybridHandwrittenPrescriptionAnalyzer:
         Returns:
             Complete prescription report
         """
+        medicines_for_ui = self._normalize_medicines_for_ui(parsed_data.get('medicines', []))
+
         report = {
             'status': 'success',
             'timestamp': datetime.now().isoformat(),
@@ -355,14 +524,16 @@ class HybridHandwrittenPrescriptionAnalyzer:
                 'methods_used': ocr_result['methods_used'],
                 'confidence': ocr_result['confidence'],
                 'quality_score': ocr_result['quality_score'],
-                'extracted_text': extracted_text[:500]  # First 500 chars
+                'extracted_text': extracted_text[:500],  # First 500 chars
+                'request': ocr_result.get('request', {}),
+                'hierarchy': ocr_result.get('hierarchy', {}),
             },
             'prescription': {
                 'patient_details': parsed_data.get('patient_details', {}),
                 'doctor_details': parsed_data.get('doctor_details', {}),
                 'date': parsed_data.get('prescription_date'),
                 'diagnosis': parsed_data.get('diagnosis'),
-                'medicines': parsed_data.get('medicines', []),
+                'medicines': medicines_for_ui,
                 'medical_advice': parsed_data.get('medical_advice'),
                 'allergies': parsed_data.get('allergies'),
             },
@@ -374,6 +545,18 @@ class HybridHandwrittenPrescriptionAnalyzer:
                 '⚠️ Follow doctor\'s instructions strictly',
                 '⚠️ Report any allergic reactions immediately'
             ]
+        }
+
+        # Flat compatibility fields expected by current frontend/mobile analyzers.
+        report['ocr_text'] = extracted_text
+        report['medicines'] = medicines_for_ui
+        report['warnings'] = validated_data.get('warnings', [])
+        if ocr_result.get('confidence', 0.0) < 0.5:
+            report['warnings'].append('OCR confidence is below 0.5. Please retake the photo for safety.')
+        report['pipeline'] = {
+            'preprocessing': 'CNN preprocessing',
+            'htr': ', '.join(ocr_result.get('methods_used', [])) or 'OCR',
+            'llm_deciphering': os.getenv("LLM_PROVIDER", "ollama").lower().strip(),
         }
 
         return report
@@ -418,4 +601,75 @@ class HybridHandwrittenPrescriptionAnalyzer:
                     os.unlink(temp_path)
                 except:
                     pass
+
+
+# ============================================================================
+# Static Wrapper Class for API Compatibility
+# ============================================================================
+
+class HandwrittenPrescriptionAnalyzer:
+    """
+    Static wrapper class for API compatibility.
+    Provides static methods that internally create analyzer instances.
+    """
+    
+    @staticmethod
+    def analyze_handwritten_prescription_from_bytes(image_bytes: bytes, filename: str = 'prescription.jpg') -> Dict[str, Any]:
+        """
+        Static method to analyze prescription from bytes.
+        Creates analyzer instance and processes the image.
+        
+        Args:
+            image_bytes: Image file content
+            filename: Original filename
+            
+        Returns:
+            Analysis result dictionary
+        """
+        try:
+            # Get configuration from environment
+            ollama_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+            ollama_model = os.getenv('OLLAMA_MODEL', 'phi4')
+            
+            # Create analyzer instance
+            analyzer = HybridHandwrittenPrescriptionAnalyzer(
+                ollama_url=ollama_url,
+                ollama_model=ollama_model
+            )
+            
+            # Analyze from bytes
+            return analyzer.analyze_from_bytes(image_bytes, filename)
+            
+        except Exception as e:
+            logger.error(f"❌ Static analysis failed: {str(e)}", exc_info=True)
+            return {
+                'status': 'error',
+                'message': f'Prescription analysis failed: {str(e)}',
+                'error': str(e),
+                'uploaded_file': filename
+            }
+    
+    @staticmethod
+    def get_service_info() -> Dict[str, Any]:
+        """
+        Get service information and capabilities.
+        
+        Returns:
+            Service information dictionary
+        """
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
+        
+        return {
+            'service': 'Handwritten Prescription Analyzer',
+            'version': '2.0',
+            'capabilities': {
+                'preprocessing': 'CNN-based image enhancement',
+                'ocr': 'Multi-method (EasyOCR + Tesseract + PaddleOCR)',
+                'parsing': f'LLM-based ({provider})',
+                'validation': 'Medical safety checks'
+            },
+            'status': 'operational',
+            'llm_provider': provider,
+            'supported_formats': ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp']
+        }
 

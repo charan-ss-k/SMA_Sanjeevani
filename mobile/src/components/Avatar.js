@@ -40,6 +40,13 @@ export const Avatar = ({
         backgroundColor: backgroundColor,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        shadowColor: '#0F172A',
+        shadowOpacity: 0.14,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+        elevation: 3,
       }}
     >
       {source ? (

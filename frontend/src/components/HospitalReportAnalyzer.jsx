@@ -1,7 +1,34 @@
 import React, { useState, useRef, useContext, useEffect } from 'react';
 import { AuthContext, LanguageContext } from '../main';
-import { playTTS, muteTTS, unmuteTTS } from '../utils/tts';
+import { playTTS, stopAllTTS } from '../utils/tts';
 import { getPrescriptionText } from '../data/prescriptionTranslations';
+import { API_BASE } from '../config/apiBase';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import DescriptionIcon from '@mui/icons-material/Description';
+import SearchIcon from '@mui/icons-material/Search';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import ClearIcon from '@mui/icons-material/Clear';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import StopCircleIcon from '@mui/icons-material/StopCircle';
+import SaveIcon from '@mui/icons-material/Save';
+import PhoneIcon from '@mui/icons-material/Phone';
+import EmailIcon from '@mui/icons-material/Email';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import PersonIcon from '@mui/icons-material/Person';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import HealingIcon from '@mui/icons-material/Healing';
+import MedicationIcon from '@mui/icons-material/Medication';
+import NoteAltIcon from '@mui/icons-material/NoteAlt';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import HistoryIcon from '@mui/icons-material/History';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const HospitalReportAnalyzer = () => {
   const { authToken } = useContext(AuthContext);
@@ -12,32 +39,86 @@ const HospitalReportAnalyzer = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState('');
-  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [historyItems, setHistoryItems] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = useState(null);
   const fileInputRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const stripLeadingEmoji = (value = '') => value.replace(/^\p{Extended_Pictographic}+\s*/u, '').trim();
 
-  useEffect(() => {
-    if (isMuted) {
-      muteTTS();
-    } else {
-      unmuteTTS();
+  const parseResponseData = async (response) => {
+    const raw = await response.text();
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { detail: raw, message: raw, raw };
     }
-  }, [isMuted]);
+  };
+
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const recoverCompletedAnalysis = async (selectedFile, signal) => {
+    if (!selectedFile) return null;
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      if (signal?.aborted) return null;
+
+      try {
+        const params = new URLSearchParams({
+          filename: selectedFile.name,
+          file_size: String(selectedFile.size)
+        });
+
+        const response = await fetch(`${API_BASE}/api/hospital-reports/analyze-result?${params.toString()}`, {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+          signal
+        });
+
+        const data = await parseResponseData(response);
+        if (response.ok && data?.status === 'success' && data?.result) {
+          return data.result;
+        }
+      } catch (err) {
+        if (err?.name === 'AbortError') return null;
+      }
+
+      await wait(2000);
+    }
+
+    return null;
+  };
+
+  const speakText = async (text) => {
+    if (!text || !text.trim()) return;
+
+    if (isSpeaking) {
+      stopAllTTS();
+      setIsSpeaking(false);
+      return;
+    }
+
+    try {
+      setIsSpeaking(true);
+      await playTTS(text, language, { userInitiated: true });
+    } catch (e) {
+      console.error('Report speak error:', e);
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
 
   // Fetch history on component mount and when auth token changes
   useEffect(() => {
-    const apiBase = window.__API_BASE__ || 'http://localhost:8000';
     const loadHistory = async () => {
       setHistoryLoading(true);
       try {
-        const response = await fetch(`${apiBase}/api/hospital-report-history`, {
+        const response = await fetch(`${API_BASE}/api/hospital-report-history`, {
           headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         });
-        const data = await response.json();
+        const data = await parseResponseData(response);
         if (response.ok) {
           setHistoryItems(data);
         }
@@ -49,8 +130,6 @@ const HospitalReportAnalyzer = () => {
     };
     loadHistory();
   }, [authToken]);
-
-  const apiBase = window.__API_BASE__ || 'http://localhost:8000';
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -97,32 +176,44 @@ const HospitalReportAnalyzer = () => {
     // Create abort controller for cancellation
     abortControllerRef.current = new AbortController();
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await fetch(`${apiBase}/api/hospital-reports/analyze`, {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${API_BASE}/api/hospital-reports/analyze`, {
         method: 'POST',
         body: formData,
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         signal: abortControllerRef.current.signal,
       });
 
+      const result = await parseResponseData(response);
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || data.message || 'Analysis failed');
+        throw new Error(result.detail || result.message || 'Analysis failed');
       }
 
-      const result = await response.json();
       setAnalysisResult(result);
-      playTTS(getPrescriptionText('analysisComplete', language), language);
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('Analysis was cancelled');
         setAnalysisError(getPrescriptionText('analysisCancelled', language));
       } else {
         console.error('Analysis error:', err);
-        setAnalysisError(err.message || getPrescriptionText('failedToAnalyze', language));
+        const message = String(err.message || '').toLowerCase();
+        const isProxyFailure = message.includes('backend call failure') || message.includes('backend proxy failed');
+
+        if (isProxyFailure) {
+          const recovered = await recoverCompletedAnalysis(file, abortControllerRef.current?.signal);
+          if (recovered) {
+            setAnalysisResult(recovered);
+            setAnalysisError('');
+          } else {
+            setAnalysisError(getPrescriptionText('failedToAnalyze', language));
+          }
+        } else {
+          setAnalysisError(err.message || getPrescriptionText('failedToAnalyze', language));
+        }
       }
     } finally {
       setAnalyzing(false);
@@ -146,10 +237,10 @@ const HospitalReportAnalyzer = () => {
   const refreshHistory = async () => {
     setHistoryLoading(true);
     try {
-      const response = await fetch(`${apiBase}/api/hospital-report-history`, {
+      const response = await fetch(`${API_BASE}/api/hospital-report-history`, {
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       });
-      const data = await response.json();
+      const data = await parseResponseData(response);
       if (response.ok) {
         setHistoryItems(data);
       }
@@ -162,7 +253,7 @@ const HospitalReportAnalyzer = () => {
 
   const speakSection = (text, title) => {
     const announcement = `${title}. ${text}`;
-    playTTS(announcement, language);
+    speakText(announcement);
   };
 
   const saveReport = async () => {
@@ -170,24 +261,29 @@ const HospitalReportAnalyzer = () => {
 
     setSavingReport(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('structured_data', JSON.stringify(analysisResult.structured_data || {}));
-      formData.append('extracted_text', analysisResult.extracted_text || '');
-      formData.append('report_title', file.name || 'Hospital Report');
+      const payload = {
+        report_title: file?.name || 'Hospital Report',
+        uploaded_file: file?.name || 'Unknown file',
+        ocr_method: analysisResult.ocr_method || 'OCR',
+        extracted_text: analysisResult.extracted_text || '',
+        structured_data: analysisResult.structured_data || {}
+      };
 
-      const response = await fetch(`${apiBase}/api/hospital-report-history`, {
+      const response = await fetch(`${API_BASE}/api/hospital-report-history/`, {
         method: 'POST',
-        body: formData,
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify(payload)
       });
 
+      const saved = await parseResponseData(response);
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || data.message || 'Failed to save report');
+        throw new Error(saved.detail || saved.message || 'Failed to save report');
       }
 
-      const saved = await response.json();
       setHistoryItems(prev => [saved, ...prev]);
     } catch (e) {
       console.error('Save report failed:', e);
@@ -199,7 +295,7 @@ const HospitalReportAnalyzer = () => {
 
   const deleteHistoryItem = async (id) => {
     try {
-      const response = await fetch(`${apiBase}/api/hospital-report-history/${id}`, {
+      const response = await fetch(`${API_BASE}/api/hospital-report-history/${id}`, {
         method: 'DELETE',
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       });
@@ -213,22 +309,15 @@ const HospitalReportAnalyzer = () => {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 to-green-50 p-6 mt-24">
+    <div className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-violet-50 p-6 mt-24">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-emerald-100">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h1 className="text-3xl font-bold text-gray-800">
-              🏥 {getPrescriptionText('hospitalReportAnalyzer', language)}
+            <h1 className="inline-flex items-center gap-2 text-3xl font-bold text-emerald-900">
+              <LocalHospitalIcon fontSize="large" />
+              {stripLeadingEmoji(getPrescriptionText('hospitalReportAnalyzer', language))}
             </h1>
-            <button
-              onClick={() => setIsMuted(prev => !prev)}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                isMuted ? 'bg-gray-200 text-gray-700' : 'bg-green-100 text-green-800'
-              }`}
-            >
-              {isMuted ? `🔇 ${getPrescriptionText('muted', language)}` : `🔊 ${getPrescriptionText('soundOn', language)}`}
-            </button>
           </div>
           <p className="text-gray-600 mt-2">
             {getPrescriptionText('uploadTypedPrintedReport', language)}
@@ -237,14 +326,14 @@ const HospitalReportAnalyzer = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Upload Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">📤 {getPrescriptionText('uploadReport', language)}</h2>
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-emerald-100">
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-emerald-900 mb-4"><CloudUploadIcon />{stripLeadingEmoji(getPrescriptionText('uploadReport', language))}</h2>
 
             {/* Drag & Drop Area */}
             <div
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50 hover:bg-blue-100 transition cursor-pointer"
+              className="border-2 border-dashed border-emerald-300 rounded-lg p-8 text-center bg-emerald-50 hover:bg-emerald-100 transition cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
             >
               {imagePreview ? (
@@ -258,7 +347,9 @@ const HospitalReportAnalyzer = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="text-6xl">📄</div>
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-200 bg-white text-emerald-700 shadow-sm">
+                    <DescriptionIcon sx={{ fontSize: 36 }} />
+                  </div>
                   <p className="text-lg font-semibold text-gray-700">
                     {getPrescriptionText('dropReportHereOrClick', language)}
                   </p>
@@ -288,14 +379,17 @@ const HospitalReportAnalyzer = () => {
                     : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
-                {analyzing ? `🔄 ${getPrescriptionText('analyzingReport', language)}` : `🔍 ${getPrescriptionText('analyzeReport', language)}`}
+                <span className="inline-flex items-center gap-2">
+                  {analyzing ? <AutorenewIcon className="animate-spin" /> : <SearchIcon />}
+                  {analyzing ? getPrescriptionText('analyzingReport', language) : stripLeadingEmoji(getPrescriptionText('analyzeReport', language))}
+                </span>
               </button>
               {analyzing && (
                 <button
                   onClick={cancelAnalysis}
                   className="px-4 py-3 rounded-lg font-semibold bg-orange-500 text-white hover:bg-orange-600"
                 >
-                  ⏸️ {getPrescriptionText('stopAnalysis', language)}
+                  <span className="inline-flex items-center gap-2"><PauseCircleOutlineIcon />{stripLeadingEmoji(getPrescriptionText('stopAnalysis', language))}</span>
                 </button>
               )}
               {file && !analyzing && (
@@ -303,7 +397,7 @@ const HospitalReportAnalyzer = () => {
                   onClick={clearReport}
                   className="px-4 py-3 rounded-lg font-semibold bg-red-500 text-white hover:bg-red-600"
                 >
-                  ❌ {getPrescriptionText('clearReport', language)}
+                  <span className="inline-flex items-center gap-2"><ClearIcon />{stripLeadingEmoji(getPrescriptionText('clearReport', language))}</span>
                 </button>
               )}
             </div>
@@ -316,12 +410,12 @@ const HospitalReportAnalyzer = () => {
           </div>
 
           {/* Results Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">📊 {getPrescriptionText('analysisResults', language)}</h2>
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-violet-100">
+            <h2 className="inline-flex items-center gap-2 text-xl font-bold text-violet-900 mb-4"><AssessmentIcon />{stripLeadingEmoji(getPrescriptionText('analysisResults', language))}</h2>
 
             {analyzing && (
               <div className="bg-gray-100 rounded-lg p-4">
-                <p className="text-gray-600">🔄 {getPrescriptionText('analyzingReport', language)}...</p>
+                <p className="inline-flex items-center gap-2 text-gray-600"><AutorenewIcon className="animate-spin" />{getPrescriptionText('analyzingReport', language)}...</p>
               </div>
             )}
 
@@ -331,114 +425,390 @@ const HospitalReportAnalyzer = () => {
               </div>
             )}
 
-            {analysisResult && (
-              <div className="space-y-4">
-                {/* Extracted Text */}
-                {analysisResult.extracted_text && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-bold text-gray-800 mb-2">📝 {getPrescriptionText('extractedText', language)}</h3>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{analysisResult.extracted_text}</p>
-                  </div>
-                )}
+            {analysisResult && analysisResult.structured_data && (
+              <div className="mt-6">
+                {/* Professional Medical Report - Inline Display */}
+                <div className="bg-white rounded-xl shadow-lg p-8">
+                  {(() => {
+                    const data = analysisResult.structured_data || {};
+                    const hospital = data.hospital_details || {};
+                    const doctor = data.doctor_details || {};
+                    const patient = data.patient_details || {};
+                    const clinical = data.clinical_details || {};
+                    const medicines = data.medicines || [];
+                    const advice = data.medical_advice || {};
+                    
+                    const hasHospitalData = hospital.name || hospital.address || hospital.phone;
+                    const hasDoctorData = doctor.name || doctor.qualifications;
+                    const hasPatientData = patient.name || patient.patient_id || patient.age;
+                    const hasClinicalData = clinical.diagnosis || clinical.chief_complaints?.length > 0;
+                    const isIncompleteData = data.additional_information?.includes("regex fallback");
 
-                {/* Structured Data */}
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <h3 className="font-bold text-gray-800 mb-3">📊 {getPrescriptionText('structuredData', language)}</h3>
-
-                {/* Patient Information */}
-                {analysisResult.structured_data.patient && Object.keys(analysisResult.structured_data.patient).length > 0 && (
-                  <InfoCard title={`👤 ${getPrescriptionText('patientInfo', language)}`} data={analysisResult.structured_data.patient} onSpeak={speakSection} language={language} />
-                )}
-
-                {/* Test Results */}
-                {analysisResult.structured_data.test_results && Object.keys(analysisResult.structured_data.test_results).length > 0 && (
-                  <InfoCard title={`🧪 ${getPrescriptionText('testResults', language)}`} data={analysisResult.structured_data.test_results} onSpeak={speakSection} language={language} />
-                )}
-
-                {/* Medicines */}
-                {analysisResult.structured_data.medicines && analysisResult.structured_data.medicines.length > 0 && (
-                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-gray-800">💊 {getPrescriptionText('medicines', language)}</h3>
-                      <button
-                        onClick={() => speakSection(JSON.stringify(analysisResult.structured_data.medicines), getPrescriptionText('medicines', language))}
-                        className="p-2 bg-green-100 rounded hover:bg-green-200"
-                      >
-                        🔊
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {analysisResult.structured_data.medicines.map((med, idx) => {
-                        const medName = med.medicine_name || med.name || med.medicine || med.drug_name || med.item_name || '';
-                        const dosage = med.dosage || med.strength || med.dose || '';
-                        const frequency = med.frequency || med.freq || '';
-                        const duration = med.duration || med.days || '';
-                        const timing = med.timing || med.time || '';
-                        const instructions = med.special_instructions || med.instructions || med.note || '';
-
-                        return (
-                        <div key={idx} className="bg-white p-3 rounded border w-full">
-                          <div className="font-semibold text-gray-800 wrap-break-word whitespace-normal">
-                            {medName || getPrescriptionText('unnamedMedicine', language)}
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600 mt-2 wrap-break-word">
-                            {dosage && <div>💉 {dosage}</div>}
-                            {frequency && <div>📅 {frequency}</div>}
-                            {duration && <div>⏳ {duration}</div>}
-                            {timing && <div>🕐 {timing}</div>}
-                          </div>
-                          {instructions && (
-                            <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded">
-                              📝 {instructions}
+                    return (
+                      <>
+                        {/* Warning for Incomplete Data */}
+                        {isIncompleteData && (
+                          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg">
+                            <div className="flex items-start">
+                              <WarningAmberIcon className="mr-3 text-yellow-700" />
+                              <div>
+                                <h4 className="font-bold text-yellow-800 mb-1">Incomplete Data Extraction</h4>
+                                <p className="text-sm text-yellow-700">
+                                  Some details could not be extracted. Only medicine information is available. 
+                                  Please verify with the original prescription.
+                                </p>
+                              </div>
                             </div>
-                          )}
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-3 mb-6 no-print">
+                          <button
+                            onClick={() => {
+                              const sd = analysisResult.structured_data || {};
+                              const meds = sd.medicines || [];
+                              const diagnosis = sd.clinical_details?.diagnosis || '';
+                              const doctor = sd.doctor_details?.name || '';
+                              const patient = sd.patient_details?.name || '';
+                              const summary = [
+                                getPrescriptionText('analysisResults', language),
+                                patient ? `Patient ${patient}.` : '',
+                                doctor ? `Doctor ${doctor}.` : '',
+                                diagnosis ? `Diagnosis ${diagnosis}.` : '',
+                                meds.length > 0 ? `Total medicines ${meds.length}.` : 'No medicines extracted.',
+                              ].join(' ');
+                              speakText(summary);
+                            }}
+                            className="px-6 py-3 rounded-lg font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 transition"
+                          >
+                            <span className="inline-flex items-center gap-2">{isSpeaking ? <StopCircleIcon /> : <VolumeUpIcon />}{isSpeaking ? 'Stop' : 'Speak'}</span>
+                          </button>
+                          <button
+                            onClick={saveReport}
+                            disabled={savingReport}
+                            className={`px-6 py-3 rounded-lg font-semibold transition ${
+                              savingReport ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
+                            }`}
+                          >
+                            <span className="inline-flex items-center gap-2"><SaveIcon />{savingReport ? 'Saving...' : 'Save Report to History'}</span>
+                          </button>
                         </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                        
+                        {/* Header - Hospital Details */}
+                        {hasHospitalData && (
+                          <div className="text-center border-b-4 border-blue-600 pb-6 mb-6">
+                            <h1 className="text-3xl font-bold text-blue-900 mb-2">
+                              {hospital.name || 'Medical Center'}
+                            </h1>
+                            {hospital.address && (
+                              <p className="text-gray-700 text-sm mb-1">{hospital.address}</p>
+                            )}
+                            <div className="flex justify-center gap-6 text-sm text-gray-600 mt-2">
+                              {hospital.phone && <span className="inline-flex items-center gap-1"><PhoneIcon sx={{ fontSize: 14 }} /> {hospital.phone}</span>}
+                              {hospital.email && <span className="inline-flex items-center gap-1"><EmailIcon sx={{ fontSize: 14 }} /> {hospital.email}</span>}
+                            </div>
+                            {hospital.timings && (
+                              <p className="text-xs text-gray-500 mt-2 inline-flex items-center gap-1">
+                                <AccessTimeIcon sx={{ fontSize: 14 }} /> {hospital.timings} {hospital.closed_days && `• ${hospital.closed_days}`}
+                              </p>
+                            )}
+                          </div>
+                        )}
 
-                {/* Medical Advice */}
-                {analysisResult.structured_data.medical_advice && Object.keys(analysisResult.structured_data.medical_advice).length > 0 && (
-                  <InfoCard
-                    title={`💡 ${getPrescriptionText('medicalAdvice', language)}`}
-                    data={analysisResult.structured_data.medical_advice}
-                    onSpeak={speakSection}
-                    language={language}
-                  />
-                )}
+                        {/* Doctor Details */}
+                        {hasDoctorData && (
+                          <div className="bg-violet-50 rounded-lg p-4 mb-6 border-l-4 border-violet-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-violet-900 mb-2 text-lg"><MedicalServicesIcon />Doctor Information</h3>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              {doctor.name && (
+                                <div>
+                                  <span className="text-gray-600">Name:</span>
+                                  <p className="font-semibold text-gray-900">{doctor.name}</p>
+                                </div>
+                              )}
+                              {doctor.qualifications && (
+                                <div>
+                                  <span className="text-gray-600">Qualifications:</span>
+                                  <p className="font-semibold text-gray-900">{doctor.qualifications}</p>
+                                </div>
+                              )}
+                              {doctor.specialization && (
+                                <div>
+                                  <span className="text-gray-600">Specialization:</span>
+                                  <p className="font-semibold text-gray-900">{doctor.specialization}</p>
+                                </div>
+                              )}
+                              {doctor.registration_number && (
+                                <div>
+                                  <span className="text-gray-600">Registration No:</span>
+                                  <p className="font-semibold text-gray-900">{doctor.registration_number}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
-                {/* Save Report Button - Below advice section */}
-                {analysisResult && (
-                  <div className="flex items-center justify-center">
-                    <button
-                      onClick={saveReport}
-                      disabled={savingReport}
-                      className={`px-6 py-3 rounded-lg font-semibold transition ${
-                        savingReport ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
-                    >
-                      {savingReport ? `💾 ${getPrescriptionText('saving', language)}` : `💾 ${getPrescriptionText('saveReportToHistory', language)}`}
-                    </button>
-                  </div>
-                )}
+                        {/* Patient Details */}
+                        {hasPatientData && (
+                          <div className="bg-emerald-50 rounded-lg p-4 mb-6 border-l-4 border-emerald-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-emerald-900 mb-2 text-lg"><PersonIcon />Patient Information</h3>
+                            <div className="grid grid-cols-3 gap-3 text-sm">
+                              {patient.name && (
+                                <div>
+                                  <span className="text-gray-600">Name:</span>
+                                  <p className="font-semibold text-gray-900">{patient.name}</p>
+                                </div>
+                              )}
+                              {patient.patient_id && (
+                                <div>
+                                  <span className="text-gray-600">Patient ID:</span>
+                                  <p className="font-semibold text-gray-900">{patient.patient_id}</p>
+                                </div>
+                              )}
+                              {patient.age && (
+                                <div>
+                                  <span className="text-gray-600">Age:</span>
+                                  <p className="font-semibold text-gray-900">{patient.age}</p>
+                                </div>
+                              )}
+                              {patient.gender && (
+                                <div>
+                                  <span className="text-gray-600">Gender:</span>
+                                  <p className="font-semibold text-gray-900">{patient.gender}</p>
+                                </div>
+                              )}
+                              {patient.mobile && (
+                                <div>
+                                  <span className="text-gray-600">Contact:</span>
+                                  <p className="font-semibold text-gray-900">{patient.mobile}</p>
+                                </div>
+                              )}
+                              {patient.visit_date && (
+                                <div>
+                                  <span className="text-gray-600">Visit Date:</span>
+                                  <p className="font-semibold text-gray-900">{patient.visit_date}</p>
+                                </div>
+                              )}
+                              {patient.address && (
+                                <div className="col-span-3">
+                                  <span className="text-gray-600">Address:</span>
+                                  <p className="font-semibold text-gray-900">{patient.address}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Clinical Details */}
+                        {hasClinicalData && (
+                          <div className="bg-violet-50 rounded-lg p-4 mb-6 border-l-4 border-violet-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-violet-900 mb-2 text-lg"><HealingIcon />Clinical Information</h3>
+                            
+                            {/* Vitals */}
+                            {(clinical.weight_kg || clinical.height_cm || clinical.bmi || clinical.blood_pressure) && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">VITAL SIGNS</p>
+                                <div className="grid grid-cols-4 gap-2 text-sm">
+                                  {clinical.weight_kg && (
+                                    <div className="bg-white p-2 rounded">
+                                      <span className="text-gray-600 text-xs">Weight:</span>
+                                      <p className="font-bold text-orange-700">{clinical.weight_kg} kg</p>
+                                    </div>
+                                  )}
+                                  {clinical.height_cm && (
+                                    <div className="bg-white p-2 rounded">
+                                      <span className="text-gray-600 text-xs">Height:</span>
+                                      <p className="font-bold text-orange-700">{clinical.height_cm} cm</p>
+                                    </div>
+                                  )}
+                                  {clinical.bmi && (
+                                    <div className="bg-white p-2 rounded">
+                                      <span className="text-gray-600 text-xs">BMI:</span>
+                                      <p className="font-bold text-orange-700">{clinical.bmi}</p>
+                                    </div>
+                                  )}
+                                  {clinical.blood_pressure && (
+                                    <div className="bg-white p-2 rounded">
+                                      <span className="text-gray-600 text-xs">BP:</span>
+                                      <p className="font-bold text-orange-700">{clinical.blood_pressure}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Complaints */}
+                            {clinical.chief_complaints && clinical.chief_complaints.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">CHIEF COMPLAINTS</p>
+                                <ul className="list-disc list-inside text-sm text-gray-800 bg-white p-2 rounded">
+                                  {clinical.chief_complaints.map((complaint, idx) => (
+                                    <li key={idx}>{complaint}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Diagnosis */}
+                            {clinical.diagnosis && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-600 mb-1">DIAGNOSIS</p>
+                                <p className="font-bold text-orange-900 bg-white p-2 rounded">{clinical.diagnosis}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Medicines - Most Important Section */}
+                        {medicines.length > 0 && (
+                          <div className="bg-emerald-50 rounded-lg p-4 mb-6 border-l-4 border-emerald-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-emerald-900 mb-3 text-lg"><MedicationIcon />Prescription</h3>
+                            <div className="space-y-3">
+                              {medicines.map((med, idx) => (
+                                <div key={idx} className="bg-white p-4 rounded-lg border border-red-200">
+                                  <div className="flex items-start gap-3">
+                                    <span className="bg-red-600 text-white font-bold rounded-full w-7 h-7 flex items-center justify-center text-sm shrink-0">
+                                      {med.serial_number || idx + 1}
+                                    </span>
+                                    <div className="flex-1">
+                                      <h4 className="font-bold text-gray-900 text-base mb-1">
+                                        {med.medicine_type && <span className="text-red-600">{med.medicine_type}. </span>}
+                                        {med.name}
+                                        {med.strength && <span className="text-gray-600 font-normal ml-2">{med.strength}</span>}
+                                      </h4>
+                                      
+                                      <div className="grid grid-cols-2 gap-2 text-sm mt-2">
+                                        {med.dosage && (
+                                          <div>
+                                            <span className="text-gray-600">Dosage:</span>
+                                            <p className="font-medium text-gray-900">{med.dosage}</p>
+                                          </div>
+                                        )}
+                                        {med.timing && (
+                                          <div>
+                                            <span className="text-gray-600">Timing:</span>
+                                            <p className="font-medium text-gray-900">{med.timing}</p>
+                                          </div>
+                                        )}
+                                        {med.frequency && (
+                                          <div>
+                                            <span className="text-gray-600">Frequency:</span>
+                                            <p className="font-medium text-gray-900">{med.frequency}</p>
+                                          </div>
+                                        )}
+                                        {med.duration && (
+                                          <div>
+                                            <span className="text-gray-600">Duration:</span>
+                                            <p className="font-medium text-gray-900">{med.duration}</p>
+                                          </div>
+                                        )}
+                                        {med.when_to_take && (
+                                          <div>
+                                            <span className="text-gray-600">When to take:</span>
+                                            <p className="font-medium text-gray-900">{med.when_to_take}</p>
+                                          </div>
+                                        )}
+                                        {med.total_quantity && (
+                                          <div>
+                                            <span className="text-gray-600">Total:</span>
+                                            <p className="font-medium text-gray-900">{med.total_quantity}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {med.instructions && (
+                                        <div className="mt-2 inline-flex items-start gap-1.5 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                          <InfoOutlinedIcon sx={{ fontSize: 14 }} /> {med.instructions}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Medical Advice */}
+                        {(advice.advice?.length > 0 || advice.dietary_restrictions || advice.precautions || advice.follow_up_date) && (
+                          <div className="bg-violet-50 rounded-lg p-4 mb-6 border-l-4 border-violet-600">
+                            <h3 className="inline-flex items-center gap-2 font-bold text-violet-900 mb-2 text-lg"><NoteAltIcon />Medical Advice & Instructions</h3>
+                            
+                            {advice.advice && advice.advice.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">GENERAL ADVICE</p>
+                                <ul className="list-disc list-inside text-sm text-gray-800 space-y-1">
+                                  {advice.advice.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {advice.dietary_restrictions && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">DIETARY RESTRICTIONS</p>
+                                <p className="text-sm text-gray-800">{advice.dietary_restrictions}</p>
+                              </div>
+                            )}
+
+                            {advice.precautions && (
+                              <div className="mb-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-1">PRECAUTIONS</p>
+                                <p className="text-sm text-gray-800">{advice.precautions}</p>
+                              </div>
+                            )}
+
+                            {advice.follow_up_date && (
+                              <div className="bg-purple-100 p-2 rounded">
+                                <p className="text-xs font-semibold text-gray-600">FOLLOW UP</p>
+                                <p className="font-bold text-purple-900">{advice.follow_up_date}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="border-t-2 border-gray-300 pt-4 mt-6 text-center">
+                          <p className="text-xs text-gray-500 mb-1">
+                            This is an AI-assisted analysis of the medical document. Please verify all information with the original prescription.
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
-            </div>
             )}
           </div>
         </div>
 
+        <style jsx>{`
+          @media print {
+            .no-print {
+              display: none !important;
+            }
+            body {
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+            }
+          }
+        `}</style>
+
         {/* History Section */}
         <div className="mt-8">
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-violet-100">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">📚 {getPrescriptionText('reportHistory', language)}</h2>
+              <h2 className="inline-flex items-center gap-2 text-xl font-bold text-violet-900"><HistoryIcon />{stripLeadingEmoji(getPrescriptionText('reportHistory', language))}</h2>
               <button
                 onClick={refreshHistory}
                 className="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
               >
-                🔄 {getPrescriptionText('refresh', language)}
+                <span className="inline-flex items-center gap-1"><RefreshIcon sx={{ fontSize: 16 }} />{stripLeadingEmoji(getPrescriptionText('refresh', language))}</span>
               </button>
             </div>
 
@@ -467,43 +837,143 @@ const HospitalReportAnalyzer = () => {
                     </div>
                     <div className="flex gap-2">
                       <button
+                        onClick={() => {
+                          const medsCount = (item.structured_data?.medicines || []).length;
+                          const diagnosis = item.structured_data?.clinical_details?.diagnosis || '';
+                          const title = item.report_title || item.uploaded_file || 'Hospital report';
+                          speakText(`${title}. ${diagnosis ? `Diagnosis: ${diagnosis}.` : ''} ${getPrescriptionText('medicines', language)}: ${medsCount}.`);
+                        }}
+                        className="px-3 py-2 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 text-sm"
+                      >
+                        {isSpeaking ? <StopCircleIcon sx={{ fontSize: 18 }} /> : <VolumeUpIcon sx={{ fontSize: 18 }} />}
+                      </button>
+                      <button
                         onClick={() => setExpandedHistoryId(expandedHistoryId === item.id ? null : item.id)}
                         className="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
                       >
-                        {expandedHistoryId === item.id ? `▲ ${getPrescriptionText('hideDetails', language)}` : `▼ ${getPrescriptionText('viewDetails', language)}`}
+                        <span className="inline-flex items-center gap-1">{expandedHistoryId === item.id ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}{expandedHistoryId === item.id ? stripLeadingEmoji(getPrescriptionText('hideDetails', language)) : stripLeadingEmoji(getPrescriptionText('viewDetails', language))}</span>
                       </button>
                       <button
                         onClick={() => deleteHistoryItem(item.id)}
                         className="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
                       >
-                        🗑️ {getPrescriptionText('deleteReport', language)}
+                        <span className="inline-flex items-center gap-1"><DeleteOutlineIcon sx={{ fontSize: 16 }} />{stripLeadingEmoji(getPrescriptionText('deleteReport', language))}</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Expanded Details */}
                   {expandedHistoryId === item.id && (
-                    <div className="mt-4 space-y-3">
-                      {/* Patient Information */}
-                      {item.structured_data.patient && Object.keys(item.structured_data.patient).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`👤 ${getPrescriptionText('patientInfo', language)}`}
-                          data={item.structured_data.patient}
-                        />
+                    <div className="mt-4 space-y-3 bg-white p-4 rounded-lg border border-gray-200">
+                      {/* Hospital Details */}
+                      {item.structured_data?.hospital_details && Object.values(item.structured_data.hospital_details).some(v => v) && (
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <h4 className="inline-flex items-center gap-2 font-bold text-blue-900 mb-2"><LocalHospitalIcon sx={{ fontSize: 18 }} />Hospital Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.hospital_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.hospital_details.name}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.address && (
+                              <div className="col-span-2"><span className="text-gray-600">Address:</span> <span className="font-semibold">{item.structured_data.hospital_details.address}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.phone && (
+                              <div><span className="text-gray-600">Phone:</span> <span className="font-semibold">{item.structured_data.hospital_details.phone}</span></div>
+                            )}
+                            {item.structured_data.hospital_details.timings && (
+                              <div><span className="text-gray-600">Timings:</span> <span className="font-semibold">{item.structured_data.hospital_details.timings}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
 
-                      {/* Test Results */}
-                      {item.structured_data.test_results && Object.keys(item.structured_data.test_results).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`🧪 ${getPrescriptionText('testResults', language)}`}
-                          data={item.structured_data.test_results}
-                        />
+                      {/* Doctor Details */}
+                      {item.structured_data?.doctor_details && Object.values(item.structured_data.doctor_details).some(v => v) && (
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <h4 className="inline-flex items-center gap-2 font-bold text-blue-900 mb-2"><MedicalServicesIcon sx={{ fontSize: 18 }} />Doctor Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.doctor_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.doctor_details.name}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.qualifications && (
+                              <div><span className="text-gray-600">Qualifications:</span> <span className="font-semibold">{item.structured_data.doctor_details.qualifications}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.specialization && (
+                              <div><span className="text-gray-600">Specialization:</span> <span className="font-semibold">{item.structured_data.doctor_details.specialization}</span></div>
+                            )}
+                            {item.structured_data.doctor_details.registration_number && (
+                              <div><span className="text-gray-600">Registration:</span> <span className="font-semibold">{item.structured_data.doctor_details.registration_number}</span></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Patient Information */}
+                      {item.structured_data?.patient_details && Object.values(item.structured_data.patient_details).some(v => v) && (
+                        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                          <h4 className="inline-flex items-center gap-2 font-bold text-green-900 mb-2"><PersonIcon sx={{ fontSize: 18 }} />Patient Information</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {item.structured_data.patient_details.name && (
+                              <div><span className="text-gray-600">Name:</span> <span className="font-semibold">{item.structured_data.patient_details.name}</span></div>
+                            )}
+                            {item.structured_data.patient_details.patient_id && (
+                              <div><span className="text-gray-600">Patient ID:</span> <span className="font-semibold">{item.structured_data.patient_details.patient_id}</span></div>
+                            )}
+                            {item.structured_data.patient_details.age && (
+                              <div><span className="text-gray-600">Age:</span> <span className="font-semibold">{item.structured_data.patient_details.age}</span></div>
+                            )}
+                            {item.structured_data.patient_details.gender && (
+                              <div><span className="text-gray-600">Gender:</span> <span className="font-semibold">{item.structured_data.patient_details.gender}</span></div>
+                            )}
+                            {item.structured_data.patient_details.mobile && (
+                              <div><span className="text-gray-600">Contact:</span> <span className="font-semibold">{item.structured_data.patient_details.mobile}</span></div>
+                            )}
+                            {item.structured_data.patient_details.visit_date && (
+                              <div><span className="text-gray-600">Visit Date:</span> <span className="font-semibold">{item.structured_data.patient_details.visit_date}</span></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Clinical Details */}
+                      {item.structured_data?.clinical_details && Object.values(item.structured_data.clinical_details).some(v => v && v.length > 0) && (
+                        <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                          <h4 className="inline-flex items-center gap-2 font-bold text-orange-900 mb-2"><HealingIcon sx={{ fontSize: 18 }} />Clinical Information</h4>
+                          <div className="text-xs space-y-2">
+                            {(item.structured_data.clinical_details.weight_kg || item.structured_data.clinical_details.height_cm || item.structured_data.clinical_details.bmi || item.structured_data.clinical_details.blood_pressure) && (
+                              <div className="grid grid-cols-4 gap-2">
+                                {item.structured_data.clinical_details.weight_kg && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">Weight:</span> <span className="font-bold">{item.structured_data.clinical_details.weight_kg} kg</span></div>
+                                )}
+                                {item.structured_data.clinical_details.height_cm && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">Height:</span> <span className="font-bold">{item.structured_data.clinical_details.height_cm} cm</span></div>
+                                )}
+                                {item.structured_data.clinical_details.bmi && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">BMI:</span> <span className="font-bold">{item.structured_data.clinical_details.bmi}</span></div>
+                                )}
+                                {item.structured_data.clinical_details.blood_pressure && (
+                                  <div className="bg-white p-2 rounded"><span className="text-gray-600">BP:</span> <span className="font-bold">{item.structured_data.clinical_details.blood_pressure}</span></div>
+                                )}
+                              </div>
+                            )}
+                            {item.structured_data.clinical_details.chief_complaints && item.structured_data.clinical_details.chief_complaints.length > 0 && (
+                              <div>
+                                <span className="font-semibold text-gray-700">Complaints:</span>
+                                <ul className="list-disc list-inside text-gray-600 mt-1">
+                                  {item.structured_data.clinical_details.chief_complaints.map((c, i) => <li key={i}>{c}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {item.structured_data.clinical_details.diagnosis && (
+                              <div><span className="text-gray-600">Diagnosis:</span> <span className="font-bold text-orange-900">{item.structured_data.clinical_details.diagnosis}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
 
                       {/* Medicines */}
                       {item.structured_data.medicines && item.structured_data.medicines.length > 0 && (
                         <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                          <h4 className="font-bold text-gray-800 mb-2">💊 {getPrescriptionText('medicines', language)}</h4>
+                          <h4 className="inline-flex items-center gap-2 font-bold text-gray-800 mb-2"><MedicationIcon sx={{ fontSize: 18 }} />{stripLeadingEmoji(getPrescriptionText('medicines', language))}</h4>
                           <div className="space-y-2">
                             {item.structured_data.medicines.map((med, idx) => {
                               const medName = med.medicine_name || med.name || med.medicine || med.drug_name || med.item_name || '';
@@ -519,14 +989,14 @@ const HospitalReportAnalyzer = () => {
                                     {medName || getPrescriptionText('unnamedMedicine', language)}
                                   </div>
                                   <div className="grid grid-cols-2 gap-2 text-gray-600 mt-2 text-xs">
-                                    {dosage && <div>💉 {dosage}</div>}
-                                    {frequency && <div>📅 {frequency}</div>}
-                                    {duration && <div>⏳ {duration}</div>}
-                                    {timing && <div>🕐 {timing}</div>}
+                                    {dosage && <div>Dosage: {dosage}</div>}
+                                    {frequency && <div>Frequency: {frequency}</div>}
+                                    {duration && <div>Duration: {duration}</div>}
+                                    {timing && <div>Timing: {timing}</div>}
                                   </div>
                                   {instructions && (
-                                    <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded">
-                                      📝 {instructions}
+                                    <div className="mt-2 inline-flex items-start gap-1.5 text-xs text-blue-700 bg-blue-50 p-2 rounded">
+                                      <NoteAltIcon sx={{ fontSize: 14 }} /> {instructions}
                                     </div>
                                   )}
                                 </div>
@@ -537,11 +1007,25 @@ const HospitalReportAnalyzer = () => {
                       )}
 
                       {/* Medical Advice */}
-                      {item.structured_data.medical_advice && Object.keys(item.structured_data.medical_advice).length > 0 && (
-                        <ExpandedInfoSection
-                          title={`💡 ${getPrescriptionText('medicalAdvice', language)}`}
-                          data={item.structured_data.medical_advice}
-                        />
+                      {item.structured_data?.medical_advice && (item.structured_data.medical_advice.advice?.length > 0 || item.structured_data.medical_advice.precautions || item.structured_data.medical_advice.follow_up_date) && (
+                        <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                          <h4 className="inline-flex items-center gap-2 font-bold text-purple-900 mb-2"><NoteAltIcon sx={{ fontSize: 18 }} />Medical Advice</h4>
+                          <div className="text-xs space-y-2">
+                            {item.structured_data.medical_advice.advice && item.structured_data.medical_advice.advice.length > 0 && (
+                              <div>
+                                <ul className="list-disc list-inside text-gray-700">
+                                  {item.structured_data.medical_advice.advice.map((a, i) => <li key={i}>{a}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {item.structured_data.medical_advice.precautions && (
+                              <div><span className="text-gray-600">Precautions:</span> <span className="font-semibold">{item.structured_data.medical_advice.precautions}</span></div>
+                            )}
+                            {item.structured_data.medical_advice.follow_up_date && (
+                              <div><span className="text-gray-600">Follow Up:</span> <span className="font-bold text-purple-900">{item.structured_data.medical_advice.follow_up_date}</span></div>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}
@@ -569,7 +1053,7 @@ const InfoCard = ({ title, data, onSpeak, language }) => {
           onClick={() => onSpeak(dataString, title)}
           className="p-2 bg-blue-100 rounded hover:bg-blue-200"
         >
-          🔊
+          <VolumeUpIcon sx={{ fontSize: 18 }} />
         </button>
       </div>
       <div className="space-y-1 text-sm">

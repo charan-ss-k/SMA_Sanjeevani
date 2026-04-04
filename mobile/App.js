@@ -9,6 +9,7 @@ import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ChatProvider } from './src/context/ChatContext';
 import { HealthProvider } from './src/context/HealthContext';
+import { LanguageProvider } from './src/context/LanguageContext';
 import { AppHeader } from './src/components';
 import ttsService from './src/services/ttsService';
 import { colors } from './src/utils/theme';
@@ -141,21 +142,26 @@ const TabScreen = () => (
   <RootTab.Navigator
     screenOptions={{
       headerShown: false,
-      tabBarActiveTintColor: '#15803d', // Green-700 (matching header)
-      tabBarInactiveTintColor: '#9CA3AF', // Gray-400
-      tabBarShowLabel: false, // Hide labels, only show icons
+      tabBarActiveTintColor: '#15803d',
+      tabBarInactiveTintColor: '#94A3B8',
+      tabBarShowLabel: true,
+      tabBarLabelStyle: {
+        fontSize: 11,
+        fontWeight: '700',
+        paddingBottom: 2,
+      },
       tabBarStyle: {
-        backgroundColor: '#fef3c7', // Amber-100 (matching header)
-        borderTopColor: '#fcd34d', // Amber-300 border
+        backgroundColor: '#fef3c7',
+        borderTopColor: '#fcd34d',
         borderTopWidth: 1,
-        height: 65,
+        height: 72,
         paddingTop: 8,
-        paddingBottom: 8,
-        shadowColor: '#000',
+        paddingBottom: 10,
+        shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3.84,
-        elevation: 5,
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 10,
       },
     }}
   >
@@ -163,8 +169,9 @@ const TabScreen = () => (
       name="HomeTab"
       component={HomeStackScreen}
       options={{
+        tabBarLabel: 'Home',
         tabBarIcon: ({ color, size }) => (
-          <Ionicons name="home" size={28} color={color} />
+          <Ionicons name="home" size={24} color={color} />
         ),
       }}
     />
@@ -172,8 +179,9 @@ const TabScreen = () => (
       name="MedicineTab"
       component={MedicineStackScreen}
       options={{
+        tabBarLabel: 'Health',
         tabBarIcon: ({ color, size }) => (
-          <FontAwesome5 name="pills" size={24} color={color} />
+          <FontAwesome5 name="pills" size={20} color={color} />
         ),
       }}
     />
@@ -181,8 +189,9 @@ const TabScreen = () => (
       name="ChatTab"
       component={ChatStackScreen}
       options={{
+        tabBarLabel: 'Assistant',
         tabBarIcon: ({ color, size }) => (
-          <Ionicons name="chatbubbles" size={28} color={color} />
+          <Ionicons name="chatbubbles" size={23} color={color} />
         ),
       }}
     />
@@ -190,8 +199,9 @@ const TabScreen = () => (
       name="ConsultTab"
       component={ConsultStackScreen}
       options={{
+        tabBarLabel: 'Consult',
         tabBarIcon: ({ color, size }) => (
-          <FontAwesome5 name="user-md" size={24} color={color} />
+          <FontAwesome5 name="user-md" size={20} color={color} />
         ),
       }}
     />
@@ -199,8 +209,9 @@ const TabScreen = () => (
       name="PrescriptionTab"
       component={PrescriptionScreen}
       options={{
+        tabBarLabel: 'Reports',
         tabBarIcon: ({ color, size }) => (
-          <FontAwesome5 name="file-prescription" size={24} color={color} />
+          <FontAwesome5 name="file-prescription" size={20} color={color} />
         ),
       }}
     />
@@ -254,13 +265,15 @@ export default function App() {
   return (
     <NavigationContainer>
       <SafeAreaProvider>
-        <AuthProvider>
-          <ChatProvider>
-            <HealthProvider>
-              <RootNavigator />
-            </HealthProvider>
-          </ChatProvider>
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ChatProvider>
+              <HealthProvider>
+                <RootNavigator />
+              </HealthProvider>
+            </ChatProvider>
+          </AuthProvider>
+        </LanguageProvider>
       </SafeAreaProvider>
     </NavigationContainer>
   );
