@@ -6,8 +6,12 @@ Separate endpoint from handwritten prescription analysis
 from fastapi import APIRouter, File, UploadFile, HTTPException, status, Depends
 from typing import Dict, Any
 import logging
+import os
+import io
 import tempfile
 import cv2
+import numpy as np
+from PIL import Image
 
 from app.core.middleware import get_current_user_optional
 from app.models.models import User
@@ -81,20 +85,38 @@ async def analyze_hospital_report(
                 detail="File too small. Please upload a complete hospital report image"
             )
         
-        # Save temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as tmp:
-            tmp.write(file_content)
+        # Validate image by decoding bytes directly.
+        # If OpenCV fails (some encodings), transcode via Pillow to normalized JPEG.
+        image_array = np.frombuffer(file_content, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+
+        normalized_bytes = file_content
+        file_extension = os.path.splitext(file.filename)[1].lower()
+
+        if image is None:
+            try:
+                pil_image = Image.open(io.BytesIO(file_content)).convert("RGB")
+                image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+                ok, encoded = cv2.imencode('.jpg', image)
+                if not ok:
+                    raise ValueError("Failed to encode normalized JPEG")
+                normalized_bytes = encoded.tobytes()
+                file_extension = '.jpg'
+                logger.info("Transcoded upload via Pillow fallback for hospital-reports analyze")
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid image file. Please upload a valid image"
+                )
+
+        if file_extension not in {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff'}:
+            file_extension = '.jpg'
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp:
+            tmp.write(normalized_bytes)
             temp_file_path = tmp.name
         
         logger.debug(f"Temporary file saved: {temp_file_path}")
-        
-        # Verify it's a valid image
-        image = cv2.imread(temp_file_path)
-        if image is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid image file. Please upload a valid image"
-            )
         
         logger.debug(f"Image validated. Size: {image.shape}")
         
@@ -134,7 +156,6 @@ async def analyze_hospital_report(
     finally:
         # Clean up temporary file
         if temp_file_path:
-            import os
             try:
                 if os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
