@@ -8,5 +8,4 @@ export default defineConfig({
     react(),
     tailwindcss()
   ]
-  // Proxy removed - frontend now connects directly to Azure VM via window.__API_BASE__
 })
