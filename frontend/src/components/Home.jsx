@@ -9,6 +9,7 @@ import remainderIcon from '../assets/remainder.png';
 import DashboardAppointments from './DashboardAppointments';
 import DashboardAnalytics from './DashboardAnalytics';
 import AppDownloadBanner from './AppDownloadBanner';
+import AuthModal from './AuthModal';
 import LocalHospitalRoundedIcon from '@mui/icons-material/LocalHospitalRounded';
 import WavingHandRoundedIcon from '@mui/icons-material/WavingHandRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
@@ -23,6 +24,7 @@ import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded';
 const Home = () => {
   const { language } = useContext(LanguageContext);
   const { isAuthenticated, user } = useContext(AuthContext);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   
   const slides = [
     { titleKey: 'scanMedicine', bg: 'bg-gradient-to-br from-emerald-100 via-white to-teal-100' },
@@ -270,7 +272,7 @@ const Home = () => {
                   <p className="text-lg mb-4">
 {t('getStartedDesc', language)}
                   </p>
-                  <button onClick={() => window.location.href = '#'} className="inline-block bg-amber-300 hover:bg-amber-200 text-emerald-950 font-bold px-6 py-3 rounded-xl transition">
+                  <button onClick={() => setShowAuthModal(true)} className="inline-block bg-amber-300 hover:bg-amber-200 text-emerald-950 font-bold px-6 py-3 rounded-xl transition">
                     <span className="inline-flex items-center gap-2">
                       <LockRoundedIcon fontSize="small" />
                       {t('loginToContinue', language)}
@@ -382,6 +384,13 @@ const Home = () => {
       <style>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
       `}</style>
+
+      {showAuthModal && (
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+        />
+      )}
     </div>
   );
 };

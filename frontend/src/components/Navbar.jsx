@@ -23,7 +23,16 @@ const Navbar = ({ language, onLanguageChange }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const langContext = { language };
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     setShowUserMenu(false);
@@ -75,51 +84,54 @@ const Navbar = ({ language, onLanguageChange }) => {
           </div>
 
           {/* Desktop Navigation */}
-          <ul className="hidden lg:flex items-center space-x-1 text-base font-medium">
-            {primaryNavLinks.map((item) => (
-              <li key={item.to}>
-                <Link to={item.to} className={`${getLinkClass(item.to)} inline-flex items-center`}>
-                  <img src={item.icon} alt={item.alt} className="h-5 w-5 mr-1 shrink-0" />
-                  <span>{item.label}</span>
-                </Link>
+          {!isMobile && (
+            <ul className="flex items-center space-x-1 text-base font-medium">
+              {primaryNavLinks.map((item) => (
+                <li key={item.to}>
+                  <Link to={item.to} className={`${getLinkClass(item.to)} inline-flex items-center`}>
+                    <img src={item.icon} alt={item.alt} className="h-5 w-5 mr-1 shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                </li>
+              ))}
+
+              <li className="relative">
+                <button
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  className={`${
+                    secondaryNavLinks.some((item) => item.to === location.pathname)
+                      ? 'text-green-800 font-semibold'
+                      : 'text-green-800 hover:text-green-900'
+                  } hover:bg-amber-50 rounded-md px-3 py-2 flex items-center gap-1 transition-all duration-200`}
+                >
+                  ⋯ {t('more', language)}
+                  <span className="text-xs">▾</span>
+                </button>
+
+                {showMoreMenu && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                    {secondaryNavLinks.map((item, index) => (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        className={`px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors flex items-center ${
+                          index < secondaryNavLinks.length - 1 ? 'border-b border-gray-100' : 'rounded-b-lg'
+                        }`}
+                        onClick={() => setShowMoreMenu(false)}
+                      >
+                        <img src={item.icon} alt={item.alt} className="h-5 w-5 mr-2 shrink-0" />
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </li>
-            ))}
-
-            <li className="relative">
-              <button
-                onClick={() => setShowMoreMenu(!showMoreMenu)}
-                className={`${
-                  secondaryNavLinks.some((item) => item.to === location.pathname)
-                    ? 'text-green-800 font-semibold'
-                    : 'text-green-800 hover:text-green-900'
-                } hover:bg-amber-50 rounded-md px-3 py-2 flex items-center gap-1 transition-all duration-200`}
-              >
-                ⋯ {t('more', language)}
-                <span className="text-xs">▾</span>
-              </button>
-
-              {showMoreMenu && (
-                <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                  {secondaryNavLinks.map((item, index) => (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={`px-4 py-3 text-green-800 hover:bg-amber-50 transition-colors flex items-center ${
-                        index < secondaryNavLinks.length - 1 ? 'border-b border-gray-100' : 'rounded-b-lg'
-                      }`}
-                      onClick={() => setShowMoreMenu(false)}
-                    >
-                      <img src={item.icon} alt={item.alt} className="h-5 w-5 mr-2 shrink-0" />
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </li>
-          </ul>
+            </ul>
+          )}
 
           {/* Desktop auth controls */}
-          <div className="hidden lg:flex items-center space-x-4">
+          {!isMobile && (
+            <div className="flex items-center space-x-4">
             <LanguageSwitcher currentLanguage={language} onLanguageChange={onLanguageChange} />
 
             {isAuthenticated ? (
@@ -159,9 +171,11 @@ const Navbar = ({ language, onLanguageChange }) => {
               </button>
             )}
           </div>
+          )}
 
           {/* Mobile controls */}
-          <div className="flex lg:hidden items-center gap-2">
+          {isMobile && (
+            <div className="flex items-center gap-2">
             <button
               onClick={() => setMobileMenuOpen((prev) => !prev)}
               aria-label="Toggle menu"
@@ -176,10 +190,11 @@ const Navbar = ({ language, onLanguageChange }) => {
               </svg>
             </button>
           </div>
+          )}
 
           {/* Mobile menu panel */}
-          {mobileMenuOpen && (
-            <div className="absolute top-full left-0 right-0 border-t border-amber-200 bg-amber-50 shadow-lg lg:hidden max-h-[calc(100vh-4.5rem)] overflow-y-auto">
+          {isMobile && mobileMenuOpen && (
+            <div className="absolute top-full left-0 right-0 border-t border-amber-200 bg-amber-50 shadow-lg md:hidden max-h-[calc(100vh-4.5rem)] overflow-y-auto">
               <div className="container mx-auto px-3 py-3">
                 <div className="mb-3">
                   <LanguageSwitcher currentLanguage={language} onLanguageChange={onLanguageChange} />
