@@ -48,6 +48,16 @@ const HospitalReportAnalyzer = () => {
   const abortControllerRef = useRef(null);
   const stripLeadingEmoji = (value = '') => value.replace(/^\p{Extended_Pictographic}+\s*/u, '').trim();
 
+  const parseResponseData = async (response) => {
+    const raw = await response.text();
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { detail: raw, message: raw, raw };
+    }
+  };
+
   const speakText = async (text) => {
     if (!text || !text.trim()) return;
 
@@ -75,7 +85,7 @@ const HospitalReportAnalyzer = () => {
         const response = await fetch(`${API_BASE}/api/hospital-report-history`, {
           headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         });
-        const data = await response.json();
+        const data = await parseResponseData(response);
         if (response.ok) {
           setHistoryItems(data);
         }
@@ -144,12 +154,12 @@ const HospitalReportAnalyzer = () => {
         signal: abortControllerRef.current.signal,
       });
 
+      const result = await parseResponseData(response);
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || data.message || 'Analysis failed');
+        throw new Error(result.detail || result.message || 'Analysis failed');
       }
 
-      const result = await response.json();
       setAnalysisResult(result);
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -184,7 +194,7 @@ const HospitalReportAnalyzer = () => {
       const response = await fetch(`${API_BASE}/api/hospital-report-history`, {
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       });
-      const data = await response.json();
+      const data = await parseResponseData(response);
       if (response.ok) {
         setHistoryItems(data);
       }
@@ -222,12 +232,12 @@ const HospitalReportAnalyzer = () => {
         body: JSON.stringify(payload)
       });
 
+      const saved = await parseResponseData(response);
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || data.message || 'Failed to save report');
+        throw new Error(saved.detail || saved.message || 'Failed to save report');
       }
 
-      const saved = await response.json();
       setHistoryItems(prev => [saved, ...prev]);
     } catch (e) {
       console.error('Save report failed:', e);
@@ -612,7 +622,7 @@ const HospitalReportAnalyzer = () => {
                               {medicines.map((med, idx) => (
                                 <div key={idx} className="bg-white p-4 rounded-lg border border-red-200">
                                   <div className="flex items-start gap-3">
-                                    <span className="bg-red-600 text-white font-bold rounded-full w-7 h-7 flex items-center justify-center text-sm flex-shrink-0">
+                                    <span className="bg-red-600 text-white font-bold rounded-full w-7 h-7 flex items-center justify-center text-sm shrink-0">
                                       {med.serial_number || idx + 1}
                                     </span>
                                     <div className="flex-1">
