@@ -349,10 +349,10 @@ class HospitalReportAnalyzer:
         
         from app.services.medical_document_parser import MedicalDocumentParser
         
-        # Use high-accuracy parser with longer timeout
+        # Single pass LLM call (extraction already tried multiple OCR methods)
         parsed_data = MedicalDocumentParser.parse_hospital_report_accurate(
             extracted_text,
-            max_retries=5,
+            max_retries=1,
             timeout=120  # 2 minutes for accurate parsing
         )
         

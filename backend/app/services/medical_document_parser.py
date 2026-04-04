@@ -20,10 +20,10 @@ class MedicalDocumentParser:
     """
     
     @staticmethod
-    def parse_hospital_report_accurate(extracted_text: str, max_retries: int = 5, timeout: int = 120) -> Dict[str, Any]:
+    def parse_hospital_report_accurate(extracted_text: str, max_retries: int = 1, timeout: int = 120) -> Dict[str, Any]:
         """
         Parse hospital report with maximum accuracy.
-        Allows more time for better results.
+        Single LLM pass (extraction already completed multiple OCR attempts).
         """
         logger.info("🧠 HIGH ACCURACY MODE: Parsing hospital report with detailed extraction...")
         
@@ -32,8 +32,8 @@ class MedicalDocumentParser:
         try:
             from app.services.enhanced_medicine_llm_generator import EnhancedMedicineLLMGenerator
             
-            # Call LLM with increased timeout for accuracy
-            logger.info(f"📞 Calling LLM (timeout: {timeout}s, retries: {max_retries})...")
+            # Single LLM call for parsing (no excessive retries)
+            logger.info(f"📞 Calling LLM (timeout: {timeout}s, single pass)...")
             response_text = EnhancedMedicineLLMGenerator._call_llm_with_retry(
                 prompt,
                 max_retries=max_retries,
@@ -66,9 +66,10 @@ class MedicalDocumentParser:
             return MedicalDocumentParser._parse_with_regex(extracted_text)
     
     @staticmethod
-    def parse_handwritten_prescription_accurate(extracted_text: str, max_retries: int = 5, timeout: int = 120) -> Dict[str, Any]:
+    def parse_handwritten_prescription_accurate(extracted_text: str, max_retries: int = 1, timeout: int = 120) -> Dict[str, Any]:
         """
         Parse handwritten prescription with maximum accuracy.
+        Single LLM pass (extraction already completed multiple OCR attempts).
         """
         logger.info("🧠 HIGH ACCURACY MODE: Parsing handwritten prescription...")
         
